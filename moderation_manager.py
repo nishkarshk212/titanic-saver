@@ -1,0 +1,88 @@
+import json
+import os
+
+WARNS_FILE = "group_warns.json"
+MUTERS_FILE = "group_muters.json"
+
+def load_data(file_path):
+    if os.path.exists(file_path):
+        try:
+            with open(file_path, "r") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+    return {}
+
+def save_data(file_path, data):
+    with open(file_path, "w") as f:
+        json.dump(data, f, indent=4)
+
+# Warning Functions
+def get_user_warns(chat_id, user_id):
+    warns_data = load_data(WARNS_FILE)
+    chat_id_str = str(chat_id)
+    user_id_str = str(user_id)
+    if chat_id_str in warns_data:
+        return warns_data[chat_id_str].get(user_id_str, 0)
+    return 0
+
+def add_warn(chat_id, user_id):
+    warns_data = load_data(WARNS_FILE)
+    chat_id_str = str(chat_id)
+    user_id_str = str(user_id)
+    if chat_id_str not in warns_data:
+        warns_data[chat_id_str] = {}
+    
+    current_warns = warns_data[chat_id_str].get(user_id_str, 0)
+    new_warns = current_warns + 1
+    warns_data[chat_id_str][user_id_str] = new_warns
+    save_data(WARNS_FILE, warns_data)
+    return new_warns
+
+def reset_warns(chat_id, user_id):
+    warns_data = load_data(WARNS_FILE)
+    chat_id_str = str(chat_id)
+    user_id_str = str(user_id)
+    if chat_id_str in warns_data and user_id_str in warns_data[chat_id_str]:
+        warns_data[chat_id_str][user_id_str] = 0
+        save_data(WARNS_FILE, warns_data)
+        return True
+    return False
+
+# Muter Functions
+def is_muter(chat_id, user_id):
+    muters_data = load_data(MUTERS_FILE)
+    chat_id_str = str(chat_id)
+    user_id_str = str(user_id)
+    if chat_id_str in muters_data:
+        return user_id_str in muters_data[chat_id_str]
+    return False
+
+def add_muter(chat_id, user_id):
+    muters_data = load_data(MUTERS_FILE)
+    chat_id_str = str(chat_id)
+    user_id_str = str(user_id)
+    if chat_id_str not in muters_data:
+        muters_data[chat_id_str] = []
+    
+    if user_id_str not in muters_data[chat_id_str]:
+        muters_data[chat_id_str].append(user_id_str)
+        save_data(MUTERS_FILE, muters_data)
+        return True
+    return False
+
+def remove_muter(chat_id, user_id):
+    muters_data = load_data(MUTERS_FILE)
+    chat_id_str = str(chat_id)
+    user_id_str = str(user_id)
+    if chat_id_str in muters_data and user_id_str in muters_data[chat_id_str]:
+        muters_data[chat_id_str].remove(user_id_str)
+        save_data(MUTERS_FILE, muters_data)
+        return True
+    return False
+
+def get_all_muters(chat_id):
+    """Returns a list of user IDs for all muters in a chat."""
+    muters_data = load_data(MUTERS_FILE)
+    chat_id_str = str(chat_id)
+    return muters_data.get(chat_id_str, [])

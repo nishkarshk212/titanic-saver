@@ -1,0 +1,122 @@
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler
+from telegram.constants import ParseMode
+from config import send_bot_response, edit_bot_response
+
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Main help command."""
+    keyboard = get_help_keyboard()
+    await send_bot_response(
+        update, context,
+        "📚 <b>Bot Help Menu</b>\n\n"
+        "Welcome to the help menu! Select a category below to see available commands and features.",
+        parse_mode=ParseMode.HTML,
+        reply_markup=keyboard
+    )
+
+def get_help_keyboard():
+    keyboard = [
+        [
+            InlineKeyboardButton("🛡️ Moderation", callback_data="help_mod"),
+            InlineKeyboardButton("⚙️ Settings", callback_data="help_settings")
+        ],
+        [
+            InlineKeyboardButton("👋 Welcome/Goodbye", callback_data="help_welcome"),
+            InlineKeyboardButton("🧹 Clean Service", callback_data="help_clean")
+        ],
+        [
+            InlineKeyboardButton("💣 Auto Delete", callback_data="help_auto"),
+            InlineKeyboardButton("🔍 Filters", callback_data="help_filters")
+        ],
+        [InlineKeyboardButton("❌ Close", callback_data="help_close")]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    data = query.data
+
+    if data == "help_close":
+        await query.message.delete()
+        await query.answer()
+        return
+
+    help_text = ""
+    if data == "help_mod":
+        help_text = (
+            "🛡️ <b>Moderation Commands</b>\n\n"
+            "• /ban - Ban a user (reply, ID, or @username)\n"
+            "• /unban - Unban a user\n"
+            "• /mute - Mute a user (prevents sending messages)\n"
+            "• /unmute - Unmute a user\n"
+            "• /warn - Give a user a warning\n"
+            "• /unwarn - Reset a user's warnings\n"
+            "• /promote - Promote a user to admin with custom perms\n"
+            "• /demote - Remove admin rights from a user\n"
+            "• /muter - Toggle 'Muter' role (can only mute/unmute)\n"
+            "• /unmuter - Remove 'Muter' role from a user"
+        )
+    elif data == "help_settings":
+        help_text = (
+            "⚙️ <b>Settings & Config</b>\n\n"
+            "• /settings - Open the interactive settings menu\n"
+            "• /id - Get your user ID and current chat ID\n\n"
+            "<i>Note: Only admins with 'Change Info' and 'Ban Users' can access settings.</i>"
+        )
+    elif data == "help_welcome":
+        help_text = (
+            "👋 <b>Welcome & Goodbye</b>\n\n"
+            "Configure these via /settings. Supports:\n"
+            "• HTML formatting\n"
+            "• Custom Media (Photos)\n"
+            "• Custom Buttons (Text | URL)\n"
+            "• Placeholders: {ID}, {NAME}, {USERNAME}, {MENTION}, etc."
+        )
+    elif data == "help_clean":
+        help_text = (
+            "🧹 <b>Clean Service</b>\n\n"
+            "Automatically deletes system messages:\n"
+            "• User Joined/Left\n"
+            "• Voice Chat Started/Ended/Scheduled/Invited\n"
+            "Enable specific types in /settings > Clean Service."
+        )
+    elif data == "help_auto":
+        help_text = (
+            "💣 <b>Auto Delete</b>\n\n"
+            "Automatically deletes every message in the group after a custom delay.\n"
+            "• Set delay (H/M/S) in /settings > Auto Delete.\n"
+            "• Toggle ON/OFF as needed."
+        )
+    elif data == "help_filters":
+        help_text = (
+            "🔍 <b>Filters (Auto-Reply)</b>\n\n"
+            "• /filter &lt;trigger&gt; &lt;reply&gt; - Set a custom auto-reply\n"
+            "• /filters - List all active filters\n"
+            "• /stop &lt;trigger&gt; - Remove a specific filter\n"
+            "• /stopall - Remove all filters in the chat"
+        )
+
+    keyboard = [[InlineKeyboardButton("🔙 Back", callback_data="help_main")]]
+    
+    if data == "help_main":
+        await edit_bot_response(
+            query, context,
+            "📚 <b>Bot Help Menu</b>\n\n"
+            "Welcome to the help menu! Select a category below to see available commands and features.",
+            parse_mode=ParseMode.HTML,
+            reply_markup=get_help_keyboard()
+        )
+    else:
+        await edit_bot_response(
+            query, context,
+            help_text,
+            parse_mode=ParseMode.HTML,
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    await query.answer()
+
+def get_help_handlers():
+    return [
+        CommandHandler("help", help_command),
+        CallbackQueryHandler(help_callback, pattern="^help_")
+    ]
