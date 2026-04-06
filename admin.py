@@ -75,25 +75,13 @@ async def promote_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 def get_promotion_keyboard(user_id, current_perms, back_to_info=False):
-    """Generate the keyboard with toggle buttons in 2 columns."""
+    """Generate the keyboard with toggle buttons in a single column."""
     keyboard = []
-    perm_items = list(PERMISSIONS_MAP.items())
     
-    # Create 2-column grid for permissions
-    for i in range(0, len(perm_items), 2):
-        row = []
-        # First column
-        key1, label1 = perm_items[i]
-        status1 = "✅" if current_perms.get(key1) else "❌"
-        row.append(InlineKeyboardButton(f"{label1}: {status1}", callback_data=f"toggle_{user_id}_{key1}"))
-        
-        # Second column (if exists)
-        if i + 1 < len(perm_items):
-            key2, label2 = perm_items[i+1]
-            status2 = "✅" if current_perms.get(key2) else "❌"
-            row.append(InlineKeyboardButton(f"{label2}: {status2}", callback_data=f"toggle_{user_id}_{key2}"))
-        
-        keyboard.append(row)
+    # Create single column for permissions
+    for key, label in PERMISSIONS_MAP.items():
+        status = "✅" if current_perms.get(key) else "❌"
+        keyboard.append([InlineKeyboardButton(f"{label}: {status}", callback_data=f"toggle_{user_id}_{key}")])
     
     keyboard.append([InlineKeyboardButton("Confirm Promotion", callback_data=f"confirm_{user_id}")])
     
