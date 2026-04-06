@@ -2,10 +2,80 @@ import logging
 import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
-from telegram.ext import ContextTypes, MessageHandler, filters, ChatMemberHandler
+from telegram.ext import ContextTypes, CommandHandler, MessageHandler, filters, ChatMemberHandler
 from config import OWNER_ID
-from settings_manager import get_chat_settings
+from settings_manager import get_chat_settings, update_chat_setting
 from welcome import format_welcome_message # Reuse the same formatter
+
+async def set_goodbye(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Set the goodbye message text."""
+    if not update.message: return
+    
+    # Check admin or owner
+    sender_id = update.effective_user.id
+    chat_id = update.effective_chat.id
+    
+    if sender_id != OWNER_ID:
+        member = await context.bot.get_chat_member(chat_id, sender_id)
+        if member.status not in ['administrator', 'creator']:
+            await update.message.reply_text("Admin only command.")
+            return
+
+    text = update.message.text.split(" ", 1)
+    if len(text) < 2:
+        await update.message.reply_text("Usage: /setgoodbye <goodbye message text>")
+        return
+
+    goodbye_text = text[1]
+    update_chat_setting(chat_id, "goodbye_text", goodbye_text)
+    await update.message.reply_text("Goodbye message text updated!")
+
+async def set_goodbye_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Set the goodbye message photo."""
+    if not update.message or not update.message.reply_to_message or not update.message.reply_to_message.photo:
+        await update.message.reply_text("Please reply to a photo message with /setgoodbyephoto to set the goodbye photo.")
+        return
+
+    # Check admin or owner
+    sender_id = update.effective_user.id
+    chat_id = update.effective_chat.id
+    
+    if sender_id != OWNER_ID:
+        member = await context.bot.get_chat_member(chat_id, sender_id)
+        if member.status not in ['administrator', 'creator']:
+            await update.message.reply_text("Admin only command.")
+            return
+
+    photo_file_id = update.message.reply_to_message.photo[-1].file_id
+    update_chat_setting(chat_id, "goodbye_media", photo_file_id)
+    await update.message.reply_text("Goodbye photo updated!")
+
+async def set_goodbye_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Set the goodbye message button."""
+    if not update.message: return
+    
+    # Check admin or owner
+    sender_id = update.effective_user.id
+    chat_id = update.effective_chat.id
+    
+    if sender_id != OWNER_ID:
+        member = await context.bot.get_chat_member(chat_id, sender_id)
+        if member.status not in ['administrator', 'creator']:
+            await update.message.reply_text("Admin only command.")
+            return
+
+    args = context.args
+    if len(args) < 2:
+        await update.message.reply_text("Usage: /setgoodbyebutton <button_text> <button_url>")
+        return
+
+    button_text = args[0]
+    button_url = args[1]
+    
+    update_chat_setting(chat_id, "goodbye_button_text", button_text)
+    update_chat_setting(chat_id, "goodbye_button_url", button_url)
+    
+    await update.message.reply_text(f"Goodbye button updated: {button_text} -> {button_url}")
 
 async def on_member_leave_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle chat member status changes to detect leaves."""
@@ -95,8 +165,22 @@ async def send_goodbye(chat, user, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             logging.error(f"Error scheduling goodbye deletion: {e}")
 
+async def on_left_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Send goodbye message when a member leaves via service message (fallback)."""
+    if not update.message or not update.message.left_chat_member:
+        return
+        
+    member = update.message.left_chat_member
+    if member.is_bot: return
+    await send_goodbye(update.effective_chat, member, context)
+
 def get_goodbye_handlers():
     """Return handlers for goodbye message."""
     return [
+        CommandHandler("setgoodbye", set_goodbye),
+        CommandHandler("setgoodbyephoto", set_goodbye_photo),
+        CommandHandler("setgoodbyebutton", set_goodbye_button),
+        # Handle service messages (legacy fallback)
+        MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, on_left_member),
         ChatMemberHandler(on_member_leave_update, ChatMemberHandler.CHAT_MEMBER)
     ]
