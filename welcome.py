@@ -197,14 +197,17 @@ async def send_welcome(chat, user, context: ContextTypes.DEFAULT_TYPE):
     # Schedule deletion if msg sent and time > 0
     if msg and welcome_delete_time > 0 and context.job_queue:
         from config import delete_message_job
-        context.job_queue.run_once(
-            delete_message_job,
-            welcome_delete_time,
-            data={"chat_id": chat_id, "message_id": msg.message_id}
-        )
+        try:
+            context.job_queue.run_once(
+                delete_message_job,
+                welcome_delete_time,
+                data={"chat_id": chat_id, "message_id": msg.message_id}
+            )
+        except Exception as e:
+            logging.error(f"Error scheduling welcome deletion: {e}")
 
 async def on_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Send welcome message when a new member joins via service message."""
+    """Send welcome message when a new member joins via service message (fallback)."""
     if not update.message or not update.message.new_chat_members:
         return
         
@@ -220,33 +223,30 @@ async def on_chat_member_update(update: Update, context: ContextTypes.DEFAULT_TY
         
     old_status = result.old_chat_member.status
     new_status = result.new_chat_member.status
+    settings = get_chat_settings(update.effective_chat.id)
     
     # Debug log
     logging.info(f"Chat Member Update: {old_status} -> {new_status} for user {result.new_chat_member.user.id}")
     
     # Trigger on join (detects both new joins and re-joins)
-    # new_status is 'member' or 'administrator' or 'creator'
+    # 1. new_status is 'member' or 'administrator' or 'creator'
     # old_status was 'left' or 'kicked' or 'none' (none is for some first-time joins)
     is_joining = new_status in ['member', 'administrator'] and old_status in ['left', 'kicked', 'none', 'restricted']
     
-    # In some groups, the old_status might be 'member' if the join event is triggered again,
-    # or it could be 'left' if they were already out.
+    # Check if it's an invite link join (sometimes status stays same but update triggers)
     # If welcome_rejoin_enabled is True, we should be more permissive.
     
-    if is_joining:
+    if is_joining or (settings.get("welcome_rejoin_enabled", True) and new_status == old_status and new_status in ['member', 'restricted']):
         member = result.new_chat_member.user
         if member.is_bot:
             return
             
-        settings = get_chat_settings(update.effective_chat.id)
-        
-        # Check rejoin setting if old_status was 'left', 'kicked', or 'restricted'
-        if old_status in ['left', 'kicked', 'restricted']:
+        # Check rejoin setting if it's clearly a rejoin
+        if old_status in ['left', 'kicked', 'restricted'] or (new_status == old_status):
             if not settings.get("welcome_rejoin_enabled", True):
                 logging.info(f"Skipping welcome for re-joining user {member.id} as welcome_rejoin_enabled is False")
                 return
         
-        # Always send if it's a new join (old_status 'none') or if re-joins are allowed
         await send_welcome(update.effective_chat, member, context)
 
 def get_welcome_handlers():
@@ -255,6 +255,8 @@ def get_welcome_handlers():
         CommandHandler("setwelcome", set_welcome),
         CommandHandler("setphoto", set_welcome_photo),
         CommandHandler("setbutton", set_welcome_button),
+        # Handle service messages (legacy fallback)
+        MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, on_new_member),
         # Handle status changes (detects joins and re-joins reliably)
         ChatMemberHandler(on_chat_member_update, ChatMemberHandler.CHAT_MEMBER)
     ]
