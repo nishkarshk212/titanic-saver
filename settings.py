@@ -74,9 +74,11 @@ def get_welcome_settings_keyboard(settings):
     return InlineKeyboardMarkup(keyboard)
 
 def get_goodbye_settings_keyboard(settings):
-    goodbye_status = "✅" if settings.get("goodbye_enabled", True) else "❌"
+    goodbye_status = "✅" if settings.get("goodbye_enabled", False) else "❌"
     media_status = "✅" if settings.get("goodbye_media_enabled", True) else "❌"
     button_status = "✅" if settings.get("goodbye_button_enabled", True) else "❌"
+    delete_time = settings.get("goodbye_delete_time", 60)
+    goodbye_buttons = settings.get("goodbye_buttons", [])
     
     keyboard = [
         [InlineKeyboardButton(f"Goodbye: {goodbye_status}", callback_data="set_toggle_goodbye_enabled")],
@@ -86,11 +88,26 @@ def get_goodbye_settings_keyboard(settings):
         ],
         [
             InlineKeyboardButton(f"Button: {button_status}", callback_data="set_toggle_goodbye_button_enabled"),
-            InlineKeyboardButton("🔗 Set Button", callback_data="set_config_goodbye_button")
-        ],
-        [InlineKeyboardButton("📝 Set Goodbye Text", callback_data="set_config_goodbye_text")],
-        [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
+            InlineKeyboardButton("➕ Add Button", callback_data="set_config_goodbye_buttons_add"),
+            InlineKeyboardButton("🗑️ Clear", callback_data="set_config_goodbye_buttons_clear")
+        ]
     ]
+    
+    # List added buttons if any
+    if goodbye_buttons:
+        for idx, btn in enumerate(goodbye_buttons, 1):
+            btn_text = btn.get("text", f"Btn {idx}")
+            keyboard.append([InlineKeyboardButton(f"Button {idx}: {btn_text}", callback_data="set_none")])
+            
+    keyboard.extend([
+        [InlineKeyboardButton("📝 Set Goodbye Text", callback_data="set_config_goodbye_text")],
+        [
+            InlineKeyboardButton("-10s", callback_data="set_goodbye_time_sub_10"),
+            InlineKeyboardButton(f"🗑️ Delete: {delete_time}s", callback_data="set_none"),
+            InlineKeyboardButton("+10s", callback_data="set_goodbye_time_add_10")
+        ],
+        [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
+    ])
     return InlineKeyboardMarkup(keyboard)
 
 def get_clean_settings_keyboard(settings):
@@ -352,13 +369,28 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         amount = int(amount)
         settings = get_chat_settings(chat_id)
         current_time = settings.get("welcome_delete_time", 60)
-        new_time = current_time + amount if action == "add" else max(1, current_time - amount)
+        new_time = current_time + amount if action == "add" else max(0, current_time - amount)
         update_chat_setting(chat_id, "welcome_delete_time", new_time)
         new_settings = get_chat_settings(chat_id)
         try:
             await query.edit_message_reply_markup(reply_markup=get_welcome_settings_keyboard(new_settings))
         except BadRequest: pass
         await query.answer(f"Welcome deletion time set to {new_time}s")
+        return
+
+    # Handle Goodbye Time adjustment buttons
+    if data.startswith("set_goodbye_time_"):
+        action, amount = data.replace("set_goodbye_time_", "").split("_")
+        amount = int(amount)
+        settings = get_chat_settings(chat_id)
+        current_time = settings.get("goodbye_delete_time", 60)
+        new_time = current_time + amount if action == "add" else max(0, current_time - amount)
+        update_chat_setting(chat_id, "goodbye_delete_time", new_time)
+        new_settings = get_chat_settings(chat_id)
+        try:
+            await query.edit_message_reply_markup(reply_markup=get_goodbye_settings_keyboard(new_settings))
+        except BadRequest: pass
+        await query.answer(f"Goodbye deletion time set to {new_time}s")
         return
 
     if data == "set_none":
