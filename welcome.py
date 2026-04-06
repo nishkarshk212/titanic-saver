@@ -2,7 +2,7 @@ import logging
 import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
-from telegram.ext import ContextTypes, CommandHandler, MessageHandler, filters
+from telegram.ext import ContextTypes, CommandHandler, MessageHandler, filters, ChatMemberHandler
 import os
 from config import OWNER_ID, log_to_channel
 from settings_manager import get_chat_settings, update_chat_setting
@@ -104,9 +104,9 @@ async def set_welcome_button(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     await update.message.reply_text(f"Welcome button updated: {button_text} -> {button_url}")
 
-async def on_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Send welcome message when a new member joins."""
-    chat_id = update.effective_chat.id
+async def send_welcome(chat, user, context: ContextTypes.DEFAULT_TYPE):
+    """Sends the welcome message to a specific user in a chat."""
+    chat_id = chat.id
     settings = get_chat_settings(chat_id)
     
     if not settings.get("welcome_enabled", True):
@@ -123,40 +123,61 @@ async def on_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if button_enabled and button_text and button_url:
         reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton(button_text, url=button_url)]])
 
-    for member in update.message.new_chat_members:
-        if member.is_bot: continue
-        
-        # Cache the user as soon as they join
-        cache_user(member.id, member.username, member.first_name)
-        
-        # Format the welcome message with advanced placeholders
-        personal_welcome = format_welcome_message(welcome_text_raw, member, update.effective_chat)
-        
-        if media_enabled and welcome_media:
-            try:
-                await context.bot.send_photo(
-                    chat_id=chat_id,
-                    photo=welcome_media,
-                    caption=personal_welcome,
-                    reply_markup=reply_markup,
-                    parse_mode=ParseMode.HTML
-                )
-            except Exception as e:
-                logging.error(f"Error sending welcome photo: {e}")
-                # Fallback to text if photo fails
-                await context.bot.send_message(
-                    chat_id=chat_id, 
-                    text=personal_welcome, 
-                    reply_markup=reply_markup,
-                    parse_mode=ParseMode.HTML
-                )
-        else:
+    # Cache the user
+    cache_user(user.id, user.username, user.first_name)
+    
+    # Format the welcome message
+    personal_welcome = format_welcome_message(welcome_text_raw, user, chat)
+    
+    if media_enabled and welcome_media:
+        try:
+            await context.bot.send_photo(
+                chat_id=chat_id,
+                photo=welcome_media,
+                caption=personal_welcome,
+                reply_markup=reply_markup,
+                parse_mode=ParseMode.HTML
+            )
+        except Exception as e:
+            logging.error(f"Error sending welcome photo: {e}")
             await context.bot.send_message(
                 chat_id=chat_id, 
                 text=personal_welcome, 
                 reply_markup=reply_markup,
                 parse_mode=ParseMode.HTML
             )
+    else:
+        await context.bot.send_message(
+            chat_id=chat_id, 
+            text=personal_welcome, 
+            reply_markup=reply_markup,
+            parse_mode=ParseMode.HTML
+        )
+
+async def on_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Send welcome message when a new member joins via service message."""
+    if not update.message or not update.message.new_chat_members:
+        return
+        
+    for member in update.message.new_chat_members:
+        if member.is_bot: continue
+        await send_welcome(update.effective_chat, member, context)
+
+async def on_chat_member_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle chat member status changes to detect joins/re-joins."""
+    result = update.chat_member
+    if not result:
+        return
+        
+    old_status = result.old_chat_member.status
+    new_status = result.new_chat_member.status
+    
+    # Trigger on join (from left/kicked to member)
+    if new_status == 'member' and old_status in ['left', 'kicked']:
+        member = result.new_chat_member.user
+        if member.is_bot:
+            return
+        await send_welcome(update.effective_chat, member, context)
 
 def get_welcome_handlers():
     """Return handlers for welcome message."""
@@ -164,5 +185,6 @@ def get_welcome_handlers():
         CommandHandler("setwelcome", set_welcome),
         CommandHandler("setphoto", set_welcome_photo),
         CommandHandler("setbutton", set_welcome_button),
-        MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, on_new_member)
+        # Handle status changes (detects joins and re-joins reliably)
+        ChatMemberHandler(on_chat_member_update, ChatMemberHandler.CHAT_MEMBER)
     ]
