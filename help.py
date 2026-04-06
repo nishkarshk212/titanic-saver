@@ -38,6 +38,7 @@ def get_help_keyboard():
             InlineKeyboardButton("💣 Auto Delete", callback_data="help_auto"),
             InlineKeyboardButton("🔍 Filters", callback_data="help_filters")
         ],
+        [InlineKeyboardButton("🚫 Block Content", callback_data="help_block")],
         [InlineKeyboardButton("❌ Close", callback_data="help_close")]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -104,6 +105,14 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "• /filters - List all active filters\n"
             "• /stop &lt;trigger&gt; - Remove a specific filter\n"
             "• /stopall - Remove all filters in the chat"
+        )
+    elif data == "help_block":
+        help_text = (
+            "🚫 <b>Block Content</b>\n\n"
+            "• /block - Reply to a message (text/media) or use `/block &lt;text&gt;` to add content to the block list.\n"
+            "• /unblock - Reply to a message or use `/unblock &lt;text&gt;` to remove content from the block list.\n"
+            "• /listblock - List all blocked text content in the group.\n\n"
+            "<i>Note: Admins are exempt from the block content checks. Configure penalties (Warn/Mute/Ban/Kick) in /settings &gt; Block Content.</i>"
         )
 
     keyboard = [[InlineKeyboardButton("🔙 Back", callback_data="help_main")]]

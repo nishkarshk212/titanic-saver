@@ -53,6 +53,8 @@ def get_chat_settings(chat_id):
             "auto_delete_time": 60,
             "warn_limit": 3,
             "warn_penalty": "ban",
+            "block_warn_limit": 3,
+            "block_warn_penalty": "warn",
             "command_deletion": False,
             "command_access": "all"
         }

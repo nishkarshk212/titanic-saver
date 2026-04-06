@@ -27,6 +27,7 @@ def get_main_settings_keyboard():
         [InlineKeyboardButton("👋 Goodbye Settings", callback_data="set_view_goodbye")],
         [InlineKeyboardButton("🧹 Clean Service", callback_data="set_view_clean")],
         [InlineKeyboardButton("💣 Auto Delete", callback_data="set_view_auto_delete")],
+        [InlineKeyboardButton("🚫 Block Content", callback_data="set_view_block_content")],
         [InlineKeyboardButton("🛡️ Moderation Settings", callback_data="set_view_mod")],
         [InlineKeyboardButton("🗑️ Command Deletion", callback_data="set_view_command_deletion")],
         [InlineKeyboardButton("🔑 Command Access", callback_data="set_view_command_access")],
@@ -161,6 +162,21 @@ def get_auto_delete_settings_keyboard(settings):
     ]
     return InlineKeyboardMarkup(keyboard)
 
+def get_block_content_settings_keyboard(settings):
+    limit = settings.get("block_warn_limit", 3)
+    penalty = settings.get("block_warn_penalty", "warn").title()
+    
+    keyboard = [
+        [
+            InlineKeyboardButton("-", callback_data="set_block_warn_limit_sub"),
+            InlineKeyboardButton(f"Block Warn Limit: {limit}", callback_data="set_none"),
+            InlineKeyboardButton("+", callback_data="set_block_warn_limit_add")
+        ],
+        [InlineKeyboardButton(f"Block Penalty: {penalty}", callback_data="set_toggle_block_warn_penalty")],
+        [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
 def get_mod_settings_keyboard(settings):
     limit = settings.get("warn_limit", 3)
     penalty = settings.get("warn_penalty", "ban").title()
@@ -267,6 +283,18 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer()
         return
 
+    if data == "set_view_block_content":
+        settings = get_chat_settings(chat_id)
+        try:
+            await edit_bot_response(
+                query, context,
+                "🚫 Block Content Configuration\n\nConfigure penalties for using blocked words/media:",
+                reply_markup=get_block_content_settings_keyboard(settings)
+            )
+        except BadRequest: pass
+        await query.answer()
+        return
+
     if data == "set_view_mod":
         settings = get_chat_settings(chat_id)
         try:
@@ -312,6 +340,16 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             current = settings.get("warn_penalty", "ban")
             new_val = "mute" if current == "ban" else "kick" if current == "mute" else "ban"
             update_chat_setting(chat_id, "warn_penalty", new_val)
+        elif key == "block_warn_penalty":
+            # Rotate: warn -> mute -> ban -> kick -> warn
+            current = settings.get("block_warn_penalty", "warn")
+            order = ["warn", "mute", "ban", "kick"]
+            try:
+                idx = order.index(current)
+                new_val = order[(idx + 1) % len(order)]
+            except ValueError:
+                new_val = "warn"
+            update_chat_setting(chat_id, "block_warn_penalty", new_val)
         elif key == "command_access":
             # Toggle: all -> admins -> all
             current = settings.get("command_access", "all")
@@ -330,6 +368,7 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             elif "goodbye" in key: await query.edit_message_reply_markup(reply_markup=get_goodbye_settings_keyboard(new_settings))
             elif "clean" in key: await query.edit_message_reply_markup(reply_markup=get_clean_settings_keyboard(new_settings))
             elif "auto_delete" in key: await query.edit_message_reply_markup(reply_markup=get_auto_delete_settings_keyboard(new_settings))
+            elif "block" in key: await query.edit_message_reply_markup(reply_markup=get_block_content_settings_keyboard(new_settings))
             elif "warn" in key: await query.edit_message_reply_markup(reply_markup=get_mod_settings_keyboard(new_settings))
             elif "command_deletion" in key: await query.edit_message_reply_markup(reply_markup=get_command_deletion_keyboard(new_settings))
             elif "command_access" in key: await query.edit_message_reply_markup(reply_markup=get_command_access_keyboard(new_settings))
@@ -348,6 +387,19 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_reply_markup(reply_markup=get_mod_settings_keyboard(new_settings))
         except BadRequest: pass
         await query.answer(f"Warn limit set to {new_limit}")
+        return
+
+    if data.startswith("set_block_warn_limit_"):
+        action = data.replace("set_block_warn_limit_", "")
+        settings = get_chat_settings(chat_id)
+        current = settings.get("block_warn_limit", 3)
+        new_limit = current + 1 if action == "add" else max(1, current - 1)
+        update_chat_setting(chat_id, "block_warn_limit", new_limit)
+        new_settings = get_chat_settings(chat_id)
+        try:
+            await query.edit_message_reply_markup(reply_markup=get_block_content_settings_keyboard(new_settings))
+        except BadRequest: pass
+        await query.answer(f"Block warn limit set to {new_limit}")
         return
 
     # Handle Time adjustment buttons

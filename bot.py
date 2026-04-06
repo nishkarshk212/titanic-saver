@@ -8,6 +8,7 @@ from telegram.constants import ParseMode
 from admin import get_admin_handlers
 from welcome import get_welcome_handlers
 from goodbye import get_goodbye_handlers
+from block_content import get_block_content_handlers
 from clean_service import get_clean_service_handlers
 from auto_delete import get_auto_delete_handlers
 from moderation import get_moderation_handlers
@@ -166,6 +167,14 @@ def main():
     # Add goodbye handlers (Group 0)
     for handler in get_goodbye_handlers():
         application.add_handler(handler)
+
+    # Add block content handlers (Group 0)
+    for handler in get_block_content_handlers():
+        # The MessageHandler for block content check should be in its own group to run concurrently
+        if isinstance(handler, MessageHandler) and not isinstance(handler, CommandHandler):
+            application.add_handler(handler, group=4)
+        else:
+            application.add_handler(handler)
 
     # Add clean service handlers in a separate group (Group 1)
     # This ensures they run even if other handlers match
