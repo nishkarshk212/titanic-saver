@@ -169,9 +169,9 @@ async def info_callback_handler(update: Update, context: ContextTypes.DEFAULT_TY
     action = data[1]
     user_id = int(data[2])
     
-    # Import handlers locally to avoid circular imports if needed
-    from moderation import mute_command, unmute_command, ban_command, warn_command
-    from admin import promote_command
+    # Import handlers locally to avoid circular imports
+    from moderation import mute_command, unmute_command, ban_command, warn_command, unwarn_command, unban_command, muter_command
+    from moderation_manager import get_user_warns, is_muter as check_is_muter
     
     # Create a mock update to reuse existing command logic
     class MockMessage:
@@ -181,39 +181,189 @@ async def info_callback_handler(update: Update, context: ContextTypes.DEFAULT_TY
             self.reply_to_message = reply_to_message
             self.text = ""
         async def reply_text(self, text, *args, **kwargs):
-            await query.message.reply_text(text, *args, **kwargs)
+            # We don't want to spam the group when clicking buttons
+            pass
 
     mock_update = Update(update.update_id, message=MockMessage(update.effective_chat, update.effective_user))
-    # For user_id extraction, we'll manually set context.args if needed or rely on a trick
-    # Most command handlers use get_user_id which checks reply, mentions, or args.
-    # We'll mock context.args to contain the user_id
     context.args = [str(user_id)]
 
+    keyboard = []
+    text_override = None
+
     if action == "warns":
+        warns = get_user_warns(chat_id, user_id)
+        text_override = f"⚠️ <b>Warn Management</b> for user <code>{user_id}</code>\n\nCurrent Warns: <code>{warns}</code>"
+        keyboard = [
+            [
+                InlineKeyboardButton("➕ Add Warn", callback_data=f"info_addwarn_{user_id}"),
+                InlineKeyboardButton("🔄 Reset Warns", callback_data=f"info_resetwarn_{user_id}")
+            ],
+            [InlineKeyboardButton("🔙 Back", callback_data=f"info_back_{user_id}")]
+        ]
+    elif action == "addwarn":
         await warn_command(mock_update, context)
-        await query.answer("Warning applied.")
+        # Re-trigger warns view
+        query.data = f"info_warns_{user_id}"
+        await info_callback_handler(update, context)
+        return
+    elif action == "resetwarn":
+        await unwarn_command(mock_update, context)
+        # Re-trigger warns view
+        query.data = f"info_warns_{user_id}"
+        await info_callback_handler(update, context)
+        return
     elif action == "mute":
-        # Check current mute status
+        member = await context.bot.get_chat_member(chat_id, user_id)
+        is_muted = member.status == 'restricted' and not member.can_send_messages
+        text_override = f"🔇 <b>Mute Management</b> for user <code>{user_id}</code>\n\nStatus: {'Muted 🔇' if is_muted else 'Unmuted 🔊'}"
+        keyboard = [
+            [InlineKeyboardButton("🔊 Unmute" if is_muted else "🔇 Mute", callback_data=f"info_domute_{user_id}")],
+            [InlineKeyboardButton("🔙 Back", callback_data=f"info_back_{user_id}")]
+        ]
+    elif action == "domute":
         member = await context.bot.get_chat_member(chat_id, user_id)
         if member.status == 'restricted' and not member.can_send_messages:
             await unmute_command(mock_update, context)
-            await query.answer("User unmuted.")
         else:
             await mute_command(mock_update, context)
-            await query.answer("User muted.")
+        query.data = f"info_mute_{user_id}"
+        await info_callback_handler(update, context)
+        return
     elif action == "ban":
-        await ban_command(mock_update, context)
-        await query.answer("User banned.")
+        member = await context.bot.get_chat_member(chat_id, user_id)
+        is_banned = member.status == 'kicked'
+        text_override = f"🔨 <b>Ban Management</b> for user <code>{user_id}</code>\n\nStatus: {'Banned ⛔' if is_banned else 'Active ✅'}"
+        keyboard = [
+            [InlineKeyboardButton("🔓 Unban" if is_banned else "🔨 Ban", callback_data=f"info_doban_{user_id}")],
+            [InlineKeyboardButton("🔙 Back", callback_data=f"info_back_{user_id}")]
+        ]
+    elif action == "doban":
+        member = await context.bot.get_chat_member(chat_id, user_id)
+        if member.status == 'kicked':
+            await unban_command(mock_update, context)
+        else:
+            await ban_command(mock_update, context)
+        query.data = f"info_ban_{user_id}"
+        await info_callback_handler(update, context)
+        return
     elif action == "roles":
-        await promote_command(mock_update, context)
-        await query.answer("Promotion menu opened.")
+        is_muter_role = check_is_muter(chat_id, user_id)
+        text_override = f"🎭 <b>Role Management</b> for user <code>{user_id}</code>"
+        keyboard = [
+            [InlineKeyboardButton(f"Muter Role: {'✅ Enabled' if is_muter_role else '❌ Disabled'}", callback_data=f"info_tomuter_{user_id}")],
+            [InlineKeyboardButton("🔙 Back", callback_data=f"info_back_{user_id}")]
+        ]
+    elif action == "tomuter":
+        await muter_command(mock_update, context)
+        query.data = f"info_roles_{user_id}"
+        await info_callback_handler(update, context)
+        return
     elif action == "perms":
-        # Reuse promotion for perms as well
-        await promote_command(mock_update, context)
-        await query.answer("Permissions menu opened.")
+        member = await context.bot.get_chat_member(chat_id, user_id)
+        # If user is admin/creator, they have full perms (can't restrict easily via buttons)
+        if member.status in ['creator', 'administrator']:
+            text_override = f"🛡️ <b>Permissions</b> for user <code>{user_id}</code>\n\nAdmin/Owner permissions cannot be toggled here. Use 🎭 Roles."
+            keyboard = [[InlineKeyboardButton("🔙 Back", callback_data=f"info_back_{user_id}")]]
+        else:
+            can_msg = member.can_send_messages if member.status == 'restricted' else True
+            can_media = member.can_send_media_messages if member.status == 'restricted' else True
+            can_sticker = member.can_send_other_messages if member.status == 'restricted' else True
+            
+            text_override = f"🛡️ <b>Permission Management</b> for user <code>{user_id}</code>"
+            keyboard = [
+                [InlineKeyboardButton(f"Send Message: {'✅' if can_msg else '❌'}", callback_data=f"info_toperm_msg_{user_id}")],
+                [InlineKeyboardButton(f"Send Media: {'✅' if can_media else '❌'}", callback_data=f"info_toperm_media_{user_id}")],
+                [InlineKeyboardButton(f"Send Stickers/GIFs: {'✅' if can_sticker else '❌'}", callback_data=f"info_toperm_sticker_{user_id}")],
+                [InlineKeyboardButton("🔙 Back", callback_data=f"info_back_{user_id}")]
+            ]
+    elif action.startswith("toperm"):
+        perm_type = data[2]
+        user_id = int(data[3])
+        member = await context.bot.get_chat_member(chat_id, user_id)
+        
+        # Current perms
+        p = {
+            "can_send_messages": member.can_send_messages if member.status == 'restricted' else True,
+            "can_send_media_messages": member.can_send_media_messages if member.status == 'restricted' else True,
+            "can_send_audios": member.can_send_audios if member.status == 'restricted' else True,
+            "can_send_documents": member.can_send_documents if member.status == 'restricted' else True,
+            "can_send_photos": member.can_send_photos if member.status == 'restricted' else True,
+            "can_send_videos": member.can_send_videos if member.status == 'restricted' else True,
+            "can_send_video_notes": member.can_send_video_notes if member.status == 'restricted' else True,
+            "can_send_voice_notes": member.can_send_voice_notes if member.status == 'restricted' else True,
+            "can_send_polls": member.can_send_polls if member.status == 'restricted' else True,
+            "can_send_other_messages": member.can_send_other_messages if member.status == 'restricted' else True,
+            "can_add_web_page_previews": member.can_add_web_page_previews if member.status == 'restricted' else True
+        }
+        
+        if perm_type == "msg": p["can_send_messages"] = not p["can_send_messages"]
+        elif perm_type == "media": p["can_send_media_messages"] = not p["can_send_media_messages"]
+        elif perm_type == "sticker": p["can_send_other_messages"] = not p["can_send_other_messages"]
+        
+        try:
+            await context.bot.restrict_chat_member(chat_id, user_id, permissions=ChatPermissions(**p))
+            await query.answer("Permissions updated.")
+        except Exception as e:
+            await query.answer(f"Error: {e}", show_alert=True)
+            
+        query.data = f"info_perms_{user_id}"
+        await info_callback_handler(update, context)
+        return
+    elif action == "back":
+        # We need to reconstruct the original info message
+        # Easiest way is to call info_command with a mock update
+        mock_update.message.text = f"/info {user_id}"
+        # We need to delete the current menu first or just edit it back
+        # Let's just edit it back to the original info text and main buttons
+        # For simplicity, we can reuse the code from info_command
+        from user_manager import get_user_stats
+        import html
+        stats = get_user_stats(user_id)
+        username = stats.get("username") if stats else None
+        joined_date = stats.get("joined_date", "Unknown") if stats else "Unknown"
+        msg_count = stats.get("msg_count", 0) if stats else 0
+        
+        # Get user status and role in group
+        user_status = "Unknown"; user_role = "Member"; is_muted = False
+        try:
+            member = await context.bot.get_chat_member(chat_id, user_id)
+            status = member.status
+            if status == 'creator': user_status = "Present"; user_role = "Owner/Creator"
+            elif status == 'administrator': user_status = "Present"; user_role = "Administrator"
+            elif status == 'member': user_status = "Present"; user_role = "Member"
+            elif status == 'restricted': 
+                user_status = "Present (Restricted)"; user_role = "Restricted Member"
+                if not member.can_send_messages: is_muted = True
+            elif status == 'left': user_status = "Left"; user_role = "None"
+            elif status == 'kicked': user_status = "Banned"; user_role = "None"
+        except: pass
+
+        info_text = (
+            f"👤 <b>User Information</b>\n\n"
+            f"• <b>User ID:</b> <code>{user_id}</code>\n"
+            f"• <b>Status:</b> {user_status}\n"
+            f"• <b>Role:</b> {user_role}\n"
+            f"• <b>Muted:</b> {'Yes 🔇' if is_muted else 'No 🔊'}\n"
+            f"• <b>Joined Date:</b> {joined_date}\n"
+            f"• <b>Total Messages:</b> {msg_count}"
+        )
+        
+        keyboard = [
+            [InlineKeyboardButton("⚠️ Warns", callback_data=f"info_warns_{user_id}"), InlineKeyboardButton("🎭 Roles", callback_data=f"info_roles_{user_id}")],
+            [InlineKeyboardButton("🔇 Mute" if not is_muted else "🔊 Unmute", callback_data=f"info_mute_{user_id}"), InlineKeyboardButton("🔨 Ban", callback_data=f"info_ban_{user_id}")],
+            [InlineKeyboardButton("🛡️ Permissions", callback_data=f"info_perms_{user_id}")]
+        ]
+        
+        await query.edit_message_text(info_text, parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup(keyboard))
+        await query.answer()
+        return
+
+    if text_override and keyboard:
+        try:
+            await query.edit_message_text(text_override, parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup(keyboard))
+        except BadRequest: pass
     
-    # Refresh info if possible (optional)
-    # await info_command(mock_update, context)
+    await query.answer()
 
 async def get_id_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Simple command to show user ID and ensure they are cached."""
