@@ -268,9 +268,19 @@ async def info_callback_handler(update: Update, context: ContextTypes.DEFAULT_TY
         is_muter_role = check_is_muter(chat_id, user_id)
         
         # Get actual status of the user
-        member = await context.bot.get_chat_member(chat_id, user_id)
-        is_admin = member.status in ['administrator', 'creator']
-        is_member = member.status == 'member'
+        is_in_group = True
+        try:
+            member = await context.bot.get_chat_member(chat_id, user_id)
+            is_admin = member.status in ['administrator', 'creator']
+            is_member = member.status in ['member', 'administrator', 'creator', 'restricted']
+            if member.status in ['left', 'kicked']:
+                is_in_group = False
+                is_admin = False
+                is_member = False
+        except Exception:
+            is_in_group = False
+            is_admin = False
+            is_member = False
         
         text_override = f"🎭 <b>Role Management</b> for user <code>{user_id}</code>"
         keyboard = [
@@ -280,36 +290,62 @@ async def info_callback_handler(update: Update, context: ContextTypes.DEFAULT_TY
             [InlineKeyboardButton("🔙 Back", callback_data=f"info_back_{user_id}"), InlineKeyboardButton("❌ Close", callback_data="info_close")]
         ]
     elif action == "toadmin":
-        member = await context.bot.get_chat_member(chat_id, user_id)
-        if member.status in ['administrator', 'creator']:
-            # Demote
-            await demote_command(mock_update, context)
-            await query.answer("Admin role removed.")
-            query.data = f"info_roles_{user_id}"
-            await info_callback_handler(update, context)
-            return
-        else:
-            # Show promotion menu with permissions in rows/columns
+        try:
+            member = await context.bot.get_chat_member(chat_id, user_id)
+            if member.status in ['left', 'kicked']:
+                await query.answer("❌ This user is not in the group. Please add them first.", show_alert=True)
+                return
+            
+            # Show promotion menu with permissions (even if already admin, to edit)
             promote_key = f"promote_{user_id}"
-            context.user_data[promote_key] = DEFAULT_PERMISSIONS.copy()
-            context.user_data[promote_key]["back_to_info"] = True # Mark as from info
+            
+            # If already admin, try to get current perms
+            current_perms = DEFAULT_PERMISSIONS.copy()
+            if member.status == 'administrator':
+                for key in DEFAULT_PERMISSIONS.keys():
+                    current_perms[key] = getattr(member, key, False)
+            
+            context.user_data[promote_key] = current_perms
+            context.user_data[promote_key]["back_to_info"] = True
             
             keyboard = get_promotion_keyboard(user_id, context.user_data[promote_key], back_to_info=True)
-            text_override = f"🛡️ <b>Promote Admin</b> for user <code>{user_id}</code>\n\nSelect permissions to grant:"
+            text_override = f"🛡️ <b>Edit Admin Permissions</b> for user <code>{user_id}</code>\n\nSelect permissions to grant/revoke:"
             try:
                 await query.edit_message_text(text_override, parse_mode=ParseMode.HTML, reply_markup=keyboard)
             except BadRequest: pass
             await query.answer()
             return
+        except Exception as e:
+            await query.answer(f"Error checking user status: {e}", show_alert=True)
+            return
+
     elif action == "tomember":
-        member = await context.bot.get_chat_member(chat_id, user_id)
-        if member.status == 'member':
-            await query.answer("User is already a member.", show_alert=True)
-        else:
-            # Demote to member
-            from admin import demote_command
-            await demote_command(mock_update, context)
-            await query.answer("User demoted to member.")
+        try:
+            member = await context.bot.get_chat_member(chat_id, user_id)
+            if member.status in ['left', 'kicked']:
+                # User not in group, show add/invite option
+                chat = await context.bot.get_chat(chat_id)
+                invite_link = chat.invite_link
+                if not invite_link:
+                    invite_link = await context.bot.export_chat_invite_link(chat_id)
+                
+                text_override = f"👤 <b>Add Member</b>\n\nUser <code>{user_id}</code> is not in this group.\n\nShare this invite link with them:\n{invite_link}"
+                keyboard = [[InlineKeyboardButton("🔙 Back", callback_data=f"info_roles_{user_id}"), InlineKeyboardButton("❌ Close", callback_data="info_close")]]
+                try:
+                    await query.edit_message_text(text_override, parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup(keyboard))
+                except BadRequest: pass
+                await query.answer()
+                return
+            else:
+                # Already a member, maybe demote from admin?
+                if member.status == 'administrator':
+                    await demote_command(mock_update, context)
+                    await query.answer("Admin demoted to regular member.")
+                else:
+                    await query.answer("User is already a member.", show_alert=True)
+        except Exception as e:
+            await query.answer(f"Error: {e}", show_alert=True)
+            
         query.data = f"info_roles_{user_id}"
         await info_callback_handler(update, context)
         return
