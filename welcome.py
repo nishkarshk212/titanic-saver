@@ -236,8 +236,12 @@ async def on_chat_member_update(update: Update, context: ContextTypes.DEFAULT_TY
     # Trigger on join (detects both new joins and re-joins)
     # 1. new_status is 'member' or 'administrator' or 'creator'
     # old_status was 'left' or 'kicked' or 'none' (none is for some first-time joins)
-    is_joining = new_status in ['member', 'administrator'] and old_status in ['left', 'kicked', 'none', 'restricted']
+    is_joining = new_status in ['member', 'administrator', 'restricted'] and old_status in ['left', 'kicked', 'none']
     
+    # Strictly ignore leaves
+    if new_status in ['left', 'kicked']:
+        return
+
     # Check if it's an invite link join (sometimes status stays same but update triggers)
     # If welcome_rejoin_enabled is True, we should be more permissive.
     

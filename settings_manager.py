@@ -27,9 +27,9 @@ def get_chat_settings(chat_id):
             "welcome_rejoin_enabled": True,
             "welcome_text": "Welcome {NAME} to the group!",
             "welcome_media": None,
-            "welcome_media_type": "photo", # photo, video, animation
-            "welcome_delete_time": 60, # seconds
-            "welcome_buttons": [], # List of {"text": str, "url": str}
+            "welcome_media_type": "photo",
+            "welcome_delete_time": 60,
+            "welcome_buttons": [],
             "welcome_button_text": "Join Channel",
             "welcome_button_url": None,
             "goodbye_enabled": False,
@@ -42,13 +42,6 @@ def get_chat_settings(chat_id):
             "goodbye_buttons": [],
             "goodbye_button_text": None,
             "goodbye_button_url": None,
-            "auto_delete_enabled": True,
-            "goodbye_media_enabled": True,
-            "goodbye_button_enabled": True,
-            "goodbye_text": "Goodbye {NAME}, we will miss you!",
-            "goodbye_media": None,
-            "goodbye_button_text": "Visit Website",
-            "goodbye_button_url": "https://example.com",
             "clean_service_enabled": True,
             "clean_join": True,
             "clean_left": True,
@@ -59,9 +52,9 @@ def get_chat_settings(chat_id):
             "auto_delete_enabled": False,
             "auto_delete_time": 60,
             "warn_limit": 3,
-            "warn_penalty": "ban", # ban, mute, kick
+            "warn_penalty": "ban",
             "command_deletion": False,
-            "command_access": "all" # all, admins
+            "command_access": "all"
         }
         save_settings(settings)
     return settings[chat_id_str]

@@ -5,7 +5,7 @@ from telegram.constants import ParseMode
 from telegram.ext import ContextTypes, MessageHandler, filters, ChatMemberHandler
 from config import OWNER_ID
 from settings_manager import get_chat_settings
-from welcome import format_welcome_message, send_welcome # Reuse the same formatter
+from welcome import format_welcome_message # Reuse the same formatter
 
 async def on_member_leave_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle chat member status changes to detect leaves."""
@@ -16,6 +16,10 @@ async def on_member_leave_update(update: Update, context: ContextTypes.DEFAULT_T
     old_status = result.old_chat_member.status
     new_status = result.new_chat_member.status
     
+    # Strictly ignore joins
+    if new_status in ['member', 'restricted', 'administrator', 'creator']:
+        return
+
     # Trigger on leave (detects when a member leaves or is kicked)
     is_leaving = new_status in ['left', 'kicked'] and old_status in ['member', 'administrator', 'restricted']
     

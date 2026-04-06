@@ -318,7 +318,9 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             new_val = "admins" if current == "all" else "all"
             update_chat_setting(chat_id, "command_access", new_val)
         else:
-            new_val = not settings.get(key, True) if "enabled" in key else not settings.get(key, False)
+            # Welcome enabled by default, others disabled by default
+            default_val = True if "welcome_enabled" in key or "media_enabled" in key or "button_enabled" in key or "clean_service_enabled" in key else False
+            new_val = not settings.get(key, default_val)
             update_chat_setting(chat_id, key, new_val)
         
         # Refresh current menu
