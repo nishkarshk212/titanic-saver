@@ -269,7 +269,6 @@ async def info_callback_handler(update: Update, context: ContextTypes.DEFAULT_TY
         # Get actual status of the user
         member = await context.bot.get_chat_member(chat_id, user_id)
         is_admin = member.status in ['administrator', 'creator']
-        is_owner = member.status == 'creator'
         is_member = member.status == 'member'
         
         text_override = f"🎭 <b>Role Management</b> for user <code>{user_id}</code>"
@@ -277,7 +276,6 @@ async def info_callback_handler(update: Update, context: ContextTypes.DEFAULT_TY
             [InlineKeyboardButton(f"Admin: {'✅' if is_admin else '❌'}", callback_data=f"info_toadmin_{user_id}")],
             [InlineKeyboardButton(f"Member: {'✅' if is_member else '❌'}", callback_data=f"info_tomember_{user_id}")],
             [InlineKeyboardButton(f"Muter: {'✅' if is_muter_role else '❌'}", callback_data=f"info_tomuter_{user_id}")],
-            [InlineKeyboardButton(f"Owner: {'✅' if is_owner else '❌'}", callback_data=f"info_toowner_{user_id}")],
             [InlineKeyboardButton("🔙 Back", callback_data=f"info_back_{user_id}"), InlineKeyboardButton("❌ Close", callback_data="info_close")]
         ]
     elif action == "toadmin":
@@ -310,9 +308,6 @@ async def info_callback_handler(update: Update, context: ContextTypes.DEFAULT_TY
             await query.answer("User demoted to member.")
         query.data = f"info_roles_{user_id}"
         await info_callback_handler(update, context)
-        return
-    elif action == "toowner":
-        await query.answer("Owner role can only be changed by the current Owner/Creator.", show_alert=True)
         return
     elif action == "tomuter":
         from moderation import add_muter, remove_muter
