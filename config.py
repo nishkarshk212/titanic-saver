@@ -60,11 +60,19 @@ async def send_bot_response(update, context, text, **kwargs):
     # Convert text to small caps
     formatted_text = to_small_caps(text)
     
-    # Handle command deletion if enabled for admins
+    # Send message - Try replying first, fallback to normal message if original is gone
+    try:
+        msg = await update.message.reply_text(formatted_text, **kwargs)
+    except Exception:
+        # If reply fails (e.g. original message deleted), send to chat normally
+        msg = await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=formatted_text,
+            **kwargs
+        )
+    
+    # Handle command deletion if enabled for admins (after sending response)
     await delete_admin_command(update, context)
-
-    # Send message
-    msg = await update.message.reply_text(formatted_text, **kwargs)
     
     # Schedule deletion in 2 minutes (120 seconds)
     if context.job_queue:
@@ -79,15 +87,25 @@ async def send_bot_media(update, context, video=None, photo=None, caption="", **
     """Sends a bot media response with formatted caption and auto-deletion."""
     formatted_caption = to_small_caps(caption)
     
-    # Handle command deletion if enabled for admins
+    # Send media - Try replying first, fallback to normal media if original is gone
+    try:
+        if video:
+            msg = await update.message.reply_video(video, caption=formatted_caption, **kwargs)
+        elif photo:
+            msg = await update.message.reply_photo(photo, caption=formatted_caption, **kwargs)
+        else:
+            return None
+    except Exception:
+        # Fallback to direct send
+        if video:
+            msg = await context.bot.send_video(chat_id=update.effective_chat.id, video=video, caption=formatted_caption, **kwargs)
+        elif photo:
+            msg = await context.bot.send_photo(chat_id=update.effective_chat.id, photo=photo, caption=formatted_caption, **kwargs)
+        else:
+            return None
+
+    # Handle command deletion if enabled for admins (after sending response)
     await delete_admin_command(update, context)
-    
-    if video:
-        msg = await update.message.reply_video(video, caption=formatted_caption, **kwargs)
-    elif photo:
-        msg = await update.message.reply_photo(photo, caption=formatted_caption, **kwargs)
-    else:
-        return None
 
     if context.job_queue:
         context.job_queue.run_once(
