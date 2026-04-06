@@ -160,30 +160,29 @@ async def check_blocked_content_handler(update: Update, context: ContextTypes.DE
 
         # Apply penalty
         if penalty == "warn":
-            current_warns = add_warn(chat_id, user_id)
-            if current_warns >= limit:
-                reset_warns(chat_id, user_id)
-                # Apply secondary penalty if limit reached (default to ban)
-                await context.bot.ban_chat_member(chat_id, user_id)
-                await context.bot.send_message(
-                    chat_id, 
-                    f"🚫 {update.effective_user.first_name} has been banned for repeatedly using blocked content ({limit}/{limit})."
-                )
-            else:
-                await context.bot.send_message(
-                    chat_id, 
-                    f"⚠️ {update.effective_user.first_name}, that content is blocked here. Warning {current_warns}/{limit}."
-                )
+            await context.bot.send_message(
+                chat_id, 
+                f"⚠️ {update.effective_user.first_name}, that content is blocked in this group. Please avoid using it."
+            )
         elif penalty == "mute":
-            await context.bot.restrict_chat_member(chat_id, user_id, permissions=ChatPermissions(can_send_messages=False))
-            await context.bot.send_message(chat_id, f"🔇 {update.effective_user.first_name} has been muted for using blocked content.")
+            try:
+                await context.bot.restrict_chat_member(chat_id, user_id, permissions=ChatPermissions(can_send_messages=False))
+                await context.bot.send_message(chat_id, f"🔇 {update.effective_user.first_name} has been muted for using blocked content.")
+            except Exception as e:
+                logging.error(f"Failed to mute user: {e}")
         elif penalty == "ban":
-            await context.bot.ban_chat_member(chat_id, user_id)
-            await context.bot.send_message(chat_id, f"🚫 {update.effective_user.first_name} has been banned for using blocked content.")
+            try:
+                await context.bot.ban_chat_member(chat_id, user_id)
+                await context.bot.send_message(chat_id, f"🚫 {update.effective_user.first_name} has been banned for using blocked content.")
+            except Exception as e:
+                logging.error(f"Failed to ban user: {e}")
         elif penalty == "kick":
-            await context.bot.ban_chat_member(chat_id, user_id)
-            await context.bot.unban_chat_member(chat_id, user_id)
-            await context.bot.send_message(chat_id, f"👞 {update.effective_user.first_name} has been kicked for using blocked content.")
+            try:
+                await context.bot.ban_chat_member(chat_id, user_id)
+                await context.bot.unban_chat_member(chat_id, user_id)
+                await context.bot.send_message(chat_id, f"👞 {update.effective_user.first_name} has been kicked for using blocked content.")
+            except Exception as e:
+                logging.error(f"Failed to kick user: {e}")
         return
 
     # Check message length
