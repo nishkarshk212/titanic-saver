@@ -28,12 +28,8 @@ async def log_to_channel(context, message):
         except Exception as e:
             logging.error(f"Failed to log to channel: {e}")
 
-async def send_bot_response(update, context, text, **kwargs):
-    """Sends a bot response formatted with small caps and schedules deletion in 2 mins."""
-    # Convert text to small caps
-    formatted_text = to_small_caps(text)
-    
-    # 1. Handle command deletion if enabled for admins
+async def delete_admin_command(update, context):
+    """Helper function to delete an admin's command message if enabled."""
     if update.message and update.message.text and update.message.text.startswith('/'):
         chat_id = update.effective_chat.id
         user_id = update.effective_user.id
@@ -46,6 +42,14 @@ async def send_bot_response(update, context, text, **kwargs):
                     await update.message.delete()
                 except Exception:
                     pass
+
+async def send_bot_response(update, context, text, **kwargs):
+    """Sends a bot response formatted with small caps and schedules deletion in 2 mins."""
+    # Convert text to small caps
+    formatted_text = to_small_caps(text)
+    
+    # Handle command deletion if enabled for admins
+    await delete_admin_command(update, context)
 
     # Send message
     msg = await update.message.reply_text(formatted_text, **kwargs)
@@ -62,6 +66,9 @@ async def send_bot_response(update, context, text, **kwargs):
 async def send_bot_media(update, context, video=None, photo=None, caption="", **kwargs):
     """Sends a bot media response with formatted caption and auto-deletion."""
     formatted_caption = to_small_caps(caption)
+    
+    # Handle command deletion if enabled for admins
+    await delete_admin_command(update, context)
     
     if video:
         msg = await update.message.reply_video(video, caption=formatted_caption, **kwargs)
