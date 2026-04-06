@@ -28,6 +28,7 @@ def get_main_settings_keyboard():
         [InlineKeyboardButton("🧹 Clean Service", callback_data="set_view_clean")],
         [InlineKeyboardButton("💣 Auto Delete", callback_data="set_view_auto_delete")],
         [InlineKeyboardButton("🛡️ Moderation Settings", callback_data="set_view_mod")],
+        [InlineKeyboardButton("🗑️ Command Deletion", callback_data="set_view_command_deletion")],
         [InlineKeyboardButton("❌ Close Menu", callback_data="set_close")]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -138,6 +139,14 @@ def get_mod_settings_keyboard(settings):
     ]
     return InlineKeyboardMarkup(keyboard)
 
+def get_command_deletion_keyboard(settings):
+    status = "✅" if settings.get("command_deletion", False) else "❌"
+    keyboard = [
+        [InlineKeyboardButton(f"Delete Admin Commands: {status}", callback_data="set_toggle_command_deletion")],
+        [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
 async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     chat_id = update.effective_chat.id
@@ -225,6 +234,18 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer()
         return
 
+    if data == "set_view_command_deletion":
+        settings = get_chat_settings(chat_id)
+        try:
+            await edit_bot_response(
+                query, context,
+                "🗑️ Command Deletion\n\nAutomatically delete admin command messages if enabled:",
+                reply_markup=get_command_deletion_keyboard(settings)
+            )
+        except BadRequest: pass
+        await query.answer()
+        return
+
     if data.startswith("set_toggle_"):
         key = data.replace("set_toggle_", "")
         settings = get_chat_settings(chat_id)
@@ -246,6 +267,7 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             elif "clean" in key: await query.edit_message_reply_markup(reply_markup=get_clean_settings_keyboard(new_settings))
             elif "auto_delete" in key: await query.edit_message_reply_markup(reply_markup=get_auto_delete_settings_keyboard(new_settings))
             elif "warn" in key: await query.edit_message_reply_markup(reply_markup=get_mod_settings_keyboard(new_settings))
+            elif "command_deletion" in key: await query.edit_message_reply_markup(reply_markup=get_command_deletion_keyboard(new_settings))
         except BadRequest: pass
         await query.answer(f"Setting updated!")
         return

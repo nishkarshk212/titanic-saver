@@ -3,6 +3,8 @@ from dotenv import load_dotenv
 import logging
 
 from font import to_small_caps
+from settings_manager import get_chat_settings
+from user_manager import is_user_admin
 
 load_dotenv()
 
@@ -31,6 +33,20 @@ async def send_bot_response(update, context, text, **kwargs):
     # Convert text to small caps
     formatted_text = to_small_caps(text)
     
+    # 1. Handle command deletion if enabled for admins
+    if update.message and update.message.text and update.message.text.startswith('/'):
+        chat_id = update.effective_chat.id
+        user_id = update.effective_user.id
+        settings = get_chat_settings(chat_id)
+        
+        if settings.get("command_deletion", False):
+            # Check if user is admin/owner
+            if await is_user_admin(chat_id, user_id, context):
+                try:
+                    await update.message.delete()
+                except Exception:
+                    pass
+
     # Send message
     msg = await update.message.reply_text(formatted_text, **kwargs)
     
