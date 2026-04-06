@@ -50,7 +50,8 @@ def get_welcome_settings_keyboard(settings):
         ],
         [
             InlineKeyboardButton(f"Button: {button_status}", callback_data="set_toggle_welcome_button_enabled"),
-            InlineKeyboardButton("🔗 Set Button", callback_data="set_config_welcome_button")
+            InlineKeyboardButton("➕ Add Button", callback_data="set_config_welcome_buttons_add"),
+            InlineKeyboardButton("🗑️ Clear", callback_data="set_config_welcome_buttons_clear")
         ],
         [InlineKeyboardButton("📝 Set Welcome Text", callback_data="set_config_welcome_text")],
         [
@@ -357,10 +358,24 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Handle Config requests (Set Media, Text, Button)
     if data.startswith("set_config_"):
         config_full = data.replace("set_config_", "")
+        
+        # Handle clear buttons separately
+        if config_full.endswith("_clear"):
+            section = config_full.replace("_buttons_clear", "")
+            update_chat_setting(chat_id, f"{section}_buttons", [])
+            update_chat_setting(chat_id, f"{section}_button_text", None)
+            update_chat_setting(chat_id, f"{section}_button_url", None)
+            await query.answer("All buttons cleared!")
+            new_settings = get_chat_settings(chat_id)
+            if section == "welcome": await query.edit_message_reply_markup(reply_markup=get_welcome_settings_keyboard(new_settings))
+            elif section == "goodbye": await query.edit_message_reply_markup(reply_markup=get_goodbye_settings_keyboard(new_settings))
+            return
+
         if "welcome" in config_full: section = "welcome"
         elif "goodbye" in config_full: section = "goodbye"
         elif "auto_delete" in config_full: section = "auto_delete"
         else: section = "unknown"
+        
         config_type = config_full.replace(f"{section}_", "")
         context.user_data["waiting_for_config"] = {"section": section, "type": config_type, "chat_id": chat_id, "user_id": user_id}
         
@@ -383,12 +398,13 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "• {RULES} = group regulation\n\n"
                 "Send /cancel to stop."
             ),
+            "buttons_add": f"Please send the {section} button text and URL in this format:\n`Button Text | https://t.me/yourlink`",
             "button": f"Please send the {section} button text and URL in this format:\n`Button Text | https://t.me/yourlink`"
         }
         
         await edit_bot_response(
             query, context, 
-            f"📥 **Configuring {section.title()} {config_type.title()}**\n\n{prompt_map.get(config_type, 'Please send the value.')}", 
+            f"📥 **Configuring {section.title()} {config_type.replace('_', ' ').title()}**\n\n{prompt_map.get(config_type, 'Please send the value.')}", 
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Cancel", callback_data=f"set_view_{section}")]]),
             parse_mode="HTML"
         )
@@ -429,6 +445,17 @@ async def handle_setting_input(update: Update, context: ContextTypes.DEFAULT_TYP
         if update.message.text:
             update_chat_setting(chat_id, setting_key, update.message.text)
             success = True
+    elif config_type == "buttons_add":
+        if update.message.text and "|" in update.message.text:
+            try:
+                btn_text, btn_url = [x.strip() for x in update.message.text.split("|", 1)]
+                if btn_url.startswith("http"):
+                    settings = get_chat_settings(chat_id)
+                    current_buttons = settings.get(f"{section}_buttons", [])
+                    current_buttons.append({"text": btn_text, "url": btn_url})
+                    update_chat_setting(chat_id, f"{section}_buttons", current_buttons)
+                    success = True
+            except Exception: pass
     elif config_type == "button":
         if update.message.text and "|" in update.message.text:
             try:

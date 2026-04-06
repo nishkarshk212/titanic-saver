@@ -29,6 +29,7 @@ def get_chat_settings(chat_id):
             "welcome_media": None,
             "welcome_media_type": "photo", # photo, video, animation
             "welcome_delete_time": 60, # seconds
+            "welcome_buttons": [], # List of {"text": str, "url": str}
             "welcome_button_text": "Join Channel",
             "welcome_button_url": "https://t.me/yourchannel",
             "goodbye_enabled": True,

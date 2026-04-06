@@ -118,12 +118,24 @@ async def send_welcome(chat, user, context: ContextTypes.DEFAULT_TYPE):
     welcome_delete_time = settings.get('welcome_delete_time', 60)
     media_enabled = settings.get('welcome_media_enabled', True)
     button_enabled = settings.get('welcome_button_enabled', True)
+    welcome_buttons = settings.get('welcome_buttons', [])
     button_text = settings.get('welcome_button_text')
     button_url = settings.get('welcome_button_url')
 
     reply_markup = None
-    if button_enabled and button_text and button_url:
-        reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton(button_text, url=button_url)]])
+    if button_enabled:
+        keyboard = []
+        # Add multiple buttons if they exist
+        for btn in welcome_buttons:
+            if btn.get("text") and btn.get("url"):
+                keyboard.append([InlineKeyboardButton(btn["text"], url=btn["url"])])
+        
+        # Fallback to single button if no multiple buttons but single button exists
+        if not keyboard and button_text and button_url:
+            keyboard.append([InlineKeyboardButton(button_text, url=button_url)])
+            
+        if keyboard:
+            reply_markup = InlineKeyboardMarkup(keyboard)
 
     # Cache the user
     cache_user(user.id, user.username, user.first_name)
