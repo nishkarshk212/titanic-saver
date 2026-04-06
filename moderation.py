@@ -17,12 +17,39 @@ async def can_user_mute(chat_id, user_id, context):
         return True
     return check_is_muter(chat_id, user_id)
 
+async def check_bot_admin_rights(chat_id, context, required_rights=None):
+    """Checks if the bot has the required administrative rights."""
+    try:
+        bot_member = await context.bot.get_chat_member(chat_id, context.bot.id)
+        if bot_member.status == 'creator':
+            return True, None
+        if bot_member.status != 'administrator':
+            return False, "❌ I am not an administrator in this group."
+        
+        if required_rights:
+            missing = []
+            for right in required_rights:
+                if not getattr(bot_member, right, False):
+                    missing.append(right)
+            if missing:
+                return False, f"❌ I am missing the following rights: {', '.join(missing)}"
+        return True, None
+    except Exception as e:
+        return False, f"❌ Error checking bot rights: {str(e)}"
+
 async def ban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Bans a user from the chat."""
     chat_id = update.effective_chat.id
     sender_id = update.effective_user.id
     
     if not await is_user_admin(chat_id, sender_id, context):
-        await send_bot_response(update, context, "Admin only command.")
+        await send_bot_response(update, context, "You must be an admin to ban users.")
+        return
+
+    # Check bot rights
+    has_rights, error_msg = await check_bot_admin_rights(chat_id, context, ['can_restrict_members'])
+    if not has_rights:
+        await send_bot_response(update, context, error_msg)
         return
 
     user_id, user_name = await get_user_id(update, context)
@@ -54,11 +81,19 @@ async def unban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await send_bot_response(update, context, f"Error: {e}")
 
 async def mute_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Mutes a user by restricting their permissions."""
     chat_id = update.effective_chat.id
     sender_id = update.effective_user.id
     
+    # Check if user is admin or muter
     if not await can_user_mute(chat_id, sender_id, context):
-        await send_bot_response(update, context, "You don't have permission to mute users.")
+        await send_bot_response(update, context, "You must be an admin or have the 'Muter' role to mute users.")
+        return
+
+    # Check bot rights
+    has_rights, error_msg = await check_bot_admin_rights(chat_id, context, ['can_restrict_members'])
+    if not has_rights:
+        await send_bot_response(update, context, error_msg)
         return
 
     user_id, user_name = await get_user_id(update, context)

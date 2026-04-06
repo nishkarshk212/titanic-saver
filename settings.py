@@ -316,10 +316,32 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         prompt_map = {
             "media": f"Please send the photo you want to use as the {section} media.",
-            "text": f"Please send the text you want to use as the {section} message.\n\nUse HTML and placeholders like {{NAME}}, {{ID}}, etc.",
+            "text": (
+                f"˹{update.effective_user.first_name}˼, send now the message you want to set!\n\n"
+                "You can use HTML and:\n"
+                "• {ID} = user ID\n"
+                "• {NAME} = user name\n"
+                "• {SURNAME} = user surname\n"
+                "• {NAMESURNAME} = name and surname\n"
+                "• {LANG} = user language\n"
+                "• {DATE} = current date\n"
+                "• {TIME} = current time\n"
+                "• {WEEKDAY} = week day\n"
+                "• {MENTION} = link to the user profile\n"
+                "• {USERNAME} = username\n"
+                "• {GROUPNAME} = group name\n"
+                "• {RULES} = group regulation\n\n"
+                "Send /cancel to stop."
+            ),
             "button": f"Please send the {section} button text and URL in this format:\n`Button Text | https://t.me/yourlink`"
         }
-        await edit_bot_response(query, context, f"📥 **Configuring {section.title()} {config_type.title()}**\n\n{prompt_map.get(config_type, 'Please send the value.')}\n\nSend /cancel to stop.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Cancel", callback_data=f"set_view_{section}")]]))
+        
+        await edit_bot_response(
+            query, context, 
+            f"📥 **Configuring {section.title()} {config_type.title()}**\n\n{prompt_map.get(config_type, 'Please send the value.')}", 
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Cancel", callback_data=f"set_view_{section}")]]),
+            parse_mode="HTML"
+        )
         await query.answer()
 
 async def handle_setting_input(update: Update, context: ContextTypes.DEFAULT_TYPE):

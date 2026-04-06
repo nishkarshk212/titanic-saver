@@ -33,13 +33,25 @@ async def delete_admin_command(update, context):
         from user_manager import is_user_admin
         chat_id = update.effective_chat.id
         user_id = update.effective_user.id
+        
+        # Don't delete if it's a private chat
+        if update.effective_chat.type == "private":
+            return
+            
         settings = get_chat_settings(chat_id)
         
         if settings.get("command_deletion", False):
             # Check if user is admin/owner
             if await is_user_admin(chat_id, user_id, context):
                 try:
-                    await update.message.delete()
+                    # We use a job to delete it slightly later to ensure the command 
+                    # handler has received the message and started processing
+                    if context.job_queue:
+                        context.job_queue.run_once(
+                            delete_message_job,
+                            1, # 1 second delay
+                            data={"chat_id": chat_id, "message_id": update.message.message_id}
+                        )
                 except Exception:
                     pass
 

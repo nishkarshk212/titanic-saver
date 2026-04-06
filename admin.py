@@ -40,8 +40,15 @@ async def promote_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     sender_id = update.effective_user.id
     
+    # Check if user is admin/owner
     if not await is_user_admin(chat_id, sender_id, context):
         await send_bot_response(update, context, "You must be an admin to promote others.")
+        return
+
+    # Check bot permissions (can_promote_members)
+    bot_member = await context.bot.get_chat_member(chat_id, context.bot.id)
+    if not (bot_member.status == 'creator' or (bot_member.status == 'administrator' and bot_member.can_promote_members)):
+        await send_bot_response(update, context, "❌ I don't have the 'Add New Admins' permission to promote anyone.")
         return
 
     user_id, user_name = await get_user_id(update, context)
@@ -209,6 +216,12 @@ async def demote_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if not await is_user_admin(chat_id, sender_id, context):
         await send_bot_response(update, context, "You must be an admin to demote others.")
+        return
+
+    # Check bot permissions (can_promote_members)
+    bot_member = await context.bot.get_chat_member(chat_id, context.bot.id)
+    if not (bot_member.status == 'creator' or (bot_member.status == 'administrator' and bot_member.can_promote_members)):
+        await send_bot_response(update, context, "❌ I don't have the 'Add New Admins' permission to demote anyone.")
         return
 
     user_id, user_name = await get_user_id(update, context)
