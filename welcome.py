@@ -172,8 +172,15 @@ async def on_chat_member_update(update: Update, context: ContextTypes.DEFAULT_TY
     old_status = result.old_chat_member.status
     new_status = result.new_chat_member.status
     
-    # Trigger on join (from left/kicked to member)
-    if new_status == 'member' and old_status in ['left', 'kicked']:
+    # Debug log
+    logging.info(f"Chat Member Update: {old_status} -> {new_status} for user {result.new_chat_member.user.id}")
+    
+    # Trigger on join (detects both new joins and re-joins)
+    # new_status is 'member' or 'administrator' or 'creator' (if bot is creator, we don't care about its own join)
+    # old_status was 'left' or 'kicked' or 'none' (none is for some first-time joins)
+    is_joining = new_status in ['member', 'administrator'] and old_status in ['left', 'kicked', 'none', 'restricted']
+    
+    if is_joining:
         member = result.new_chat_member.user
         if member.is_bot:
             return
