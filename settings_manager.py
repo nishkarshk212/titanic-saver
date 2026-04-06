@@ -24,6 +24,7 @@ def get_chat_settings(chat_id):
             "welcome_enabled": True,
             "welcome_media_enabled": True,
             "welcome_button_enabled": True,
+            "welcome_rejoin_enabled": True,
             "welcome_text": "Welcome {NAME} to the group!",
             "welcome_media": None,
             "welcome_button_text": "Join Channel",

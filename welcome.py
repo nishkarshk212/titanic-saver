@@ -184,6 +184,14 @@ async def on_chat_member_update(update: Update, context: ContextTypes.DEFAULT_TY
         member = result.new_chat_member.user
         if member.is_bot:
             return
+            
+        # Check rejoin setting if old_status was 'left' or 'kicked'
+        if old_status in ['left', 'kicked']:
+            settings = get_chat_settings(update.effective_chat.id)
+            if not settings.get("welcome_rejoin_enabled", True):
+                logging.info(f"Skipping welcome for re-joining user {member.id} as welcome_rejoin_enabled is False")
+                return
+                
         await send_welcome(update.effective_chat, member, context)
 
 def get_welcome_handlers():

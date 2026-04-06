@@ -35,11 +35,13 @@ def get_main_settings_keyboard():
 
 def get_welcome_settings_keyboard(settings):
     welcome_status = "✅" if settings.get("welcome_enabled", True) else "❌"
+    rejoin_status = "✅" if settings.get("welcome_rejoin_enabled", True) else "❌"
     media_status = "✅" if settings.get("welcome_media_enabled", True) else "❌"
     button_status = "✅" if settings.get("welcome_button_enabled", True) else "❌"
     
     keyboard = [
         [InlineKeyboardButton(f"Welcome: {welcome_status}", callback_data="set_toggle_welcome_enabled")],
+        [InlineKeyboardButton(f"Welcome on Re-join: {rejoin_status}", callback_data="set_toggle_welcome_rejoin_enabled")],
         [
             InlineKeyboardButton(f"Media: {media_status}", callback_data="set_toggle_welcome_media_enabled"),
             InlineKeyboardButton("🖼️ Set Media", callback_data="set_config_welcome_media")
