@@ -228,30 +228,30 @@ async def on_chat_member_update(update: Update, context: ContextTypes.DEFAULT_TY
         
     old_status = result.old_chat_member.status
     new_status = result.new_chat_member.status
-    settings = get_chat_settings(update.effective_chat.id)
+    chat_id = update.effective_chat.id
+    settings = get_chat_settings(chat_id)
     
     # Debug log
-    logging.info(f"Chat Member Update: {old_status} -> {new_status} for user {result.new_chat_member.user.id}")
+    logging.info(f"Chat Member Update in {chat_id}: {old_status} -> {new_status} for user {result.new_chat_member.user.id}")
     
-    # Trigger on join (detects both new joins and re-joins)
-    # 1. new_status is 'member' or 'administrator' or 'creator' or 'restricted'
-    # 2. old_status was 'left' or 'kicked' or 'none' (none is for some first-time joins)
-    is_joining = new_status in ['member', 'administrator', 'restricted'] and old_status in ['left', 'kicked', 'none']
+    # Active statuses that should receive a welcome message
+    active_statuses = ['member', 'administrator', 'restricted']
     
-    # Strictly ignore leaves and kicks
-    if new_status in ['left', 'kicked']:
-        return
+    # Non-active statuses from which a user can "join"
+    inactive_statuses = ['left', 'kicked', 'none']
 
-    # Debug: Only process if it's clearly a join
+    # Trigger welcome if moving from inactive to active
+    is_joining = new_status in active_statuses and old_status in inactive_statuses
+    
     if is_joining:
         member = result.new_chat_member.user
         if member.is_bot:
             return
             
-        # Check rejoin setting if it's clearly a rejoin (was previously left or kicked)
+        # If it's a rejoin (was previously left or kicked), check the rejoin setting
         if old_status in ['left', 'kicked']:
             if not settings.get("welcome_rejoin_enabled", True):
-                logging.info(f"Skipping welcome for re-joining user {member.id} as welcome_rejoin_enabled is False")
+                logging.info(f"Skipping welcome for re-joining user {member.id} in {chat_id} as welcome_rejoin_enabled is False")
                 return
         
         await send_welcome(update.effective_chat, member, context)
