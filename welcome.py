@@ -213,22 +213,28 @@ async def on_chat_member_update(update: Update, context: ContextTypes.DEFAULT_TY
     logging.info(f"Chat Member Update: {old_status} -> {new_status} for user {result.new_chat_member.user.id}")
     
     # Trigger on join (detects both new joins and re-joins)
-    # new_status is 'member' or 'administrator' or 'creator' (if bot is creator, we don't care about its own join)
+    # new_status is 'member' or 'administrator' or 'creator'
     # old_status was 'left' or 'kicked' or 'none' (none is for some first-time joins)
     is_joining = new_status in ['member', 'administrator'] and old_status in ['left', 'kicked', 'none', 'restricted']
+    
+    # In some groups, the old_status might be 'member' if the join event is triggered again,
+    # or it could be 'left' if they were already out.
+    # If welcome_rejoin_enabled is True, we should be more permissive.
     
     if is_joining:
         member = result.new_chat_member.user
         if member.is_bot:
             return
             
-        # Check rejoin setting if old_status was 'left' or 'kicked'
-        if old_status in ['left', 'kicked']:
-            settings = get_chat_settings(update.effective_chat.id)
+        settings = get_chat_settings(update.effective_chat.id)
+        
+        # Check rejoin setting if old_status was 'left', 'kicked', or 'restricted'
+        if old_status in ['left', 'kicked', 'restricted']:
             if not settings.get("welcome_rejoin_enabled", True):
                 logging.info(f"Skipping welcome for re-joining user {member.id} as welcome_rejoin_enabled is False")
                 return
-                
+        
+        # Always send if it's a new join (old_status 'none') or if re-joins are allowed
         await send_welcome(update.effective_chat, member, context)
 
 def get_welcome_handlers():
