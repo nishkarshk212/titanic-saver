@@ -136,7 +136,84 @@ async def info_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"• <b>Total Messages:</b> {msg_count}"
     )
     
-    await send_bot_response(update, context, info_text, parse_mode=ParseMode.HTML)
+    # Create keyboard for admins
+    reply_markup = None
+    if await is_user_admin(chat_id, update.effective_user.id, context):
+        keyboard = [
+            [
+                InlineKeyboardButton("⚠️ Warns", callback_data=f"info_warns_{user_id}"),
+                InlineKeyboardButton("🎭 Roles", callback_data=f"info_roles_{user_id}")
+            ],
+            [
+                InlineKeyboardButton("🔇 Mute" if not is_muted else "🔊 Unmute", callback_data=f"info_mute_{user_id}"),
+                InlineKeyboardButton("🔨 Ban", callback_data=f"info_ban_{user_id}")
+            ],
+            [InlineKeyboardButton("🛡️ Permissions", callback_data=f"info_perms_{user_id}")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await send_bot_response(update, context, info_text, parse_mode=ParseMode.HTML, reply_markup=reply_markup)
+
+async def info_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle management buttons from the /info command."""
+    query = update.callback_query
+    chat_id = update.effective_chat.id
+    admin_id = update.effective_user.id
+    
+    # Permission check: only admins can use these buttons
+    if not await is_user_admin(chat_id, admin_id, context):
+        await query.answer("Admin only feature.", show_alert=True)
+        return
+
+    data = query.data.split("_")
+    action = data[1]
+    user_id = int(data[2])
+    
+    # Import handlers locally to avoid circular imports if needed
+    from moderation import mute_command, unmute_command, ban_command, warn_command
+    from admin import promote_command
+    
+    # Create a mock update to reuse existing command logic
+    class MockMessage:
+        def __init__(self, chat, from_user, reply_to_message=None):
+            self.chat = chat
+            self.from_user = from_user
+            self.reply_to_message = reply_to_message
+            self.text = ""
+        async def reply_text(self, text, *args, **kwargs):
+            await query.message.reply_text(text, *args, **kwargs)
+
+    mock_update = Update(update.update_id, message=MockMessage(update.effective_chat, update.effective_user))
+    # For user_id extraction, we'll manually set context.args if needed or rely on a trick
+    # Most command handlers use get_user_id which checks reply, mentions, or args.
+    # We'll mock context.args to contain the user_id
+    context.args = [str(user_id)]
+
+    if action == "warns":
+        await warn_command(mock_update, context)
+        await query.answer("Warning applied.")
+    elif action == "mute":
+        # Check current mute status
+        member = await context.bot.get_chat_member(chat_id, user_id)
+        if member.status == 'restricted' and not member.can_send_messages:
+            await unmute_command(mock_update, context)
+            await query.answer("User unmuted.")
+        else:
+            await mute_command(mock_update, context)
+            await query.answer("User muted.")
+    elif action == "ban":
+        await ban_command(mock_update, context)
+        await query.answer("User banned.")
+    elif action == "roles":
+        await promote_command(mock_update, context)
+        await query.answer("Promotion menu opened.")
+    elif action == "perms":
+        # Reuse promotion for perms as well
+        await promote_command(mock_update, context)
+        await query.answer("Permissions menu opened.")
+    
+    # Refresh info if possible (optional)
+    # await info_command(mock_update, context)
 
 async def get_id_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Simple command to show user ID and ensure they are cached."""
@@ -180,6 +257,7 @@ def main():
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("id", get_id_command))
     application.add_handler(CommandHandler("info", info_command))
+    application.add_handler(CallbackQueryHandler(info_callback_handler, pattern="^info_"))
     application.add_handler(MessageHandler(filters.ALL & (filters.ChatType.GROUPS | filters.ChatType.SUPERGROUP), cache_user_handler), group=-1)
 
     # Add admin handlers (Group 0)
