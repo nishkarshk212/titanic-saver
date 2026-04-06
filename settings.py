@@ -40,6 +40,7 @@ def get_welcome_settings_keyboard(settings):
     media_status = "✅" if settings.get("welcome_media_enabled", True) else "❌"
     button_status = "✅" if settings.get("welcome_button_enabled", True) else "❌"
     delete_time = settings.get("welcome_delete_time", 60)
+    welcome_buttons = settings.get("welcome_buttons", [])
     
     keyboard = [
         [InlineKeyboardButton(f"Welcome: {welcome_status}", callback_data="set_toggle_welcome_enabled")],
@@ -52,7 +53,16 @@ def get_welcome_settings_keyboard(settings):
             InlineKeyboardButton(f"Button: {button_status}", callback_data="set_toggle_welcome_button_enabled"),
             InlineKeyboardButton("➕ Add Button", callback_data="set_config_welcome_buttons_add"),
             InlineKeyboardButton("🗑️ Clear", callback_data="set_config_welcome_buttons_clear")
-        ],
+        ]
+    ]
+    
+    # List added buttons if any
+    if welcome_buttons:
+        for idx, btn in enumerate(welcome_buttons, 1):
+            btn_text = btn.get("text", f"Btn {idx}")
+            keyboard.append([InlineKeyboardButton(f"Button {idx}: {btn_text}", callback_data="set_none")])
+    
+    keyboard.extend([
         [InlineKeyboardButton("📝 Set Welcome Text", callback_data="set_config_welcome_text")],
         [
             InlineKeyboardButton("-10s", callback_data="set_welcome_time_sub_10"),
@@ -60,7 +70,7 @@ def get_welcome_settings_keyboard(settings):
             InlineKeyboardButton("+10s", callback_data="set_welcome_time_add_10")
         ],
         [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
-    ]
+    ])
     return InlineKeyboardMarkup(keyboard)
 
 def get_goodbye_settings_keyboard(settings):

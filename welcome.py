@@ -136,6 +136,11 @@ async def send_welcome(chat, user, context: ContextTypes.DEFAULT_TYPE):
             
         if keyboard:
             reply_markup = InlineKeyboardMarkup(keyboard)
+            logging.info(f"Generated welcome keyboard with {len(keyboard)} buttons")
+        else:
+            logging.info("No welcome buttons generated (keyboard empty)")
+    else:
+        logging.info("Welcome buttons disabled in settings")
 
     # Cache the user
     cache_user(user.id, user.username, user.first_name)
