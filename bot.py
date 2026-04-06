@@ -2,7 +2,7 @@ import logging
 import os
 import html
 import random
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, ChatPermissions
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 from telegram.constants import ParseMode
 from admin import get_admin_handlers
@@ -146,9 +146,10 @@ async def info_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ],
             [
                 InlineKeyboardButton("🔇 Mute" if not is_muted else "🔊 Unmute", callback_data=f"info_mute_{user_id}"),
-                InlineKeyboardButton("🔨 Ban", callback_data=f"info_ban_{user_id}")
+                InlineKeyboardButton("🔨 Ban" if user_status != "Banned" else "🔓 Unban", callback_data=f"info_ban_{user_id}")
             ],
-            [InlineKeyboardButton("🛡️ Permissions", callback_data=f"info_perms_{user_id}")]
+            [InlineKeyboardButton("🛡️ Permissions", callback_data=f"info_perms_{user_id}")],
+            [InlineKeyboardButton("❌ Close", callback_data="info_close")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -198,7 +199,7 @@ async def info_callback_handler(update: Update, context: ContextTypes.DEFAULT_TY
                 InlineKeyboardButton("➕ Add Warn", callback_data=f"info_addwarn_{user_id}"),
                 InlineKeyboardButton("🔄 Reset Warns", callback_data=f"info_resetwarn_{user_id}")
             ],
-            [InlineKeyboardButton("🔙 Back", callback_data=f"info_back_{user_id}")]
+            [InlineKeyboardButton("🔙 Back", callback_data=f"info_back_{user_id}"), InlineKeyboardButton("❌ Close", callback_data="info_close")]
         ]
     elif action == "addwarn":
         await warn_command(mock_update, context)
@@ -218,7 +219,7 @@ async def info_callback_handler(update: Update, context: ContextTypes.DEFAULT_TY
         text_override = f"🔇 <b>Mute Management</b> for user <code>{user_id}</code>\n\nStatus: {'Muted 🔇' if is_muted else 'Unmuted 🔊'}"
         keyboard = [
             [InlineKeyboardButton("🔊 Unmute" if is_muted else "🔇 Mute", callback_data=f"info_domute_{user_id}")],
-            [InlineKeyboardButton("🔙 Back", callback_data=f"info_back_{user_id}")]
+            [InlineKeyboardButton("🔙 Back", callback_data=f"info_back_{user_id}"), InlineKeyboardButton("❌ Close", callback_data="info_close")]
         ]
     elif action == "domute":
         try:
@@ -247,7 +248,7 @@ async def info_callback_handler(update: Update, context: ContextTypes.DEFAULT_TY
         text_override = f"🔨 <b>Ban Management</b> for user <code>{user_id}</code>\n\nStatus: {'Banned ⛔' if is_banned else 'Active ✅'}"
         keyboard = [
             [InlineKeyboardButton("🔓 Unban" if is_banned else "🔨 Ban", callback_data=f"info_doban_{user_id}")],
-            [InlineKeyboardButton("🔙 Back", callback_data=f"info_back_{user_id}")]
+            [InlineKeyboardButton("🔙 Back", callback_data=f"info_back_{user_id}"), InlineKeyboardButton("❌ Close", callback_data="info_close")]
         ]
     elif action == "doban":
         try:
@@ -268,7 +269,7 @@ async def info_callback_handler(update: Update, context: ContextTypes.DEFAULT_TY
         text_override = f"🎭 <b>Role Management</b> for user <code>{user_id}</code>"
         keyboard = [
             [InlineKeyboardButton(f"Muter Role: {'✅ Enabled' if is_muter_role else '❌ Disabled'}", callback_data=f"info_tomuter_{user_id}")],
-            [InlineKeyboardButton("🔙 Back", callback_data=f"info_back_{user_id}")]
+            [InlineKeyboardButton("🔙 Back", callback_data=f"info_back_{user_id}"), InlineKeyboardButton("❌ Close", callback_data="info_close")]
         ]
     elif action == "tomuter":
         from moderation import add_muter, remove_muter
@@ -285,7 +286,7 @@ async def info_callback_handler(update: Update, context: ContextTypes.DEFAULT_TY
         member = await context.bot.get_chat_member(chat_id, user_id)
         if member.status in ['creator', 'administrator']:
             text_override = f"🛡️ <b>Permissions</b> for user <code>{user_id}</code>\n\nAdmin/Owner permissions cannot be toggled here. Use 🎭 Roles."
-            keyboard = [[InlineKeyboardButton("🔙 Back", callback_data=f"info_back_{user_id}")]]
+            keyboard = [[InlineKeyboardButton("🔙 Back", callback_data=f"info_back_{user_id}"), InlineKeyboardButton("❌ Close", callback_data="info_close")]]
         else:
             p = {
                 "msg": member.can_send_messages if member.status == 'restricted' else True,
@@ -307,7 +308,7 @@ async def info_callback_handler(update: Update, context: ContextTypes.DEFAULT_TY
                 [InlineKeyboardButton(f"Send Music: {'✅' if p['music'] else '❌'}", callback_data=f"info_toperm_music_{user_id}")],
                 [InlineKeyboardButton(f"Send Poll: {'✅' if p['poll'] else '❌'}", callback_data=f"info_toperm_poll_{user_id}")],
                 [InlineKeyboardButton(f"Send Stickers/GIFs: {'✅' if p['other'] else '❌'}", callback_data=f"info_toperm_other_{user_id}")],
-                [InlineKeyboardButton("🔙 Back", callback_data=f"info_back_{user_id}")]
+                [InlineKeyboardButton("🔙 Back", callback_data=f"info_back_{user_id}"), InlineKeyboardButton("❌ Close", callback_data="info_close")]
             ]
     elif action.startswith("toperm"):
         perm_type = data[2]
@@ -349,6 +350,12 @@ async def info_callback_handler(update: Update, context: ContextTypes.DEFAULT_TY
             
         query.data = f"info_perms_{user_id}"
         await info_callback_handler(update, context)
+        return
+    elif action == "close":
+        try:
+            await query.message.delete()
+        except:
+            await query.edit_message_text("Menu closed.")
         return
     elif action == "back":
         # We need to reconstruct the original info message
@@ -392,12 +399,14 @@ async def info_callback_handler(update: Update, context: ContextTypes.DEFAULT_TY
         keyboard = [
             [InlineKeyboardButton("⚠️ Warns", callback_data=f"info_warns_{user_id}"), InlineKeyboardButton("🎭 Roles", callback_data=f"info_roles_{user_id}")],
             [InlineKeyboardButton("🔇 Mute" if not is_muted else "🔊 Unmute", callback_data=f"info_mute_{user_id}"), InlineKeyboardButton("🔨 Ban", callback_data=f"info_ban_{user_id}")],
-            [InlineKeyboardButton("🛡️ Permissions", callback_data=f"info_perms_{user_id}")]
+            [InlineKeyboardButton("🛡️ Permissions", callback_data=f"info_perms_{user_id}")],
+            [InlineKeyboardButton("❌ Close", callback_data="info_close")]
         ]
         
         await query.edit_message_text(info_text, parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup(keyboard))
         await query.answer()
         return
+
 
     if text_override and keyboard:
         try:
