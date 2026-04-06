@@ -88,11 +88,50 @@ async def info_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     joined_date = stats.get("joined_date", "Unknown") if stats else "Unknown"
     msg_count = stats.get("msg_count", 0) if stats else 0
     
+    # Get user status and role in group
+    user_status = "Unknown"
+    user_role = "Member"
+    is_muted = False
+    
+    try:
+        member = await context.bot.get_chat_member(chat_id, user_id)
+        status = member.status
+        
+        # Determine Status & Role
+        if status == 'creator':
+            user_status = "Present"
+            user_role = "Owner/Creator"
+        elif status == 'administrator':
+            user_status = "Present"
+            user_role = "Administrator"
+            if member.custom_title:
+                user_role += f" ({member.custom_title})"
+        elif status == 'member':
+            user_status = "Present"
+            user_role = "Member"
+        elif status == 'restricted':
+            user_status = "Present (Restricted)"
+            user_role = "Restricted Member"
+            if not member.can_send_messages:
+                is_muted = True
+        elif status == 'left':
+            user_status = "Left"
+            user_role = "None"
+        elif status == 'kicked':
+            user_status = "Banned"
+            user_role = "None"
+            
+    except Exception as e:
+        logging.error(f"Error getting member status for info: {e}")
+
     info_text = (
         f"👤 <b>User Information</b>\n\n"
         f"• <b>Name:</b> {html.escape(first_name)}\n"
         f"• <b>Username:</b> @{username if username else 'None'}\n"
         f"• <b>User ID:</b> <code>{user_id}</code>\n"
+        f"• <b>Status:</b> {user_status}\n"
+        f"• <b>Role:</b> {user_role}\n"
+        f"• <b>Muted:</b> {'Yes 🔇' if is_muted else 'No 🔊'}\n"
         f"• <b>Joined Date:</b> {joined_date}\n"
         f"• <b>Total Messages:</b> {msg_count}"
     )
