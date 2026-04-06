@@ -167,7 +167,23 @@ async def info_callback_handler(update: Update, context: ContextTypes.DEFAULT_TY
 
     data = query.data.split("_")
     action = data[1]
-    user_id = int(data[2])
+    
+    if action == "close":
+        try:
+            await query.message.delete()
+        except:
+            try:
+                await query.edit_message_text("Menu closed.")
+            except BadRequest: pass
+        await query.answer()
+        return
+
+    # All other actions require a user_id
+    try:
+        user_id = int(data[-1])
+    except (IndexError, ValueError):
+        await query.answer("Invalid action data.", show_alert=True)
+        return
     
     # Import handlers locally to avoid circular imports
     from moderation import mute_command, unmute_command, ban_command, warn_command, unwarn_command, unban_command, muter_command
@@ -428,12 +444,6 @@ async def info_callback_handler(update: Update, context: ContextTypes.DEFAULT_TY
             
         query.data = f"info_perms_{user_id}"
         await info_callback_handler(update, context)
-        return
-    elif action == "close":
-        try:
-            await query.message.delete()
-        except:
-            await query.edit_message_text("Menu closed.")
         return
     elif action == "back":
         # We need to reconstruct the original info message
