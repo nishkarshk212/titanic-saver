@@ -38,6 +38,7 @@ def get_welcome_settings_keyboard(settings):
     rejoin_status = "✅" if settings.get("welcome_rejoin_enabled", True) else "❌"
     media_status = "✅" if settings.get("welcome_media_enabled", True) else "❌"
     button_status = "✅" if settings.get("welcome_button_enabled", True) else "❌"
+    delete_time = settings.get("welcome_delete_time", 60)
     
     keyboard = [
         [InlineKeyboardButton(f"Welcome: {welcome_status}", callback_data="set_toggle_welcome_enabled")],
@@ -51,6 +52,11 @@ def get_welcome_settings_keyboard(settings):
             InlineKeyboardButton("🔗 Set Button", callback_data="set_config_welcome_button")
         ],
         [InlineKeyboardButton("📝 Set Welcome Text", callback_data="set_config_welcome_text")],
+        [
+            InlineKeyboardButton("-10s", callback_data="set_welcome_time_sub_10"),
+            InlineKeyboardButton(f"🗑️ Delete: {delete_time}s", callback_data="set_none"),
+            InlineKeyboardButton("+10s", callback_data="set_welcome_time_add_10")
+        ],
         [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -302,6 +308,21 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer(f"Time updated to {new_time}s")
         return
 
+    # Handle Welcome Time adjustment buttons
+    if data.startswith("set_welcome_time_"):
+        action, amount = data.replace("set_welcome_time_", "").split("_")
+        amount = int(amount)
+        settings = get_chat_settings(chat_id)
+        current_time = settings.get("welcome_delete_time", 60)
+        new_time = current_time + amount if action == "add" else max(1, current_time - amount)
+        update_chat_setting(chat_id, "welcome_delete_time", new_time)
+        new_settings = get_chat_settings(chat_id)
+        try:
+            await query.edit_message_reply_markup(reply_markup=get_welcome_settings_keyboard(new_settings))
+        except BadRequest: pass
+        await query.answer(f"Welcome deletion time set to {new_time}s")
+        return
+
     if data == "set_none":
         await query.answer()
         return
@@ -360,7 +381,23 @@ async def handle_setting_input(update: Update, context: ContextTypes.DEFAULT_TYP
     if config_type == "media":
         if update.message.photo:
             update_chat_setting(chat_id, setting_key, update.message.photo[-1].file_id)
+            update_chat_setting(chat_id, f"{section}_media_type", "photo")
             success = True
+        elif update.message.video:
+            update_chat_setting(chat_id, setting_key, update.message.video.file_id)
+            update_chat_setting(chat_id, f"{section}_media_type", "video")
+            success = True
+        elif update.message.animation:
+            update_chat_setting(chat_id, setting_key, update.message.animation.file_id)
+            update_chat_setting(chat_id, f"{section}_media_type", "animation")
+            success = True
+        elif update.message.document:
+            # Check if it's a gif or video
+            mime = update.message.document.mime_type
+            if mime and ("video" in mime or "gif" in mime or "image" in mime):
+                update_chat_setting(chat_id, setting_key, update.message.document.file_id)
+                update_chat_setting(chat_id, f"{section}_media_type", "document")
+                success = True
     elif config_type == "text":
         if update.message.text:
             update_chat_setting(chat_id, setting_key, update.message.text)

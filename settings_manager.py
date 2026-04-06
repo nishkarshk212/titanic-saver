@@ -27,6 +27,8 @@ def get_chat_settings(chat_id):
             "welcome_rejoin_enabled": True,
             "welcome_text": "Welcome {NAME} to the group!",
             "welcome_media": None,
+            "welcome_media_type": "photo", # photo, video, animation
+            "welcome_delete_time": 60, # seconds
             "welcome_button_text": "Join Channel",
             "welcome_button_url": "https://t.me/yourchannel",
             "goodbye_enabled": True,

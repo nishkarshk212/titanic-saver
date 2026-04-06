@@ -114,6 +114,8 @@ async def send_welcome(chat, user, context: ContextTypes.DEFAULT_TYPE):
 
     welcome_text_raw = settings.get('welcome_text', "Welcome {NAME} to the group!")
     welcome_media = settings.get('welcome_media')
+    welcome_media_type = settings.get('welcome_media_type', 'photo')
+    welcome_delete_time = settings.get('welcome_delete_time', 60)
     media_enabled = settings.get('welcome_media_enabled', True)
     button_enabled = settings.get('welcome_button_enabled', True)
     button_text = settings.get('welcome_button_text')
@@ -129,29 +131,64 @@ async def send_welcome(chat, user, context: ContextTypes.DEFAULT_TYPE):
     # Format the welcome message
     personal_welcome = format_welcome_message(welcome_text_raw, user, chat)
     
+    msg = None
     if media_enabled and welcome_media:
         try:
-            await context.bot.send_photo(
-                chat_id=chat_id,
-                photo=welcome_media,
-                caption=personal_welcome,
-                reply_markup=reply_markup,
-                parse_mode=ParseMode.HTML
-            )
+            if welcome_media_type == "photo":
+                msg = await context.bot.send_photo(
+                    chat_id=chat_id,
+                    photo=welcome_media,
+                    caption=personal_welcome,
+                    reply_markup=reply_markup,
+                    parse_mode=ParseMode.HTML
+                )
+            elif welcome_media_type == "video":
+                msg = await context.bot.send_video(
+                    chat_id=chat_id,
+                    video=welcome_media,
+                    caption=personal_welcome,
+                    reply_markup=reply_markup,
+                    parse_mode=ParseMode.HTML
+                )
+            elif welcome_media_type == "animation":
+                msg = await context.bot.send_animation(
+                    chat_id=chat_id,
+                    animation=welcome_media,
+                    caption=personal_welcome,
+                    reply_markup=reply_markup,
+                    parse_mode=ParseMode.HTML
+                )
+            else: # document or fallback
+                msg = await context.bot.send_document(
+                    chat_id=chat_id,
+                    document=welcome_media,
+                    caption=personal_welcome,
+                    reply_markup=reply_markup,
+                    parse_mode=ParseMode.HTML
+                )
         except Exception as e:
-            logging.error(f"Error sending welcome photo: {e}")
-            await context.bot.send_message(
+            logging.error(f"Error sending welcome media: {e}")
+            msg = await context.bot.send_message(
                 chat_id=chat_id, 
                 text=personal_welcome, 
                 reply_markup=reply_markup,
                 parse_mode=ParseMode.HTML
             )
     else:
-        await context.bot.send_message(
+        msg = await context.bot.send_message(
             chat_id=chat_id, 
             text=personal_welcome, 
             reply_markup=reply_markup,
             parse_mode=ParseMode.HTML
+        )
+    
+    # Schedule deletion if msg sent and time > 0
+    if msg and welcome_delete_time > 0 and context.job_queue:
+        from config import delete_message_job
+        context.job_queue.run_once(
+            delete_message_job,
+            welcome_delete_time,
+            data={"chat_id": chat_id, "message_id": msg.message_id}
         )
 
 async def on_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
