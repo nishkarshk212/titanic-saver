@@ -234,24 +234,22 @@ async def on_chat_member_update(update: Update, context: ContextTypes.DEFAULT_TY
     logging.info(f"Chat Member Update: {old_status} -> {new_status} for user {result.new_chat_member.user.id}")
     
     # Trigger on join (detects both new joins and re-joins)
-    # 1. new_status is 'member' or 'administrator' or 'creator'
-    # old_status was 'left' or 'kicked' or 'none' (none is for some first-time joins)
+    # 1. new_status is 'member' or 'administrator' or 'creator' or 'restricted'
+    # 2. old_status was 'left' or 'kicked' or 'none' (none is for some first-time joins)
     is_joining = new_status in ['member', 'administrator', 'restricted'] and old_status in ['left', 'kicked', 'none']
     
-    # Strictly ignore leaves
+    # Strictly ignore leaves and kicks
     if new_status in ['left', 'kicked']:
         return
 
-    # Check if it's an invite link join (sometimes status stays same but update triggers)
-    # If welcome_rejoin_enabled is True, we should be more permissive.
-    
-    if is_joining or (settings.get("welcome_rejoin_enabled", True) and new_status == old_status and new_status in ['member', 'restricted']):
+    # Debug: Only process if it's clearly a join
+    if is_joining:
         member = result.new_chat_member.user
         if member.is_bot:
             return
             
-        # Check rejoin setting if it's clearly a rejoin
-        if old_status in ['left', 'kicked', 'restricted'] or (new_status == old_status):
+        # Check rejoin setting if it's clearly a rejoin (was previously left or kicked)
+        if old_status in ['left', 'kicked']:
             if not settings.get("welcome_rejoin_enabled", True):
                 logging.info(f"Skipping welcome for re-joining user {member.id} as welcome_rejoin_enabled is False")
                 return
