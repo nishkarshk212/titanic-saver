@@ -7,7 +7,6 @@ from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandle
 from telegram.constants import ParseMode
 from admin import get_admin_handlers
 from welcome import get_welcome_handlers
-from goodbye import get_goodbye_handlers
 from block_content import get_block_content_handlers
 from clean_service import get_clean_service_handlers
 from auto_delete import get_auto_delete_handlers
@@ -162,10 +161,6 @@ def main():
 
     # Add welcome handlers (Group 0)
     for handler in get_welcome_handlers():
-        application.add_handler(handler)
-
-    # Add goodbye handlers (Group 0)
-    for handler in get_goodbye_handlers():
         application.add_handler(handler)
 
     # Add block content handlers (Group 0)

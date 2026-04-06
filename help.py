@@ -76,12 +76,13 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     elif data == "help_welcome":
         help_text = (
-            "👋 <b>Welcome & Goodbye</b>\n\n"
-            "Configure these via /settings. Supports:\n"
+            "👋 <b>Welcome Message</b>\n\n"
+            "Configure how new members are greeted via /settings. Supports:\n"
             "• HTML formatting\n"
             "• Custom Media (Photos)\n"
             "• Custom Buttons (Text | URL)\n"
-            "• Placeholders: {ID}, {NAME}, {USERNAME}, {MENTION}, etc."
+            "• Placeholders: {ID}, {NAME}, {USERNAME}, {MENTION}, etc.\n\n"
+            "<i>Note: Goodbye messages are not supported by this bot.</i>"
         )
     elif data == "help_clean":
         help_text = (
