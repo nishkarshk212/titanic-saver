@@ -138,6 +138,12 @@ async def get_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def is_user_admin(chat_id, user_id, context):
     """Check if the user is an admin or owner."""
     if not user_id: return False
+    
+    # Telegram's ID for anonymous admins (Group Anonymous Bot)
+    ANONYMOUS_ADMIN_ID = 1087968824
+    if user_id == ANONYMOUS_ADMIN_ID:
+        return True
+        
     if user_id == OWNER_ID:
         return True
     try:
@@ -149,6 +155,12 @@ async def is_user_admin(chat_id, user_id, context):
 async def can_user_configure_settings(chat_id, user_id, context):
     """Check if a user can configure settings (Owner, Creator, or Admin with Change Info + Ban perms)."""
     if not user_id: return False
+    
+    # Anonymous admins are allowed to configure settings as we can't check specific rights easily
+    ANONYMOUS_ADMIN_ID = 1087968824
+    if user_id == ANONYMOUS_ADMIN_ID:
+        return True
+        
     if user_id == OWNER_ID:
         return True
     try:
