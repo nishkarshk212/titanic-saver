@@ -221,11 +221,23 @@ async def info_callback_handler(update: Update, context: ContextTypes.DEFAULT_TY
             [InlineKeyboardButton("🔙 Back", callback_data=f"info_back_{user_id}")]
         ]
     elif action == "domute":
-        member = await context.bot.get_chat_member(chat_id, user_id)
-        if member.status == 'restricted' and not member.can_send_messages:
-            await unmute_command(mock_update, context)
-        else:
-            await mute_command(mock_update, context)
+        try:
+            member = await context.bot.get_chat_member(chat_id, user_id)
+            if member.status == 'restricted' and not member.can_send_messages:
+                # Unmute: grant basic permissions
+                await context.bot.restrict_chat_member(chat_id, user_id, permissions=ChatPermissions(
+                    can_send_messages=True, can_send_audios=True, can_send_documents=True,
+                    can_send_photos=True, can_send_videos=True, can_send_video_notes=True,
+                    can_send_voice_notes=True, can_send_polls=True, can_send_other_messages=True,
+                    can_add_web_page_previews=True
+                ))
+                await query.answer("User unmuted.")
+            else:
+                # Mute: restrict sending messages
+                await context.bot.restrict_chat_member(chat_id, user_id, permissions=ChatPermissions(can_send_messages=False))
+                await query.answer("User muted.")
+        except Exception as e:
+            await query.answer(f"Action failed: {e}", show_alert=True)
         query.data = f"info_mute_{user_id}"
         await info_callback_handler(update, context)
         return
@@ -238,11 +250,16 @@ async def info_callback_handler(update: Update, context: ContextTypes.DEFAULT_TY
             [InlineKeyboardButton("🔙 Back", callback_data=f"info_back_{user_id}")]
         ]
     elif action == "doban":
-        member = await context.bot.get_chat_member(chat_id, user_id)
-        if member.status == 'kicked':
-            await unban_command(mock_update, context)
-        else:
-            await ban_command(mock_update, context)
+        try:
+            member = await context.bot.get_chat_member(chat_id, user_id)
+            if member.status == 'kicked':
+                await context.bot.unban_chat_member(chat_id, user_id, only_if_banned=True)
+                await query.answer("User unbanned.")
+            else:
+                await context.bot.ban_chat_member(chat_id, user_id)
+                await query.answer("User banned.")
+        except Exception as e:
+            await query.answer(f"Action failed: {e}", show_alert=True)
         query.data = f"info_ban_{user_id}"
         await info_callback_handler(update, context)
         return
@@ -254,26 +271,42 @@ async def info_callback_handler(update: Update, context: ContextTypes.DEFAULT_TY
             [InlineKeyboardButton("🔙 Back", callback_data=f"info_back_{user_id}")]
         ]
     elif action == "tomuter":
-        await muter_command(mock_update, context)
+        from moderation import add_muter, remove_muter
+        if check_is_muter(chat_id, user_id):
+            remove_muter(chat_id, user_id)
+            await query.answer("Muter role removed.")
+        else:
+            add_muter(chat_id, user_id)
+            await query.answer("Muter role granted.")
         query.data = f"info_roles_{user_id}"
         await info_callback_handler(update, context)
         return
     elif action == "perms":
         member = await context.bot.get_chat_member(chat_id, user_id)
-        # If user is admin/creator, they have full perms (can't restrict easily via buttons)
         if member.status in ['creator', 'administrator']:
             text_override = f"🛡️ <b>Permissions</b> for user <code>{user_id}</code>\n\nAdmin/Owner permissions cannot be toggled here. Use 🎭 Roles."
             keyboard = [[InlineKeyboardButton("🔙 Back", callback_data=f"info_back_{user_id}")]]
         else:
-            can_msg = member.can_send_messages if member.status == 'restricted' else True
-            can_media = member.can_send_media_messages if member.status == 'restricted' else True
-            can_sticker = member.can_send_other_messages if member.status == 'restricted' else True
+            p = {
+                "msg": member.can_send_messages if member.status == 'restricted' else True,
+                "media": member.can_send_media_messages if member.status == 'restricted' else True,
+                "voice": member.can_send_voice_notes if member.status == 'restricted' else True,
+                "doc": member.can_send_documents if member.status == 'restricted' else True,
+                "poll": member.can_send_polls if member.status == 'restricted' else True,
+                "other": member.can_send_other_messages if member.status == 'restricted' else True,
+                "music": member.can_send_audios if member.status == 'restricted' else True,
+                "video": member.can_send_videos if member.status == 'restricted' else True
+            }
             
             text_override = f"🛡️ <b>Permission Management</b> for user <code>{user_id}</code>"
             keyboard = [
-                [InlineKeyboardButton(f"Send Message: {'✅' if can_msg else '❌'}", callback_data=f"info_toperm_msg_{user_id}")],
-                [InlineKeyboardButton(f"Send Media: {'✅' if can_media else '❌'}", callback_data=f"info_toperm_media_{user_id}")],
-                [InlineKeyboardButton(f"Send Stickers/GIFs: {'✅' if can_sticker else '❌'}", callback_data=f"info_toperm_sticker_{user_id}")],
+                [InlineKeyboardButton(f"Send Message: {'✅' if p['msg'] else '❌'}", callback_data=f"info_toperm_msg_{user_id}")],
+                [InlineKeyboardButton(f"Send Media: {'✅' if p['media'] else '❌'}", callback_data=f"info_toperm_media_{user_id}")],
+                [InlineKeyboardButton(f"Send Voice: {'✅' if p['voice'] else '❌'}", callback_data=f"info_toperm_voice_{user_id}")],
+                [InlineKeyboardButton(f"Send Document/File: {'✅' if p['doc'] else '❌'}", callback_data=f"info_toperm_doc_{user_id}")],
+                [InlineKeyboardButton(f"Send Music: {'✅' if p['music'] else '❌'}", callback_data=f"info_toperm_music_{user_id}")],
+                [InlineKeyboardButton(f"Send Poll: {'✅' if p['poll'] else '❌'}", callback_data=f"info_toperm_poll_{user_id}")],
+                [InlineKeyboardButton(f"Send Stickers/GIFs: {'✅' if p['other'] else '❌'}", callback_data=f"info_toperm_other_{user_id}")],
                 [InlineKeyboardButton("🔙 Back", callback_data=f"info_back_{user_id}")]
             ]
     elif action.startswith("toperm"):
@@ -281,30 +314,38 @@ async def info_callback_handler(update: Update, context: ContextTypes.DEFAULT_TY
         user_id = int(data[3])
         member = await context.bot.get_chat_member(chat_id, user_id)
         
-        # Current perms
-        p = {
-            "can_send_messages": member.can_send_messages if member.status == 'restricted' else True,
-            "can_send_media_messages": member.can_send_media_messages if member.status == 'restricted' else True,
-            "can_send_audios": member.can_send_audios if member.status == 'restricted' else True,
-            "can_send_documents": member.can_send_documents if member.status == 'restricted' else True,
-            "can_send_photos": member.can_send_photos if member.status == 'restricted' else True,
-            "can_send_videos": member.can_send_videos if member.status == 'restricted' else True,
-            "can_send_video_notes": member.can_send_video_notes if member.status == 'restricted' else True,
-            "can_send_voice_notes": member.can_send_voice_notes if member.status == 'restricted' else True,
-            "can_send_polls": member.can_send_polls if member.status == 'restricted' else True,
-            "can_send_other_messages": member.can_send_other_messages if member.status == 'restricted' else True,
-            "can_add_web_page_previews": member.can_add_web_page_previews if member.status == 'restricted' else True
+        # Determine current state or default to True if not restricted
+        is_restricted = member.status == 'restricted'
+        
+        # Build current permissions object
+        current_p = {
+            "can_send_messages": member.can_send_messages if is_restricted else True,
+            "can_send_media_messages": member.can_send_media_messages if is_restricted else True,
+            "can_send_audios": member.can_send_audios if is_restricted else True,
+            "can_send_documents": member.can_send_documents if is_restricted else True,
+            "can_send_photos": member.can_send_photos if is_restricted else True,
+            "can_send_videos": member.can_send_videos if is_restricted else True,
+            "can_send_video_notes": member.can_send_video_notes if is_restricted else True,
+            "can_send_voice_notes": member.can_send_voice_notes if is_restricted else True,
+            "can_send_polls": member.can_send_polls if is_restricted else True,
+            "can_send_other_messages": member.can_send_other_messages if is_restricted else True,
+            "can_add_web_page_previews": member.can_add_web_page_previews if is_restricted else True
         }
         
-        if perm_type == "msg": p["can_send_messages"] = not p["can_send_messages"]
-        elif perm_type == "media": p["can_send_media_messages"] = not p["can_send_media_messages"]
-        elif perm_type == "sticker": p["can_send_other_messages"] = not p["can_send_other_messages"]
+        # Toggle the specific permission
+        if perm_type == "msg": current_p["can_send_messages"] = not current_p["can_send_messages"]
+        elif perm_type == "media": current_p["can_send_media_messages"] = not current_p["can_send_media_messages"]
+        elif perm_type == "voice": current_p["can_send_voice_notes"] = not current_p["can_send_voice_notes"]
+        elif perm_type == "doc": current_p["can_send_documents"] = not current_p["can_send_documents"]
+        elif perm_type == "music": current_p["can_send_audios"] = not current_p["can_send_audios"]
+        elif perm_type == "poll": current_p["can_send_polls"] = not current_p["can_send_polls"]
+        elif perm_type == "other": current_p["can_send_other_messages"] = not current_p["can_send_other_messages"]
         
         try:
-            await context.bot.restrict_chat_member(chat_id, user_id, permissions=ChatPermissions(**p))
+            await context.bot.restrict_chat_member(chat_id, user_id, permissions=ChatPermissions(**current_p))
             await query.answer("Permissions updated.")
         except Exception as e:
-            await query.answer(f"Error: {e}", show_alert=True)
+            await query.answer(f"Failed to update permissions: {e}", show_alert=True)
             
         query.data = f"info_perms_{user_id}"
         await info_callback_handler(update, context)
