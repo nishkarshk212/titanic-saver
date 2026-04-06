@@ -4,7 +4,6 @@ import logging
 
 from font import to_small_caps
 from settings_manager import get_chat_settings
-from user_manager import is_user_admin
 
 load_dotenv()
 
@@ -31,6 +30,7 @@ async def log_to_channel(context, message):
 async def delete_admin_command(update, context):
     """Helper function to delete an admin's command message if enabled."""
     if update.message and update.message.text and update.message.text.startswith('/'):
+        from user_manager import is_user_admin
         chat_id = update.effective_chat.id
         user_id = update.effective_user.id
         settings = get_chat_settings(chat_id)
