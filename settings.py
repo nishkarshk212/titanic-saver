@@ -549,7 +549,7 @@ async def handle_setting_input(update: Update, context: ContextTypes.DEFAULT_TYP
 
 def get_settings_handlers():
     return [
-        CommandHandler("settings", settings_menu),
+        CommandHandler(["settings", "config"], settings_menu),
         CallbackQueryHandler(settings_callback, pattern="^set_"),
         MessageHandler(filters.ALL & ~filters.COMMAND, handle_setting_input)
     ]
