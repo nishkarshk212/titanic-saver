@@ -172,6 +172,7 @@ async def info_callback_handler(update: Update, context: ContextTypes.DEFAULT_TY
     # Import handlers locally to avoid circular imports
     from moderation import mute_command, unmute_command, ban_command, warn_command, unwarn_command, unban_command, muter_command
     from moderation_manager import get_user_warns, is_muter as check_is_muter
+    from admin import promote_command, demote_command, DEFAULT_PERMISSIONS, get_promotion_keyboard
     
     # Create a mock update to reuse existing command logic
     class MockMessage:
@@ -282,21 +283,24 @@ async def info_callback_handler(update: Update, context: ContextTypes.DEFAULT_TY
         member = await context.bot.get_chat_member(chat_id, user_id)
         if member.status in ['administrator', 'creator']:
             # Demote
-            from admin import demote_command
             await demote_command(mock_update, context)
             await query.answer("Admin role removed.")
+            query.data = f"info_roles_{user_id}"
+            await info_callback_handler(update, context)
+            return
         else:
-            # Promote with default perms
-            from admin import promote_command, DEFAULT_PERMISSIONS
-            context.user_data[f"promote_{user_id}"] = DEFAULT_PERMISSIONS.copy()
-            # For simplicity, we just promote with basic perms if they click from here
-            # Or we could just trigger the promote command UI
-            await promote_command(mock_update, context)
-            await query.answer("Promotion started.")
-            return # Let the promote command handle the UI
-        query.data = f"info_roles_{user_id}"
-        await info_callback_handler(update, context)
-        return
+            # Show promotion menu with permissions in rows/columns
+            promote_key = f"promote_{user_id}"
+            context.user_data[promote_key] = DEFAULT_PERMISSIONS.copy()
+            context.user_data[promote_key]["back_to_info"] = True # Mark as from info
+            
+            keyboard = get_promotion_keyboard(user_id, context.user_data[promote_key], back_to_info=True)
+            text_override = f"🛡️ <b>Promote Admin</b> for user <code>{user_id}</code>\n\nSelect permissions to grant:"
+            try:
+                await query.edit_message_text(text_override, parse_mode=ParseMode.HTML, reply_markup=keyboard)
+            except BadRequest: pass
+            await query.answer()
+            return
     elif action == "tomember":
         member = await context.bot.get_chat_member(chat_id, user_id)
         if member.status == 'member':

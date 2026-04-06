@@ -74,15 +74,33 @@ async def promote_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=keyboard
     )
 
-def get_promotion_keyboard(user_id, current_perms):
-    """Generate the keyboard with toggle buttons."""
+def get_promotion_keyboard(user_id, current_perms, back_to_info=False):
+    """Generate the keyboard with toggle buttons in 2 columns."""
     keyboard = []
-    for key, label in PERMISSIONS_MAP.items():
-        status = "✅" if current_perms.get(key) else "❌"
-        keyboard.append([InlineKeyboardButton(f"{label}: {status}", callback_data=f"toggle_{user_id}_{key}")])
+    perm_items = list(PERMISSIONS_MAP.items())
+    
+    # Create 2-column grid for permissions
+    for i in range(0, len(perm_items), 2):
+        row = []
+        # First column
+        key1, label1 = perm_items[i]
+        status1 = "✅" if current_perms.get(key1) else "❌"
+        row.append(InlineKeyboardButton(f"{label1}: {status1}", callback_data=f"toggle_{user_id}_{key1}"))
+        
+        # Second column (if exists)
+        if i + 1 < len(perm_items):
+            key2, label2 = perm_items[i+1]
+            status2 = "✅" if current_perms.get(key2) else "❌"
+            row.append(InlineKeyboardButton(f"{label2}: {status2}", callback_data=f"toggle_{user_id}_{key2}"))
+        
+        keyboard.append(row)
     
     keyboard.append([InlineKeyboardButton("Confirm Promotion", callback_data=f"confirm_{user_id}")])
-    keyboard.append([InlineKeyboardButton("Cancel", callback_data=f"cancel_{user_id}")])
+    
+    if back_to_info:
+        keyboard.append([InlineKeyboardButton("🔙 Back to Roles", callback_data=f"info_roles_{user_id}")])
+    else:
+        keyboard.append([InlineKeyboardButton("Cancel", callback_data=f"cancel_{user_id}")])
     
     return InlineKeyboardMarkup(keyboard)
 
@@ -104,7 +122,11 @@ async def toggle_permission(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     context.user_data[promote_key][perm_key] = not context.user_data[promote_key][perm_key]
     
-    keyboard = get_promotion_keyboard(user_id, context.user_data[promote_key])
+    keyboard = get_promotion_keyboard(
+        user_id, 
+        context.user_data[promote_key], 
+        back_to_info=context.user_data[promote_key].get("back_to_info", False)
+    )
     try:
         await query.edit_message_reply_markup(reply_markup=keyboard)
     except BadRequest:
@@ -168,6 +190,15 @@ async def confirm_promotion(update: Update, context: ContextTypes.DEFAULT_TYPE):
             can_promote_members=final_perms.get('can_promote_members', False),
             is_anonymous=final_perms.get('is_anonymous', False)
         )
+        
+        if requested_perms.get("back_to_info"):
+            await query.answer("Successfully promoted user.")
+            query.data = f"info_roles_{user_id}"
+            from bot import info_callback_handler
+            await info_callback_handler(update, context)
+            del context.user_data[promote_key]
+            return
+
         await edit_bot_response(query, context, f"Successfully promoted user to administrator.")
         
         # Log to channel
