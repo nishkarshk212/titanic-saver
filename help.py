@@ -2,9 +2,19 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler
 from telegram.constants import ParseMode
 from config import send_bot_response, edit_bot_response
+from settings_manager import get_chat_settings
+from user_manager import is_user_admin
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Main help command."""
+    chat_id = update.effective_chat.id
+    settings = get_chat_settings(chat_id)
+    
+    # Check access
+    if settings.get("command_access") == "admins":
+        if not await is_user_admin(chat_id, update.effective_user.id, context):
+            return
+
     keyboard = get_help_keyboard()
     await send_bot_response(
         update, context,

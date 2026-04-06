@@ -49,7 +49,8 @@ def get_chat_settings(chat_id):
             "auto_delete_time": 60,
             "warn_limit": 3,
             "warn_penalty": "ban", # ban, mute, kick
-            "command_deletion": False
+            "command_deletion": False,
+            "command_access": "all" # all, admins
         }
         save_settings(settings)
     return settings[chat_id_str]

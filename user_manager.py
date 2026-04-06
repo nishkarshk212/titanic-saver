@@ -7,6 +7,8 @@ from telegram.ext import ContextTypes
 
 from config import OWNER_ID
 
+import datetime
+
 USERS_FILE = "user_cache.json"
 
 def load_users():
@@ -23,17 +25,70 @@ def save_users(users_data):
         json.dump(users_data, f, indent=4)
 
 def cache_user(user_id, username, first_name):
-    """Saves user mapping for later resolution."""
-    if not username: return
-    
+    """Saves user mapping for later resolution and tracks stats."""
     users_data = load_users()
-    username = username.lower().replace('@', '')
     
-    # Only save if changed or new
-    if username not in users_data or users_data[username]["id"] != user_id:
-        logging.info(f"Caching user: @{username} -> {user_id}")
-        users_data[username] = {"id": user_id, "name": first_name}
+    # We use user_id as string for JSON keys to be consistent
+    uid_str = str(user_id)
+    
+    # Find user entry (either by ID or username)
+    user_entry = None
+    
+    # 1. Try to find by ID
+    for key, data in users_data.items():
+        if str(data.get("id")) == uid_str:
+            user_entry = data
+            break
+            
+    # If not found by ID, check if username exists and maps to this user
+    if not user_entry and username:
+        clean_username = username.lower().replace('@', '')
+        if clean_username in users_data:
+            user_entry = users_data[clean_username]
+
+    now = datetime.datetime.now().strftime("%Y-%m-%d")
+    
+    if not user_entry:
+        # New user
+        user_entry = {
+            "id": user_id,
+            "name": first_name,
+            "username": username.lower().replace('@', '') if username else None,
+            "joined_date": now,
+            "msg_count": 0
+        }
+    else:
+        # Update existing user
+        user_entry["name"] = first_name
+        if username:
+            user_entry["username"] = username.lower().replace('@', '')
+
+    # Save by username for resolution and by ID for stats
+    if user_entry.get("username"):
+        users_data[user_entry["username"]] = user_entry
+    
+    # Also save a copy indexed by ID for faster lookups
+    users_data[f"id_{uid_str}"] = user_entry
+    
+    save_users(users_data)
+
+def increment_message_count(user_id):
+    """Increments the message count for a user."""
+    users_data = load_users()
+    uid_str = f"id_{user_id}"
+    if uid_str in users_data:
+        users_data[uid_str]["msg_count"] = users_data[uid_str].get("msg_count", 0) + 1
+        # Also update the username entry if it exists
+        username = users_data[uid_str].get("username")
+        if username and username in users_data:
+            users_data[username]["msg_count"] = users_data[uid_str]["msg_count"]
         save_users(users_data)
+
+def get_user_stats(user_id):
+    """Returns user stats from cache."""
+    users_data = load_users()
+    uid_str = f"id_{user_id}"
+    return users_data.get(uid_str)
 
 def resolve_username(username):
     """Returns (user_id, first_name) if found in cache."""

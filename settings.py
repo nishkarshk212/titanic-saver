@@ -29,6 +29,7 @@ def get_main_settings_keyboard():
         [InlineKeyboardButton("💣 Auto Delete", callback_data="set_view_auto_delete")],
         [InlineKeyboardButton("🛡️ Moderation Settings", callback_data="set_view_mod")],
         [InlineKeyboardButton("🗑️ Command Deletion", callback_data="set_view_command_deletion")],
+        [InlineKeyboardButton("🔑 Command Access", callback_data="set_view_command_access")],
         [InlineKeyboardButton("❌ Close Menu", callback_data="set_close")]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -155,6 +156,14 @@ def get_command_deletion_keyboard(settings):
     ]
     return InlineKeyboardMarkup(keyboard)
 
+def get_command_access_keyboard(settings):
+    access = settings.get("command_access", "all").title()
+    keyboard = [
+        [InlineKeyboardButton(f"Command Access: {access}", callback_data="set_toggle_command_access")],
+        [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
 async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     chat_id = update.effective_chat.id
@@ -254,6 +263,18 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer()
         return
 
+    if data == "set_view_command_access":
+        settings = get_chat_settings(chat_id)
+        try:
+            await edit_bot_response(
+                query, context,
+                "🔑 Command Access\n\nChoose who can use normal commands (help, id, info):",
+                reply_markup=get_command_access_keyboard(settings)
+            )
+        except BadRequest: pass
+        await query.answer()
+        return
+
     if data.startswith("set_toggle_"):
         key = data.replace("set_toggle_", "")
         settings = get_chat_settings(chat_id)
@@ -263,6 +284,11 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             current = settings.get("warn_penalty", "ban")
             new_val = "mute" if current == "ban" else "kick" if current == "mute" else "ban"
             update_chat_setting(chat_id, "warn_penalty", new_val)
+        elif key == "command_access":
+            # Toggle: all -> admins -> all
+            current = settings.get("command_access", "all")
+            new_val = "admins" if current == "all" else "all"
+            update_chat_setting(chat_id, "command_access", new_val)
         else:
             new_val = not settings.get(key, True) if "enabled" in key else not settings.get(key, False)
             update_chat_setting(chat_id, key, new_val)
@@ -276,6 +302,7 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             elif "auto_delete" in key: await query.edit_message_reply_markup(reply_markup=get_auto_delete_settings_keyboard(new_settings))
             elif "warn" in key: await query.edit_message_reply_markup(reply_markup=get_mod_settings_keyboard(new_settings))
             elif "command_deletion" in key: await query.edit_message_reply_markup(reply_markup=get_command_deletion_keyboard(new_settings))
+            elif "command_access" in key: await query.edit_message_reply_markup(reply_markup=get_command_access_keyboard(new_settings))
         except BadRequest: pass
         await query.answer(f"Setting updated!")
         return
