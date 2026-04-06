@@ -28,6 +28,7 @@ def get_main_settings_keyboard():
         [InlineKeyboardButton("🧹 Clean Service", callback_data="set_view_clean")],
         [InlineKeyboardButton("💣 Auto Delete", callback_data="set_view_auto_delete")],
         [InlineKeyboardButton("🚫 Block Content", callback_data="set_view_block_content")],
+        [InlineKeyboardButton("📏 Message Length", callback_data="set_view_msg_length")],
         [InlineKeyboardButton("🛡️ Moderation Settings", callback_data="set_view_mod")],
         [InlineKeyboardButton("🗑️ Command Deletion", callback_data="set_view_command_deletion")],
         [InlineKeyboardButton("🔑 Command Access", callback_data="set_view_command_access")],
@@ -177,6 +178,25 @@ def get_block_content_settings_keyboard(settings):
     ]
     return InlineKeyboardMarkup(keyboard)
 
+def get_msg_length_settings_keyboard(settings):
+    current_limit = settings.get("msg_length_limit", 0)
+    status = f"{current_limit} chars" if current_limit > 0 else "Disabled"
+    
+    keyboard = [
+        [InlineKeyboardButton(f"Current Limit: {status}", callback_data="set_none")],
+        [
+            InlineKeyboardButton("100", callback_data="set_msg_length_100"),
+            InlineKeyboardButton("200", callback_data="set_msg_length_200"),
+            InlineKeyboardButton("300", callback_data="set_msg_length_300")
+        ],
+        [
+            InlineKeyboardButton("Custom", callback_data="set_config_msg_length_limit"),
+            InlineKeyboardButton("Disable", callback_data="set_msg_length_0")
+        ],
+        [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
 def get_mod_settings_keyboard(settings):
     limit = settings.get("warn_limit", 3)
     penalty = settings.get("warn_penalty", "ban").title()
@@ -295,6 +315,18 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer()
         return
 
+    if data == "set_view_msg_length":
+        settings = get_chat_settings(chat_id)
+        try:
+            await edit_bot_response(
+                query, context,
+                "📏 Message Length Configuration\n\nSet the maximum character limit for messages:",
+                reply_markup=get_msg_length_settings_keyboard(settings)
+            )
+        except BadRequest: pass
+        await query.answer()
+        return
+
     if data == "set_view_mod":
         settings = get_chat_settings(chat_id)
         try:
@@ -402,6 +434,17 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer(f"Block warn limit set to {new_limit}")
         return
 
+    if data.startswith("set_msg_length_"):
+        new_limit = int(data.replace("set_msg_length_", ""))
+        update_chat_setting(chat_id, "msg_length_limit", new_limit)
+        new_settings = get_chat_settings(chat_id)
+        try:
+            await query.edit_message_reply_markup(reply_markup=get_msg_length_settings_keyboard(new_settings))
+        except BadRequest: pass
+        status = f"set to {new_limit} chars" if new_limit > 0 else "disabled"
+        await query.answer(f"Message length limit {status}")
+        return
+
     # Handle Time adjustment buttons
     if data.startswith("set_time_"):
         action, amount = data.replace("set_time_", "").split("_")
@@ -470,6 +513,7 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if "welcome" in config_full: section = "welcome"
         elif "goodbye" in config_full: section = "goodbye"
         elif "auto_delete" in config_full: section = "auto_delete"
+        elif "msg_length" in config_full: section = "msg_length"
         else: section = "unknown"
         
         config_type = config_full.replace(f"{section}_", "")
@@ -495,7 +539,8 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "Send /cancel to stop."
             ),
             "buttons_add": f"Please send the {section} button text and URL in this format:\n`Button Text | https://t.me/yourlink`",
-            "button": f"Please send the {section} button text and URL in this format:\n`Button Text | https://t.me/yourlink`"
+            "button": f"Please send the {section} button text and URL in this format:\n`Button Text | https://t.me/yourlink`",
+            "limit": f"Please send the maximum character limit for messages (e.g., 500)."
         }
         
         await edit_bot_response(

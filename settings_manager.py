@@ -55,6 +55,7 @@ def get_chat_settings(chat_id):
             "warn_penalty": "ban",
             "block_warn_limit": 3,
             "block_warn_penalty": "warn",
+            "msg_length_limit": 0, # 0 means disabled
             "command_deletion": False,
             "command_access": "all"
         }

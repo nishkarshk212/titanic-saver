@@ -112,7 +112,9 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "• /block - Reply to a message (text/media) or use `/block &lt;text&gt;` to add content to the block list.\n"
             "• /unblock - Reply to a message or use `/unblock &lt;text&gt;` to remove content from the block list.\n"
             "• /listblock - List all blocked text content in the group.\n\n"
-            "<i>Note: Admins are exempt from the block content checks. Configure penalties (Warn/Mute/Ban/Kick) in /settings &gt; Block Content.</i>"
+            "📏 <b>Message Length Limit</b>\n\n"
+            "Configure a maximum character limit for messages in /settings &gt; Message Length. Messages exceeding this limit will be automatically deleted.\n\n"
+            "<i>Note: Admins are exempt from these checks.</i>"
         )
 
     keyboard = [[InlineKeyboardButton("🔙 Back", callback_data="help_main")]]

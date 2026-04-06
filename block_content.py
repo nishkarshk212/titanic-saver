@@ -184,6 +184,21 @@ async def check_blocked_content_handler(update: Update, context: ContextTypes.DE
             await context.bot.ban_chat_member(chat_id, user_id)
             await context.bot.unban_chat_member(chat_id, user_id)
             await context.bot.send_message(chat_id, f"👞 {update.effective_user.first_name} has been kicked for using blocked content.")
+        return
+
+    # Check message length
+    settings = get_chat_settings(chat_id)
+    length_limit = settings.get("msg_length_limit", 0)
+    if length_limit > 0 and update.message.text:
+        if len(update.message.text) > length_limit:
+            try:
+                await update.message.delete()
+                await context.bot.send_message(
+                    chat_id,
+                    f"📏 {update.effective_user.first_name}, your message is too long (>{length_limit} chars) and was deleted."
+                )
+            except Exception as e:
+                logging.error(f"Failed to delete long message: {e}")
 
 def get_block_content_handlers():
     return [
