@@ -78,14 +78,14 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "help_settings":
         help_text = (
             "⚙️ <b>Settings & Config</b>\n\n"
-            "• /settings - Open the interactive settings menu\n"
+            "• /config - Open the interactive settings menu\n"
             "• /id - Get your user ID and current chat ID\n\n"
             "<i>Note: Only admins with 'Change Info' and 'Ban Users' can access settings.</i>"
         )
     elif data == "help_welcome":
         help_text = (
             "👋 <b>Welcome Message</b>\n\n"
-            "Configure how new members are greeted via /settings. Supports:\n"
+            "Configure how new members are greeted via /config. Supports:\n"
             "• HTML formatting\n"
             "• Custom Media (Photos)\n"
             "• Custom Buttons (Text | URL)\n"
@@ -98,19 +98,19 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Automatically deletes system messages:\n"
             "• User Joined/Left\n"
             "• Voice Chat Started/Ended/Scheduled/Invited\n"
-            "Enable specific types in /settings > Clean Service."
+            "Enable specific types in /config > Clean Service."
         )
     elif data == "help_pinned":
         help_text = (
             "📌 <b>Pinned Messages</b>\n\n"
             "Automatically deletes 'X pinned a message' service notifications.\n"
-            "Enable in /settings > Pinned Messages."
+            "Enable in /config > Pinned Messages."
         )
     elif data == "help_auto":
         help_text = (
             "💣 <b>Auto Delete</b>\n\n"
             "Automatically deletes every message in the group after a custom delay.\n"
-            "• Set delay (H/M/S) in /settings > Auto Delete.\n"
+            "• Set delay (H/M/S) in /config > Auto Delete.\n"
             "• Toggle ON/OFF as needed."
         )
     elif data == "help_filters":
@@ -128,7 +128,7 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "• /unblock - Reply to a message or use `/unblock &lt;text&gt;` to remove content from the block list.\n"
             "• /listblock - List all blocked text content in the group.\n\n"
             "📏 <b>Message Length Limit</b>\n\n"
-            "Configure a maximum character limit for messages in /settings &gt; Message Length. Messages exceeding this limit will be automatically deleted.\n\n"
+            "Configure a maximum character limit for messages in /config &gt; Message Length. Messages exceeding this limit will be automatically deleted.\n\n"
             "<i>Note: Admins are exempt from these checks.</i>"
         )
     elif data == "help_bot_prot":
@@ -136,7 +136,7 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "🤖 <b>Bot Protection</b>\n\n"
             "Prevents other bots from being added to the group.\n"
             "• If enabled, any bot added to the group will be automatically kicked.\n"
-            "• Enable/Disable in /settings > Bot Protection.\n\n"
+            "• Enable/Disable in /config > Bot Protection.\n\n"
             "<i>Note: This bot itself is exempt.</i>"
         )
 

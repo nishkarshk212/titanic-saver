@@ -683,7 +683,7 @@ async def open_command_access_settings(update: Update, context: ContextTypes.DEF
 
 def get_settings_handlers():
     return [
-        CommandHandler(["settings", "config"], settings_menu),
+        CommandHandler(["config"], settings_menu),
         CommandHandler(["welcome", "welcomesettings", "settings_welcome"], open_welcome_settings),
         CommandHandler(["clean", "cleanservice", "settings_clean"], open_clean_settings),
         CommandHandler(["auto", "autodelete", "settings_auto_delete"], open_auto_delete_settings),
