@@ -83,6 +83,37 @@ async def info_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user = update.effective_user
         user_id, first_name = user.id, user.first_name
     
+    # Check if target is a channel
+    is_channel = str(user_id).startswith('-100')
+    
+    if is_channel:
+        try:
+            chat = await context.bot.get_chat(user_id)
+            info_text = (
+                f"📢 <b>Channel Information</b>\n\n"
+                f"• <b>Title:</b> {html.escape(chat.title)}\n"
+                f"• <b>Username:</b> @{chat.username if chat.username else 'None'}\n"
+                f"• <b>Channel ID:</b> <code>{user_id}</code>\n"
+                f"• <b>Type:</b> Channel\n"
+                f"• <b>Description:</b> {html.escape(chat.description) if chat.description else 'None'}"
+            )
+            
+            # Simple keyboard for channels (mostly just ban/unban from group)
+            reply_markup = None
+            if await is_user_admin(chat_id, update.effective_user.id, context):
+                keyboard = [
+                    [InlineKeyboardButton("🔨 Ban Channel", callback_data=f"info_ban_{user_id}")],
+                    [InlineKeyboardButton("❌ Close", callback_data="info_close")]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await send_bot_response(update, context, info_text, parse_mode=ParseMode.HTML, reply_markup=reply_markup)
+            return
+        except Exception as e:
+            logging.error(f"Error getting channel info: {e}")
+            await send_bot_response(update, context, f"Error getting channel info: {e}")
+            return
+
     stats = get_user_stats(user_id)
     username = stats.get("username") if stats else None
     joined_date = stats.get("joined_date", "Unknown") if stats else "Unknown"
@@ -259,22 +290,39 @@ async def info_callback_handler(update: Update, context: ContextTypes.DEFAULT_TY
         await info_callback_handler(update, context)
         return
     elif action == "ban":
-        member = await context.bot.get_chat_member(chat_id, user_id)
-        is_banned = member.status == 'kicked'
-        text_override = f"🔨 <b>Ban Management</b> for user <code>{user_id}</code>\n\nStatus: {'Banned ⛔' if is_banned else 'Active ✅'}"
-        keyboard = [
-            [InlineKeyboardButton("🔓 Unban" if is_banned else "🔨 Ban", callback_data=f"info_doban_{user_id}")],
-            [InlineKeyboardButton("🔙 Back", callback_data=f"info_back_{user_id}"), InlineKeyboardButton("❌ Close", callback_data="info_close")]
-        ]
+        # Check if target is a channel
+        is_channel = str(user_id).startswith('-100')
+        
+        if is_channel:
+            text_override = f"🔨 <b>Channel Management</b> for <code>{user_id}</code>\n\nAre you sure you want to ban this channel from the group?"
+            keyboard = [
+                [InlineKeyboardButton("🔨 Confirm Ban", callback_data=f"info_doban_{user_id}")],
+                [InlineKeyboardButton("🔙 Back", callback_data=f"info_back_{user_id}"), InlineKeyboardButton("❌ Close", callback_data="info_close")]
+            ]
+        else:
+            member = await context.bot.get_chat_member(chat_id, user_id)
+            is_banned = member.status == 'kicked'
+            text_override = f"🔨 <b>Ban Management</b> for user <code>{user_id}</code>\n\nStatus: {'Banned ⛔' if is_banned else 'Active ✅'}"
+            keyboard = [
+                [InlineKeyboardButton("🔓 Unban" if is_banned else "🔨 Ban", callback_data=f"info_doban_{user_id}")],
+                [InlineKeyboardButton("🔙 Back", callback_data=f"info_back_{user_id}"), InlineKeyboardButton("❌ Close", callback_data="info_close")]
+            ]
     elif action == "doban":
         try:
-            member = await context.bot.get_chat_member(chat_id, user_id)
-            if member.status == 'kicked':
-                await context.bot.unban_chat_member(chat_id, user_id, only_if_banned=True)
-                await query.answer("User unbanned.")
+            # Check if target is a channel
+            is_channel = str(user_id).startswith('-100')
+            
+            if is_channel:
+                await context.bot.ban_chat_sender_chat(chat_id, user_id)
+                await query.answer("Channel banned from group.")
             else:
-                await context.bot.ban_chat_member(chat_id, user_id)
-                await query.answer("User banned.")
+                member = await context.bot.get_chat_member(chat_id, user_id)
+                if member.status == 'kicked':
+                    await context.bot.unban_chat_member(chat_id, user_id, only_if_banned=True)
+                    await query.answer("User unbanned.")
+                else:
+                    await context.bot.ban_chat_member(chat_id, user_id)
+                    await query.answer("User banned.")
         except Exception as e:
             await query.answer(f"Action failed: {e}", show_alert=True)
         query.data = f"info_ban_{user_id}"
@@ -446,6 +494,34 @@ async def info_callback_handler(update: Update, context: ContextTypes.DEFAULT_TY
         await info_callback_handler(update, context)
         return
     elif action == "back":
+        # Check if target is a channel
+        is_channel = str(user_id).startswith('-100')
+        
+        if is_channel:
+            try:
+                chat = await context.bot.get_chat(user_id)
+                info_text = (
+                    f"📢 <b>Channel Information</b>\n\n"
+                    f"• <b>Title:</b> {html.escape(chat.title)}\n"
+                    f"• <b>Username:</b> @{chat.username if chat.username else 'None'}\n"
+                    f"• <b>Channel ID:</b> <code>{user_id}</code>\n"
+                    f"• <b>Type:</b> Channel\n"
+                    f"• <b>Description:</b> {html.escape(chat.description) if chat.description else 'None'}"
+                )
+                
+                keyboard = [
+                    [InlineKeyboardButton("🔨 Ban Channel", callback_data=f"info_ban_{user_id}")],
+                    [InlineKeyboardButton("❌ Close", callback_data="info_close")]
+                ]
+                
+                await query.edit_message_text(info_text, parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup(keyboard))
+                await query.answer()
+                return
+            except Exception as e:
+                logging.error(f"Error returning to channel info: {e}")
+                await query.answer(f"Error: {e}", show_alert=True)
+                return
+
         # We need to reconstruct the original info message
         # Easiest way is to call info_command with a mock update
         mock_update.message.text = f"/info {user_id}"
