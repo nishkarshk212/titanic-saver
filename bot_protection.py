@@ -1,5 +1,6 @@
 import logging
 from telegram import Update
+from telegram.constants import ParseMode
 from telegram.ext import ContextTypes, ChatMemberHandler, MessageHandler, filters
 from settings_manager import get_chat_settings
 from config import send_bot_response
@@ -30,7 +31,11 @@ async def kick_if_bot(update: Update, context: ContextTypes.DEFAULT_TYPE, user):
         await context.bot.unban_chat_member(chat_id, user.id)
         
         # Notify the group
-        await send_bot_response(update, context, f"🚫 <b>Bot Protection:</b> Kicked added bot {user.first_name} (@{user.username}). Adding bots is restricted in this group.")
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=f"🚫 <b>Bot Protection:</b> Kicked added bot {user.first_name} (@{user.username}). Adding bots is restricted in this group.",
+            parse_mode=ParseMode.HTML
+        )
         logging.info(f"Bot Protection: Kicked bot {user.id} in chat {chat_id}")
     except Exception as e:
         logging.error(f"Bot Protection: Failed to kick bot {user.id} in chat {chat_id}: {e}")
