@@ -601,9 +601,99 @@ async def handle_setting_input(update: Update, context: ContextTypes.DEFAULT_TYP
         del context.user_data["waiting_for_config"]
         await update.message.reply_text(f"✅ {section.title()} {config_type} updated successfully!", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(f"Back to {section.title()} Settings", callback_data=f"set_view_{section}")]]))
 
+async def open_welcome_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    user_id = update.effective_user.id
+    if not await can_user_configure_settings(chat_id, user_id, context):
+        return
+    settings = get_chat_settings(chat_id)
+    await send_bot_response(update, context, "👋 Welcome Configuration\n\nConfigure how new members are greeted:", reply_markup=get_welcome_settings_keyboard(settings))
+
+async def open_clean_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    user_id = update.effective_user.id
+    if not await can_user_configure_settings(chat_id, user_id, context):
+        return
+    settings = get_chat_settings(chat_id)
+    await send_bot_response(update, context, "🧹 Clean Service Configuration\n\nAuto-delete service messages from the chat:", reply_markup=get_clean_settings_keyboard(settings))
+
+async def open_auto_delete_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    user_id = update.effective_user.id
+    if not await can_user_configure_settings(chat_id, user_id, context):
+        return
+    settings = get_chat_settings(chat_id)
+    await send_bot_response(update, context, "💣 Auto Delete Configuration\n\nAutomatically delete group messages after a set time:", reply_markup=get_auto_delete_settings_keyboard(settings))
+
+async def open_block_content_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    user_id = update.effective_user.id
+    if not await can_user_configure_settings(chat_id, user_id, context):
+        return
+    settings = get_chat_settings(chat_id)
+    await send_bot_response(update, context, "🚫 Block Content Configuration\n\nConfigure penalties for using blocked words/media:", reply_markup=get_block_content_settings_keyboard(settings))
+
+async def open_msg_length_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    user_id = update.effective_user.id
+    if not await can_user_configure_settings(chat_id, user_id, context):
+        return
+    settings = get_chat_settings(chat_id)
+    await send_bot_response(update, context, "📏 Message Length Configuration\n\nSet the maximum character limit for messages:", reply_markup=get_msg_length_settings_keyboard(settings))
+
+async def open_mod_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    user_id = update.effective_user.id
+    if not await can_user_configure_settings(chat_id, user_id, context):
+        return
+    settings = get_chat_settings(chat_id)
+    await send_bot_response(update, context, "🛡️ Moderation Settings\n\nConfigure warning limits and penalties:", reply_markup=get_mod_settings_keyboard(settings))
+
+async def open_pinned_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    user_id = update.effective_user.id
+    if not await can_user_configure_settings(chat_id, user_id, context):
+        return
+    settings = get_chat_settings(chat_id)
+    await send_bot_response(update, context, "📌 Pinned Messages Settings\n\nConfigure how pinned messages are handled:", reply_markup=get_pinned_message_settings_keyboard(settings))
+
+async def open_bot_protection_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    user_id = update.effective_user.id
+    if not await can_user_configure_settings(chat_id, user_id, context):
+        return
+    settings = get_chat_settings(chat_id)
+    await send_bot_response(update, context, "🤖 Bot Protection Settings\n\nConfigure how bots are handled when added to the group:", reply_markup=get_bot_protection_settings_keyboard(settings))
+
+async def open_command_deletion_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    user_id = update.effective_user.id
+    if not await can_user_configure_settings(chat_id, user_id, context):
+        return
+    settings = get_chat_settings(chat_id)
+    await send_bot_response(update, context, "🗑️ Command Deletion\n\nAutomatically delete admin command messages if enabled:", reply_markup=get_command_deletion_keyboard(settings))
+
+async def open_command_access_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    user_id = update.effective_user.id
+    if not await can_user_configure_settings(chat_id, user_id, context):
+        return
+    settings = get_chat_settings(chat_id)
+    await send_bot_response(update, context, "🔑 Command Access\n\nChoose who can use normal commands (help, id, info):", reply_markup=get_command_access_keyboard(settings))
+
 def get_settings_handlers():
     return [
         CommandHandler(["settings", "config"], settings_menu),
+        CommandHandler(["welcome", "welcomesettings", "settings_welcome"], open_welcome_settings),
+        CommandHandler(["clean", "cleanservice", "settings_clean"], open_clean_settings),
+        CommandHandler(["auto", "autodelete", "settings_auto_delete"], open_auto_delete_settings),
+        CommandHandler(["block", "blockcontent", "settings_block"], open_block_content_settings),
+        CommandHandler(["length", "msglength", "settings_msg_length"], open_msg_length_settings),
+        CommandHandler(["mod", "moderation", "settings_mod"], open_mod_settings),
+        CommandHandler(["pinned", "pinnedmessages", "settings_pinned"], open_pinned_settings),
+        CommandHandler(["botprot", "botprotection", "settings_bot_protection"], open_bot_protection_settings),
+        CommandHandler(["cmddel", "commanddeletion", "settings_command_deletion"], open_command_deletion_settings),
+        CommandHandler(["cmdaccess", "commandaccess", "settings_command_access"], open_command_access_settings),
         CallbackQueryHandler(settings_callback, pattern="^set_"),
         MessageHandler(filters.ALL & ~filters.COMMAND, handle_setting_input)
     ]
