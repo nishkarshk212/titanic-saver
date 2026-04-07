@@ -13,6 +13,8 @@ from auto_delete import get_auto_delete_handlers
 from moderation import get_moderation_handlers
 from filter import get_filter_handlers
 from bot_protection import get_bot_protection_handlers
+from link_spam import get_link_spam_handlers
+from forward_protection import get_forward_protection_handlers
 from settings import get_settings_handlers
 from help import get_help_handlers
 from config import BOT_TOKEN, LOG_CHANNEL_ID, OWNER_ID, log_to_channel, send_bot_response, send_bot_media, START_VIDEOS
@@ -702,6 +704,14 @@ def main():
     # Add bot protection handlers (Group 5)
     for handler in get_bot_protection_handlers():
         application.add_handler(handler, group=5)
+
+    # Add link spam protection handlers (Group 6)
+    for handler in get_link_spam_handlers():
+        application.add_handler(handler, group=6)
+
+    # Add forward protection handlers (Group 7)
+    for handler in get_forward_protection_handlers():
+        application.add_handler(handler, group=7)
 
     # Start the bot
     print("Bot is starting...")

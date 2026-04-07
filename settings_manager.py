@@ -45,7 +45,9 @@ DEFAULT_CHAT_SETTINGS = {
     "msg_length_limit": 0, # 0 means disabled
     "command_deletion": False,
     "command_access": "all",
-    "bot_protection_enabled": False
+    "bot_protection_enabled": False,
+    "link_spam_protection_enabled": False,
+    "forward_protection_enabled": False
 }
 
 def get_chat_settings(chat_id):

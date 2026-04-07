@@ -32,6 +32,8 @@ def get_main_settings_keyboard():
         [InlineKeyboardButton("🗑️ Command Deletion", callback_data="set_view_command_deletion")],
         [InlineKeyboardButton("📌 Pinned Messages", callback_data="set_view_pinned_messages")],
         [InlineKeyboardButton("🤖 Bot Protection", callback_data="set_view_bot_protection")],
+        [InlineKeyboardButton("🔗 Link Spam Protection", callback_data="set_view_link_spam")],
+        [InlineKeyboardButton("🔄 Forward Protection", callback_data="set_view_forward_protection")],
         [InlineKeyboardButton("🔑 Command Access", callback_data="set_view_command_access")],
         [InlineKeyboardButton("❌ Close Menu", callback_data="set_close")]
     ]
@@ -204,6 +206,25 @@ def get_bot_protection_settings_keyboard(settings):
     status = "✅" if settings.get("bot_protection_enabled", False) else "❌"
     keyboard = [
         [InlineKeyboardButton(f"Bot Protection: {status}", callback_data="set_toggle_bot_protection_enabled")],
+        [InlineKeyboardButton("ℹ️ Only affects members (not admins)", callback_data="set_none")],
+        [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+def get_link_spam_settings_keyboard(settings):
+    status = "✅" if settings.get("link_spam_protection_enabled", False) else "❌"
+    keyboard = [
+        [InlineKeyboardButton(f"Link Spam Protection: {status}", callback_data="set_toggle_link_spam_protection_enabled")],
+        [InlineKeyboardButton("ℹ️ Only affects members (not admins)", callback_data="set_none")],
+        [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+def get_forward_protection_settings_keyboard(settings):
+    status = "✅" if settings.get("forward_protection_enabled", False) else "❌"
+    keyboard = [
+        [InlineKeyboardButton(f"Forward Protection: {status}", callback_data="set_toggle_forward_protection_enabled")],
+        [InlineKeyboardButton("ℹ️ Only affects members (not admins)", callback_data="set_none")],
         [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -355,6 +376,30 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer()
         return
 
+    if data == "set_view_link_spam":
+        settings = get_chat_settings(chat_id)
+        try:
+            await edit_bot_response(
+                query, context,
+                "🔗 Link Spam Protection Settings\n\nAutomatically delete messages containing links from members:",
+                reply_markup=get_link_spam_settings_keyboard(settings)
+            )
+        except BadRequest: pass
+        await query.answer()
+        return
+
+    if data == "set_view_forward_protection":
+        settings = get_chat_settings(chat_id)
+        try:
+            await edit_bot_response(
+                query, context,
+                "🔄 Forward Protection Settings\n\nAutomatically delete forwarded messages from members:",
+                reply_markup=get_forward_protection_settings_keyboard(settings)
+            )
+        except BadRequest: pass
+        await query.answer()
+        return
+
     if data.startswith("set_toggle_"):
         key = data.replace("set_toggle_", "")
         settings = get_chat_settings(chat_id)
@@ -405,6 +450,10 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await query.edit_message_reply_markup(reply_markup=get_command_deletion_keyboard(new_settings))
             elif "bot_protection" in key:
                 await query.edit_message_reply_markup(reply_markup=get_bot_protection_settings_keyboard(new_settings))
+            elif "link_spam" in key:
+                await query.edit_message_reply_markup(reply_markup=get_link_spam_settings_keyboard(new_settings))
+            elif "forward_protection" in key:
+                await query.edit_message_reply_markup(reply_markup=get_forward_protection_settings_keyboard(new_settings))
             elif "command_access" in key: 
                 await query.edit_message_reply_markup(reply_markup=get_command_access_keyboard(new_settings))
         except BadRequest: pass

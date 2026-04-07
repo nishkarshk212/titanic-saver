@@ -4,9 +4,10 @@ from telegram.constants import ParseMode
 from telegram.ext import ContextTypes, ChatMemberHandler, MessageHandler, filters
 from settings_manager import get_chat_settings
 from config import send_bot_response
+from user_manager import is_user_admin
 
-async def kick_if_bot(update: Update, context: ContextTypes.DEFAULT_TYPE, user):
-    """Kicks the user if they are a bot and Bot Protection is enabled."""
+async def kick_if_bot(update: Update, context: ContextTypes.DEFAULT_TYPE, user, added_by_user=None):
+    """Kicks the bot if added by a member (not admin) and Bot Protection is enabled."""
     if not user.is_bot or user.id == context.bot.id:
         return
 
@@ -15,6 +16,18 @@ async def kick_if_bot(update: Update, context: ContextTypes.DEFAULT_TYPE, user):
     
     if not settings.get("bot_protection_enabled", False):
         return
+
+    # Check if the user who added the bot is an admin
+    # If added by admin, allow it. If added by member, kick the bot.
+    if added_by_user:
+        try:
+            is_admin = await is_user_admin(chat_id, added_by_user.id, context)
+            if is_admin:
+                # Admin added the bot, allow it
+                logging.info(f"Bot Protection: Bot {user.id} added by admin {added_by_user.id} in chat {chat_id}, allowing")
+                return
+        except Exception as e:
+            logging.error(f"Bot Protection: Failed to check admin status in chat {chat_id}: {e}")
 
     try:
         # Check bot permissions
@@ -48,7 +61,9 @@ async def on_chat_member_update(update: Update, context: ContextTypes.DEFAULT_TY
     # Only act if someone is newly joined/added
     status = update.chat_member.new_chat_member.status
     if status in ['member', 'administrator']:
-        await kick_if_bot(update, context, update.chat_member.new_chat_member.user)
+        # The user who performed the action (added the bot)
+        added_by_user = update.chat_member.from_user
+        await kick_if_bot(update, context, update.chat_member.new_chat_member.user, added_by_user)
 
 async def on_new_members_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Detects bot additions via MessageHandler (legacy/service messages)."""
@@ -56,7 +71,9 @@ async def on_new_members_message(update: Update, context: ContextTypes.DEFAULT_T
         return
         
     for user in update.message.new_chat_members:
-        await kick_if_bot(update, context, user)
+        # The message sender is the one who added the bot
+        added_by_user = update.message.from_user
+        await kick_if_bot(update, context, user, added_by_user)
 
 def get_bot_protection_handlers():
     """Returns the handlers for bot protection."""
