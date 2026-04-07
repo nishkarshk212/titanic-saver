@@ -283,10 +283,52 @@ async def demote_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await send_bot_response(update, context, f"Failed to demote: {str(e)}")
 
+async def reload_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Reloads the admin list and refreshes the bot's presence in the group."""
+    chat_id = update.effective_chat.id
+    user_id = update.effective_user.id
+    
+    # Check if user is admin/owner
+    if not await is_user_admin(chat_id, user_id, context):
+        await send_bot_response(update, context, "You must be an admin to use the /reload command.")
+        return
+
+    try:
+        # 1. Update the bot's own administrative rights cache (by calling get_chat_member for the bot)
+        # This ensures the bot knows its latest permissions
+        bot_member = await context.bot.get_chat_member(chat_id, context.bot.id)
+        
+        # 2. Get the latest admin list from Telegram
+        # This is useful for groups where admins have changed recently
+        admins = await context.bot.get_chat_administrators(chat_id)
+        admin_count = len(admins)
+        
+        # 3. Success message (Green themed)
+        reload_msg = (
+            f"✅ **Group Reloaded Successfully!**\n\n"
+            f"• **Admin List:** Updated ({admin_count} admins found)\n"
+            f"• **Bot Permissions:** Refreshed\n"
+            f"• **Group Cache:** Synced\n\n"
+            f"Everything is up to date!"
+        )
+        
+        await send_bot_response(update, context, reload_msg, parse_mode="MARKDOWN")
+        
+        # Log to channel
+        await log_to_channel(context, 
+            f"🔄 #RELOAD\n"
+            f"📍 Group: {update.effective_chat.title} ({chat_id})\n"
+            f"👤 Admin: {update.effective_user.first_name}"
+        )
+    except Exception as e:
+        logging.error(f"Error during reload: {e}")
+        await send_bot_response(update, context, f"❌ Failed to reload group: {e}")
+
 def get_admin_handlers():
     return [
         CommandHandler("promote", promote_command),
         CommandHandler("demote", demote_command),
+        CommandHandler("reload", reload_command),
         CallbackQueryHandler(toggle_permission, pattern="^toggle_"),
         CallbackQueryHandler(confirm_promotion, pattern="^confirm_"),
         CallbackQueryHandler(cancel_promotion, pattern="^cancel_")
