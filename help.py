@@ -63,6 +63,7 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "• /warn - Give a user a warning\n"
             "• /unwarn - Reset a user's warnings\n"
             "• /pin - Pin a message (reply only)\n"
+            "• /unpin - Unpin a message (reply only) or all pinned messages\n"
             "• /promote - Promote a user to admin with custom perms\n"
             "• /demote - Remove admin rights from a user\n"
             "• /muter - Toggle 'Muter' role (can only mute/unmute)\n"

@@ -351,12 +351,40 @@ async def pin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await send_bot_response(update, context, f"Failed to pin message: {str(e)}")
 
+async def unpin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Unpins the message that is replied to, or the last pinned message if no reply."""
+    chat_id = update.effective_chat.id
+    user_id = update.effective_user.id
+    
+    # Check if user is admin/owner
+    if not await is_user_admin(chat_id, user_id, context):
+        await send_bot_response(update, context, "You must be an admin to use the /unpin command.")
+        return
+
+    # Check bot permissions (can_pin_messages)
+    bot_member = await context.bot.get_chat_member(chat_id, context.bot.id)
+    if not (bot_member.status == 'creator' or (bot_member.status == 'administrator' and bot_member.can_pin_messages)):
+        await send_bot_response(update, context, "❌ I don't have the 'Pin Messages' permission to unpin messages.")
+        return
+
+    try:
+        if update.message.reply_to_message:
+            await context.bot.unpin_chat_message(chat_id=chat_id, message_id=update.message.reply_to_message.message_id)
+            await send_bot_response(update, context, "✅ Message unpinned successfully!")
+        else:
+            await context.bot.unpin_all_chat_messages(chat_id=chat_id)
+            await send_bot_response(update, context, "✅ All messages unpinned successfully!")
+        
+    except Exception as e:
+        await send_bot_response(update, context, f"Failed to unpin message: {str(e)}")
+
 def get_admin_handlers():
     return [
         CommandHandler("promote", promote_command),
         CommandHandler("demote", demote_command),
         CommandHandler("reload", reload_command),
         CommandHandler("pin", pin_command),
+        CommandHandler("unpin", unpin_command),
         CallbackQueryHandler(toggle_permission, pattern="^toggle_"),
         CallbackQueryHandler(confirm_promotion, pattern="^confirm_"),
         CallbackQueryHandler(cancel_promotion, pattern="^cancel_")
