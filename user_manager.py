@@ -100,10 +100,14 @@ def resolve_username(username):
     return None, None
 
 async def get_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Extracts user ID from reply, mention, or argument."""
+    """Extracts user ID or Chat ID from reply, mention, or argument."""
     # 1. Check if it's a reply
     if update.message.reply_to_message:
-        user = update.message.reply_to_message.from_user
+        reply = update.message.reply_to_message
+        # Check if it's a post from a channel or anonymous admin
+        if reply.sender_chat:
+            return reply.sender_chat.id, reply.sender_chat.title or reply.sender_chat.username
+        user = reply.from_user
         return user.id, user.first_name
     
     # 2. Check for mentions in entities
@@ -113,6 +117,12 @@ async def get_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 username_text = update.message.text[entity.offset:entity.offset+entity.length]
                 user_id, user_name = resolve_username(username_text)
                 if user_id: return user_id, user_name
+                
+                # If not in cache, try to get chat info directly
+                try:
+                    chat = await context.bot.get_chat(username_text)
+                    return chat.id, chat.title or chat.username
+                except: pass
             elif entity.type == 'text_mention':
                 return entity.user.id, entity.user.first_name
 
@@ -120,18 +130,29 @@ async def get_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.args:
         arg = context.args[0]
         # Check if ID
-        if arg.isdigit():
+        if arg.startswith('-') or arg.isdigit():
             try:
-                user_id = int(arg)
-                chat_member = await context.bot.get_chat_member(update.effective_chat.id, user_id)
-                return user_id, chat_member.user.first_name
+                chat_id = int(arg)
+                # Try to get chat info
+                try:
+                    chat = await context.bot.get_chat(chat_id)
+                    return chat.id, chat.title or chat.username or str(chat.id)
+                except:
+                    # Fallback to just the ID
+                    return chat_id, str(chat_id)
             except:
-                return int(arg), arg
+                pass
         
         # If it's a username but not found in entities
         if arg.startswith('@'):
             user_id, user_name = resolve_username(arg)
             if user_id: return user_id, user_name
+            
+            # Try to resolve via bot
+            try:
+                chat = await context.bot.get_chat(arg)
+                return chat.id, chat.title or chat.username
+            except: pass
             
     return None, None
 
