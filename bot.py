@@ -12,6 +12,7 @@ from clean_service import get_clean_service_handlers
 from auto_delete import get_auto_delete_handlers
 from moderation import get_moderation_handlers
 from filter import get_filter_handlers
+from bot_protection import get_bot_protection_handlers
 from settings import get_settings_handlers
 from help import get_help_handlers
 from config import BOT_TOKEN, LOG_CHANNEL_ID, OWNER_ID, log_to_channel, send_bot_response, send_bot_media, START_VIDEOS
@@ -697,6 +698,10 @@ def main():
             application.add_handler(handler, group=3)
         else:
             application.add_handler(handler)
+
+    # Add bot protection handlers (Group 0)
+    for handler in get_bot_protection_handlers():
+        application.add_handler(handler)
 
     # Start the bot
     print("Bot is starting...")

@@ -42,7 +42,10 @@ def get_help_keyboard():
             InlineKeyboardButton("🚫 Block Content", callback_data="help_block"),
             InlineKeyboardButton("📌 Pinned Messages", callback_data="help_pinned")
         ],
-        [InlineKeyboardButton("❌ Close", callback_data="help_close")]
+        [
+            InlineKeyboardButton("🤖 Bot Protection", callback_data="help_bot_prot"),
+            InlineKeyboardButton("❌ Close", callback_data="help_close")
+        ]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -127,6 +130,14 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "📏 <b>Message Length Limit</b>\n\n"
             "Configure a maximum character limit for messages in /settings &gt; Message Length. Messages exceeding this limit will be automatically deleted.\n\n"
             "<i>Note: Admins are exempt from these checks.</i>"
+        )
+    elif data == "help_bot_prot":
+        help_text = (
+            "🤖 <b>Bot Protection</b>\n\n"
+            "Prevents other bots from being added to the group.\n"
+            "• If enabled, any bot added to the group will be automatically kicked.\n"
+            "• Enable/Disable in /settings > Bot Protection.\n\n"
+            "<i>Note: This bot itself is exempt.</i>"
         )
 
     keyboard = [[InlineKeyboardButton("🔙 Back", callback_data="help_main")]]

@@ -31,6 +31,7 @@ def get_main_settings_keyboard():
         [InlineKeyboardButton("🛡️ Moderation Settings", callback_data="set_view_mod")],
         [InlineKeyboardButton("🗑️ Command Deletion", callback_data="set_view_command_deletion")],
         [InlineKeyboardButton("📌 Pinned Messages", callback_data="set_view_pinned_messages")],
+        [InlineKeyboardButton("🤖 Bot Protection", callback_data="set_view_bot_protection")],
         [InlineKeyboardButton("🔑 Command Access", callback_data="set_view_command_access")],
         [InlineKeyboardButton("❌ Close Menu", callback_data="set_close")]
     ]
@@ -199,6 +200,14 @@ def get_pinned_message_settings_keyboard(settings):
     ]
     return InlineKeyboardMarkup(keyboard)
 
+def get_bot_protection_settings_keyboard(settings):
+    status = "✅" if settings.get("bot_protection_enabled", False) else "❌"
+    keyboard = [
+        [InlineKeyboardButton(f"Bot Protection: {status}", callback_data="set_toggle_bot_protection_enabled")],
+        [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
 async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     chat_id = update.effective_chat.id
@@ -334,6 +343,18 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer()
         return
 
+    if data == "set_view_bot_protection":
+        settings = get_chat_settings(chat_id)
+        try:
+            await edit_bot_response(
+                query, context,
+                "🤖 Bot Protection Settings\n\nConfigure how bots are handled when added to the group:",
+                reply_markup=get_bot_protection_settings_keyboard(settings)
+            )
+        except BadRequest: pass
+        await query.answer()
+        return
+
     if data.startswith("set_toggle_"):
         key = data.replace("set_toggle_", "")
         settings = get_chat_settings(chat_id)
@@ -382,6 +403,8 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await query.edit_message_reply_markup(reply_markup=get_mod_settings_keyboard(new_settings))
             elif "command_deletion" in key: 
                 await query.edit_message_reply_markup(reply_markup=get_command_deletion_keyboard(new_settings))
+            elif "bot_protection" in key:
+                await query.edit_message_reply_markup(reply_markup=get_bot_protection_settings_keyboard(new_settings))
             elif "command_access" in key: 
                 await query.edit_message_reply_markup(reply_markup=get_command_access_keyboard(new_settings))
         except BadRequest: pass
