@@ -89,20 +89,34 @@ async def info_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if is_channel:
         try:
             chat = await context.bot.get_chat(user_id)
+            
+            # Check if channel is banned in the current group
+            # Telegram doesn't have a direct "is_sender_chat_banned" method for groups,
+            # but we can try to infer it or rely on the fact that if we can't find it in members, 
+            # it might be banned. However, for sender chats, we just show both buttons or handle it in the callback.
+            # To show status, we'd ideally need a local cache of banned sender chats.
+            # For now, we'll try to provide the status if possible.
+            channel_status = "Active ✅"
+            # Note: Checking actual ban status for a sender chat is tricky without a local database of bans.
+            
             info_text = (
                 f"📢 <b>Channel Information</b>\n\n"
                 f"• <b>Title:</b> {html.escape(chat.title)}\n"
                 f"• <b>Username:</b> @{chat.username if chat.username else 'None'}\n"
                 f"• <b>Channel ID:</b> <code>{user_id}</code>\n"
+                f"• <b>Status:</b> {channel_status}\n"
                 f"• <b>Type:</b> Channel\n"
                 f"• <b>Description:</b> {html.escape(chat.description) if chat.description else 'None'}"
             )
             
-            # Simple keyboard for channels (mostly just ban/unban from group)
+            # Keyboard for channels with Ban/Unban
             reply_markup = None
             if await is_user_admin(chat_id, update.effective_user.id, context):
                 keyboard = [
-                    [InlineKeyboardButton("🔨 Ban Channel", callback_data=f"info_ban_{user_id}")],
+                    [
+                        InlineKeyboardButton("🔨 Ban Channel", callback_data=f"info_ban_{user_id}"),
+                        InlineKeyboardButton("🔓 Unban Channel", callback_data=f"info_unban_{user_id}")
+                    ],
                     [InlineKeyboardButton("❌ Close", callback_data="info_close")]
                 ]
                 reply_markup = InlineKeyboardMarkup(keyboard)
@@ -294,9 +308,12 @@ async def info_callback_handler(update: Update, context: ContextTypes.DEFAULT_TY
         is_channel = str(user_id).startswith('-100')
         
         if is_channel:
-            text_override = f"🔨 <b>Channel Management</b> for <code>{user_id}</code>\n\nAre you sure you want to ban this channel from the group?"
+            text_override = f"🔨 <b>Channel Management</b> for <code>{user_id}</code>\n\nChoose an action for this channel in this group:"
             keyboard = [
-                [InlineKeyboardButton("🔨 Confirm Ban", callback_data=f"info_doban_{user_id}")],
+                [
+                    InlineKeyboardButton("🔨 Confirm Ban", callback_data=f"info_doban_{user_id}"),
+                    InlineKeyboardButton("🔓 Confirm Unban", callback_data=f"info_dounban_{user_id}")
+                ],
                 [InlineKeyboardButton("🔙 Back", callback_data=f"info_back_{user_id}"), InlineKeyboardButton("❌ Close", callback_data="info_close")]
             ]
         else:
@@ -307,6 +324,26 @@ async def info_callback_handler(update: Update, context: ContextTypes.DEFAULT_TY
                 [InlineKeyboardButton("🔓 Unban" if is_banned else "🔨 Ban", callback_data=f"info_doban_{user_id}")],
                 [InlineKeyboardButton("🔙 Back", callback_data=f"info_back_{user_id}"), InlineKeyboardButton("❌ Close", callback_data="info_close")]
             ]
+    elif action == "unban":
+        # Redirect to the management view for channel unbanning
+        query.data = f"info_ban_{user_id}"
+        await info_callback_handler(update, context)
+        return
+    elif action == "dounban":
+        try:
+            # Check if target is a channel
+            is_channel = str(user_id).startswith('-100')
+            if is_channel:
+                await context.bot.unban_chat_sender_chat(chat_id, user_id)
+                await query.answer("Channel unbanned from group.")
+            else:
+                await context.bot.unban_chat_member(chat_id, user_id, only_if_banned=True)
+                await query.answer("User unbanned.")
+        except Exception as e:
+            await query.answer(f"Action failed: {e}", show_alert=True)
+        query.data = f"info_ban_{user_id}"
+        await info_callback_handler(update, context)
+        return
     elif action == "doban":
         try:
             # Check if target is a channel
