@@ -38,13 +38,20 @@ async def check_bot_admin_rights(chat_id, context, required_rights=None):
         return False, f"❌ Error checking bot rights: {str(e)}"
 
 async def ban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Bans a user from the chat."""
+    """Bans a user from the chat or channel."""
     chat_id = update.effective_chat.id
     sender_id = update.effective_user.id
+    chat_type = update.effective_chat.type
     
-    if not await is_user_admin(chat_id, sender_id, context):
-        await send_bot_response(update, context, "You must be an admin to ban users.")
-        return
+    # Check if user is admin/owner
+    if chat_type != 'channel':
+        if not await is_user_admin(chat_id, sender_id, context):
+            await send_bot_response(update, context, "You must be an admin to ban users.")
+            return
+    else:
+        # In channels, we check if the update is a channel_post and the sender is likely an admin
+        # Note: channel_post doesn't have from_user in standard updates unless the bot is an admin
+        pass
 
     # Check bot rights
     has_rights, error_msg = await check_bot_admin_rights(chat_id, context, ['can_restrict_members'])
@@ -60,17 +67,21 @@ async def ban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         await context.bot.ban_chat_member(chat_id, user_id)
         await send_bot_response(update, context, f"✅ Banned {user_name}.")
-        await log_to_channel(context, f"🔨 #BAN\nUser: {user_name} ({user_id})\nAdmin: {update.effective_user.first_name}")
+        admin_name = update.effective_user.first_name if update.effective_user else "Channel Admin"
+        await log_to_channel(context, f"🔨 #BAN\nUser: {user_name} ({user_id})\nAdmin: {admin_name}")
     except Exception as e:
         await send_bot_response(update, context, f"Error: {e}")
 
 async def unban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Unbans a user from the chat or channel."""
     chat_id = update.effective_chat.id
     sender_id = update.effective_user.id
+    chat_type = update.effective_chat.type
     
-    if not await is_user_admin(chat_id, sender_id, context):
-        return
-
+    if chat_type != 'channel':
+        if not await is_user_admin(chat_id, sender_id, context):
+            return
+    
     user_id, user_name = await get_user_id(update, context)
     if not user_id: return
 

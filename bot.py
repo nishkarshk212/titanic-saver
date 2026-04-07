@@ -547,6 +547,11 @@ def main():
     application.add_handler(CallbackQueryHandler(info_callback_handler, pattern="^info_"))
     application.add_handler(MessageHandler(filters.ALL & (filters.ChatType.GROUPS | filters.ChatType.SUPERGROUP), cache_user_handler), group=-1)
 
+    # Add support for commands in channels
+    from moderation import ban_command, unban_command
+    application.add_handler(CommandHandler("ban", ban_command, filters=filters.ChatType.CHANNEL))
+    application.add_handler(CommandHandler("unban", unban_command, filters=filters.ChatType.CHANNEL))
+
     # Add admin handlers (Group 0)
     for handler in get_admin_handlers():
         application.add_handler(handler)
