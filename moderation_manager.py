@@ -81,8 +81,47 @@ def remove_muter(chat_id, user_id):
         return True
     return False
 
+BANNED_CHANNELS_FILE = "banned_channels.json"
+
+# ... (rest of the code)
+
 def get_all_muters(chat_id):
     """Returns a list of user IDs for all muters in a chat."""
     muters_data = load_data(MUTERS_FILE)
     chat_id_str = str(chat_id)
     return muters_data.get(chat_id_str, [])
+
+# Banned Channels Functions
+def is_channel_banned(chat_id, channel_id):
+    """Checks if a channel (sender chat) is banned in a specific chat."""
+    banned_data = load_data(BANNED_CHANNELS_FILE)
+    chat_id_str = str(chat_id)
+    channel_id_str = str(channel_id)
+    if chat_id_str in banned_data:
+        return channel_id_str in banned_data[chat_id_str]
+    return False
+
+def add_banned_channel(chat_id, channel_id):
+    """Adds a channel to the banned list for a chat."""
+    banned_data = load_data(BANNED_CHANNELS_FILE)
+    chat_id_str = str(chat_id)
+    channel_id_str = str(channel_id)
+    if chat_id_str not in banned_data:
+        banned_data[chat_id_str] = []
+    
+    if channel_id_str not in banned_data[chat_id_str]:
+        banned_data[chat_id_str].append(channel_id_str)
+        save_data(BANNED_CHANNELS_FILE, banned_data)
+        return True
+    return False
+
+def remove_banned_channel(chat_id, channel_id):
+    """Removes a channel from the banned list for a chat."""
+    banned_data = load_data(BANNED_CHANNELS_FILE)
+    chat_id_str = str(chat_id)
+    channel_id_str = str(channel_id)
+    if chat_id_str in banned_data and channel_id_str in banned_data[chat_id_str]:
+        banned_data[chat_id_str].remove(channel_id_str)
+        save_data(BANNED_CHANNELS_FILE, banned_data)
+        return True
+    return False
