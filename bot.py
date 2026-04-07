@@ -699,9 +699,9 @@ def main():
         else:
             application.add_handler(handler)
 
-    # Add bot protection handlers (Group 0)
+    # Add bot protection handlers (Group 5)
     for handler in get_bot_protection_handlers():
-        application.add_handler(handler)
+        application.add_handler(handler, group=5)
 
     # Start the bot
     print("Bot is starting...")
