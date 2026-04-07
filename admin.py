@@ -345,7 +345,7 @@ async def pin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     try:
-        await update.message.reply_to_message.pin()
+        await context.bot.pin_chat_message(chat_id=chat_id, message_id=update.message.reply_to_message.message_id)
         await send_bot_response(update, context, "✅ Message pinned successfully!")
         
     except Exception as e:

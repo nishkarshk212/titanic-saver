@@ -35,13 +35,15 @@ async def clean_service_messages(update: Update, context: ContextTypes.DEFAULT_T
         should_delete = True
     elif update.message.pinned_message and settings.get("clean_pinned_message", True):
         should_delete = True
+        logging.info(f"Pinned message detected. clean_pinned_message setting: {settings.get('clean_pinned_message', True)}. Update message: {update.message}")
 
     if should_delete:
-        logging.info(f"Deleting service message in {chat_id}")
+        logging.info(f"Attempting to delete service message in {chat_id}. Message ID: {update.message.message_id}")
         try:
             await update.message.delete()
+            logging.info(f"Successfully deleted service message in {chat_id}. Message ID: {update.message.message_id}")
         except Exception as e:
-            logging.error(f"Failed to delete service message in {chat_id}: {e}")
+            logging.error(f"Failed to delete service message in {chat_id}, Message ID: {update.message.message_id}: {e}")
 
 def get_clean_service_handlers():
     """Return handlers for cleaning service messages."""

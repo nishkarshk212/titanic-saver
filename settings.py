@@ -348,13 +348,20 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Refresh current menu
         new_settings = get_chat_settings(chat_id)
         try:
-            if "welcome" in key: await query.edit_message_reply_markup(reply_markup=get_welcome_settings_keyboard(new_settings))
-            elif "clean" in key: await query.edit_message_reply_markup(reply_markup=get_clean_settings_keyboard(new_settings))
-            elif "auto_delete" in key: await query.edit_message_reply_markup(reply_markup=get_auto_delete_settings_keyboard(new_settings))
-            elif "block" in key: await query.edit_message_reply_markup(reply_markup=get_block_content_settings_keyboard(new_settings))
-            elif "warn" in key: await query.edit_message_reply_markup(reply_markup=get_mod_settings_keyboard(new_settings))
-            elif "command_deletion" in key: await query.edit_message_reply_markup(reply_markup=get_command_deletion_keyboard(new_settings))
-            elif "command_access" in key: await query.edit_message_reply_markup(reply_markup=get_command_access_keyboard(new_settings))
+            if "welcome" in key: 
+                await query.edit_message_reply_markup(reply_markup=get_welcome_settings_keyboard(new_settings))
+            elif "clean" in key: 
+                await query.edit_message_reply_markup(reply_markup=get_clean_settings_keyboard(new_settings))
+            elif "auto_delete" in key: 
+                await query.edit_message_reply_markup(reply_markup=get_auto_delete_settings_keyboard(new_settings))
+            elif "block" in key: 
+                await query.edit_message_reply_markup(reply_markup=get_block_content_settings_keyboard(new_settings))
+            elif "warn" in key: 
+                await query.edit_message_reply_markup(reply_markup=get_mod_settings_keyboard(new_settings))
+            elif "command_deletion" in key: 
+                await query.edit_message_reply_markup(reply_markup=get_command_deletion_keyboard(new_settings))
+            elif "command_access" in key: 
+                await query.edit_message_reply_markup(reply_markup=get_command_access_keyboard(new_settings))
         except BadRequest: pass
         await query.answer(f"Setting updated!")
         return
