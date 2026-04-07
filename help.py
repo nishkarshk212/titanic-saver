@@ -38,7 +38,10 @@ def get_help_keyboard():
             InlineKeyboardButton("💣 Auto Delete", callback_data="help_auto"),
             InlineKeyboardButton("🔍 Filters", callback_data="help_filters")
         ],
-        [InlineKeyboardButton("🚫 Block Content", callback_data="help_block")],
+        [
+            InlineKeyboardButton("🚫 Block Content", callback_data="help_block"),
+            InlineKeyboardButton("📌 Pinned Messages", callback_data="help_pinned")
+        ],
         [InlineKeyboardButton("❌ Close", callback_data="help_close")]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -92,8 +95,13 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Automatically deletes system messages:\n"
             "• User Joined/Left\n"
             "• Voice Chat Started/Ended/Scheduled/Invited\n"
-            "• Pinned Message notification\n"
             "Enable specific types in /settings > Clean Service."
+        )
+    elif data == "help_pinned":
+        help_text = (
+            "📌 <b>Pinned Messages</b>\n\n"
+            "Automatically deletes 'X pinned a message' service notifications.\n"
+            "Enable in /settings > Pinned Messages."
         )
     elif data == "help_auto":
         help_text = (

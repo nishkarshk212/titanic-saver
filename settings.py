@@ -30,6 +30,7 @@ def get_main_settings_keyboard():
         [InlineKeyboardButton("📏 Message Length", callback_data="set_view_msg_length")],
         [InlineKeyboardButton("🛡️ Moderation Settings", callback_data="set_view_mod")],
         [InlineKeyboardButton("🗑️ Command Deletion", callback_data="set_view_command_deletion")],
+        [InlineKeyboardButton("📌 Pinned Messages", callback_data="set_view_pinned_messages")],
         [InlineKeyboardButton("🔑 Command Access", callback_data="set_view_command_access")],
         [InlineKeyboardButton("❌ Close Menu", callback_data="set_close")]
     ]
@@ -82,7 +83,6 @@ def get_clean_settings_keyboard(settings):
     ended_status = "✅" if settings.get("clean_video_chat_ended", True) else "❌"
     invited_status = "✅" if settings.get("clean_video_chat_invited", True) else "❌"
     scheduled_status = "✅" if settings.get("clean_video_chat_scheduled", True) else "❌"
-    pinned_status = "✅" if settings.get("clean_pinned_message", True) else "❌"
     
     keyboard = [
         [InlineKeyboardButton(f"Master Clean: {master_status}", callback_data="set_toggle_clean_service_enabled")],
@@ -92,7 +92,6 @@ def get_clean_settings_keyboard(settings):
         [InlineKeyboardButton(f"Voice Chat Ended: {ended_status}", callback_data="set_toggle_clean_video_chat_ended")],
         [InlineKeyboardButton(f"Voice Chat Invited: {invited_status}", callback_data="set_toggle_clean_video_chat_invited")],
         [InlineKeyboardButton(f"Voice Chat Scheduled: {scheduled_status}", callback_data="set_toggle_clean_video_chat_scheduled")],
-        [InlineKeyboardButton(f"Pinned Message: {pinned_status}", callback_data="set_toggle_clean_pinned_message")],
         [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -188,6 +187,14 @@ def get_command_access_keyboard(settings):
     access = settings.get("command_access", "all").title()
     keyboard = [
         [InlineKeyboardButton(f"Command Access: {access}", callback_data="set_toggle_command_access")],
+        [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+def get_pinned_message_settings_keyboard(settings):
+    pinned_status = "✅" if settings.get("clean_pinned_message", True) else "❌"
+    keyboard = [
+        [InlineKeyboardButton(f"Clean Pinned Message: {pinned_status}", callback_data="set_toggle_clean_pinned_message")],
         [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -315,6 +322,18 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer()
         return
 
+    if data == "set_view_pinned_messages":
+        settings = get_chat_settings(chat_id)
+        try:
+            await edit_bot_response(
+                query, context,
+                "📌 Pinned Messages Settings\n\nConfigure how pinned messages are handled:",
+                reply_markup=get_pinned_message_settings_keyboard(settings)
+            )
+        except BadRequest: pass
+        await query.answer()
+        return
+
     if data.startswith("set_toggle_"):
         key = data.replace("set_toggle_", "")
         settings = get_chat_settings(chat_id)
@@ -351,7 +370,10 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if "welcome" in key: 
                 await query.edit_message_reply_markup(reply_markup=get_welcome_settings_keyboard(new_settings))
             elif "clean" in key: 
-                await query.edit_message_reply_markup(reply_markup=get_clean_settings_keyboard(new_settings))
+                if "pinned" in key:
+                    await query.edit_message_reply_markup(reply_markup=get_pinned_message_settings_keyboard(new_settings))
+                else:
+                    await query.edit_message_reply_markup(reply_markup=get_clean_settings_keyboard(new_settings))
             elif "auto_delete" in key: 
                 await query.edit_message_reply_markup(reply_markup=get_auto_delete_settings_keyboard(new_settings))
             elif "block" in key: 
