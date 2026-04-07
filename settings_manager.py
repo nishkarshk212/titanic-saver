@@ -39,6 +39,7 @@ def get_chat_settings(chat_id):
             "clean_video_chat_ended": True,
             "clean_video_chat_invited": True,
             "clean_video_chat_scheduled": True,
+            "clean_pinned_message": True,
             "auto_delete_enabled": False,
             "auto_delete_time": 60,
             "warn_limit": 3,

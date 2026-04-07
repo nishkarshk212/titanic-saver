@@ -33,6 +33,8 @@ async def clean_service_messages(update: Update, context: ContextTypes.DEFAULT_T
         should_delete = True
     elif update.message.video_chat_scheduled and settings.get("clean_video_chat_scheduled", True):
         should_delete = True
+    elif update.message.pinned_message and settings.get("clean_pinned_message", True):
+        should_delete = True
 
     if should_delete:
         logging.info(f"Deleting service message in {chat_id}")
@@ -50,7 +52,8 @@ def get_clean_service_handlers():
             filters.StatusUpdate.VIDEO_CHAT_STARTED | 
             filters.StatusUpdate.VIDEO_CHAT_ENDED | 
             filters.StatusUpdate.VIDEO_CHAT_PARTICIPANTS_INVITED | 
-            filters.StatusUpdate.VIDEO_CHAT_SCHEDULED,
+            filters.StatusUpdate.VIDEO_CHAT_SCHEDULED |
+            filters.StatusUpdate.PINNED_MESSAGE,
             clean_service_messages
         )
     ]

@@ -62,6 +62,7 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "• /unmute - Unmute a user\n"
             "• /warn - Give a user a warning\n"
             "• /unwarn - Reset a user's warnings\n"
+            "• /pin - Pin a message (reply only)\n"
             "• /promote - Promote a user to admin with custom perms\n"
             "• /demote - Remove admin rights from a user\n"
             "• /muter - Toggle 'Muter' role (can only mute/unmute)\n"
@@ -90,6 +91,7 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Automatically deletes system messages:\n"
             "• User Joined/Left\n"
             "• Voice Chat Started/Ended/Scheduled/Invited\n"
+            "• Pinned Message notification\n"
             "Enable specific types in /settings > Clean Service."
         )
     elif data == "help_auto":

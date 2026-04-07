@@ -82,6 +82,7 @@ def get_clean_settings_keyboard(settings):
     ended_status = "✅" if settings.get("clean_video_chat_ended", True) else "❌"
     invited_status = "✅" if settings.get("clean_video_chat_invited", True) else "❌"
     scheduled_status = "✅" if settings.get("clean_video_chat_scheduled", True) else "❌"
+    pinned_status = "✅" if settings.get("clean_pinned_message", True) else "❌"
     
     keyboard = [
         [InlineKeyboardButton(f"Master Clean: {master_status}", callback_data="set_toggle_clean_service_enabled")],
@@ -91,6 +92,7 @@ def get_clean_settings_keyboard(settings):
         [InlineKeyboardButton(f"Voice Chat Ended: {ended_status}", callback_data="set_toggle_clean_video_chat_ended")],
         [InlineKeyboardButton(f"Voice Chat Invited: {invited_status}", callback_data="set_toggle_clean_video_chat_invited")],
         [InlineKeyboardButton(f"Voice Chat Scheduled: {scheduled_status}", callback_data="set_toggle_clean_video_chat_scheduled")],
+        [InlineKeyboardButton(f"Pinned Message: {pinned_status}", callback_data="set_toggle_clean_pinned_message")],
         [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -338,8 +340,8 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             new_val = "admins" if current == "all" else "all"
             update_chat_setting(chat_id, "command_access", new_val)
         else:
-            # Welcome enabled by default, others disabled by default
-            default_val = True if "welcome_enabled" in key or "media_enabled" in key or "button_enabled" in key or "clean_service_enabled" in key else False
+            # Welcome and Clean settings enabled by default, others disabled by default
+            default_val = True if "welcome_enabled" in key or "media_enabled" in key or "button_enabled" in key or "clean_" in key else False
             new_val = not settings.get(key, default_val)
             update_chat_setting(chat_id, key, new_val)
         

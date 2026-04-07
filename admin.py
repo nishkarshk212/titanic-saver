@@ -324,11 +324,39 @@ async def reload_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logging.error(f"Error during reload: {e}")
         await send_bot_response(update, context, f"❌ Failed to reload group: {e}")
 
+async def pin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Pins the message that is replied to."""
+    chat_id = update.effective_chat.id
+    user_id = update.effective_user.id
+    
+    # Check if user is admin/owner
+    if not await is_user_admin(chat_id, user_id, context):
+        await send_bot_response(update, context, "You must be an admin to use the /pin command.")
+        return
+
+    # Check bot permissions (can_pin_messages)
+    bot_member = await context.bot.get_chat_member(chat_id, context.bot.id)
+    if not (bot_member.status == 'creator' or (bot_member.status == 'administrator' and bot_member.can_pin_messages)):
+        await send_bot_response(update, context, "❌ I don't have the 'Pin Messages' permission.")
+        return
+
+    if not update.message.reply_to_message:
+        await send_bot_response(update, context, "Please reply to a message you want to pin.")
+        return
+
+    try:
+        await update.message.reply_to_message.pin()
+        await send_bot_response(update, context, "✅ Message pinned successfully!")
+        
+    except Exception as e:
+        await send_bot_response(update, context, f"Failed to pin message: {str(e)}")
+
 def get_admin_handlers():
     return [
         CommandHandler("promote", promote_command),
         CommandHandler("demote", demote_command),
         CommandHandler("reload", reload_command),
+        CommandHandler("pin", pin_command),
         CallbackQueryHandler(toggle_permission, pattern="^toggle_"),
         CallbackQueryHandler(confirm_promotion, pattern="^confirm_"),
         CallbackQueryHandler(cancel_promotion, pattern="^cancel_")
