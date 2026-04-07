@@ -29,15 +29,22 @@ async def check_forwarded_messages(update: Update, context: ContextTypes.DEFAULT
         return
     
     # Check if message is forwarded
-    # Telegram marks forwarded messages with forward_origin (newer API) or forward_from/forward_from_chat (older API)
+    # In python-telegram-bot v21+, we need to check if the message has forward_origin attribute
     is_forwarded = False
     
-    # Check for forward_origin (Telegram Bot API 5.0+)
-    if update.message.forward_origin:
-        is_forwarded = True
+    try:
+        # Check for forward_origin (Telegram Bot API 5.0+)
+        if hasattr(update.message, 'forward_origin') and update.message.forward_origin:
+            is_forwarded = True
+    except AttributeError:
+        pass
+    
     # Legacy checks for older API versions
-    elif update.message.forward_from or update.message.forward_from_chat:
-        is_forwarded = True
+    if not is_forwarded:
+        if hasattr(update.message, 'forward_from') and update.message.forward_from:
+            is_forwarded = True
+        elif hasattr(update.message, 'forward_from_chat') and update.message.forward_from_chat:
+            is_forwarded = True
     
     if is_forwarded:
         try:
