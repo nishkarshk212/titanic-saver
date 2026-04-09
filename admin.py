@@ -74,6 +74,185 @@ async def promote_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=keyboard
     )
 
+async def set_admin_title_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Set a custom admin title for a user."""
+    chat_id = update.effective_chat.id
+    sender_id = update.effective_user.id
+    
+    # Check if user is admin/owner
+    if not await is_user_admin(chat_id, sender_id, context):
+        await send_bot_response(update, context, "You must be an admin to set admin titles.")
+        return
+
+    # Check bot permissions (can_promote_members)
+    bot_member = await context.bot.get_chat_member(chat_id, context.bot.id)
+    if not (bot_member.status == 'creator' or (bot_member.status == 'administrator' and bot_member.can_promote_members)):
+        await send_bot_response(update, context, "❌ I don't have the 'Add New Admins' permission to set admin titles.")
+        return
+
+    # Get user and title from command
+    if not context.args or len(context.args) < 2:
+        await send_bot_response(
+            update, context,
+            "❌ Usage: /setadmintitle @username or reply to user with title\n\n"
+            "Example: /setadmintitle @john Moderator\n"
+            "Or reply to a user's message with: /setadmintitle Moderator"
+        )
+        return
+
+    user_id, user_name = await get_user_id(update, context)
+    if not user_id:
+        if context.args[0].startswith('@'):
+            await send_bot_response(
+                update, context,
+                f"❌ Could not find user {context.args[0]} in my database.\n\n"
+                "**Why?** I only remember users who have spoken or joined since I was added.\n"
+                "**Fix:** Please reply to one of their messages instead."
+            )
+        else:
+            await send_bot_response(update, context, "Please reply to a user's message or provide a username/ID.")
+        return
+
+    # Extract title (everything after the first argument)
+    title = " ".join(context.args[1:])
+    
+    # Title must be 0-16 characters
+    if len(title) > 16:
+        await send_bot_response(update, context, "❌ Admin title must be 16 characters or less.")
+        return
+
+    try:
+        # Get current admin status
+        member = await context.bot.get_chat_member(chat_id, user_id)
+        
+        if member.status not in ['creator', 'administrator']:
+            await send_bot_response(update, context, "❌ User must be an admin first to set a title.")
+            return
+
+        # Promote with the new title (keeping existing permissions)
+        await context.bot.promote_chat_member(
+            chat_id=chat_id,
+            user_id=user_id,
+            can_change_info=member.can_change_info,
+            can_delete_messages=member.can_delete_messages,
+            can_restrict_members=member.can_restrict_members,
+            can_invite_users=member.can_invite_users,
+            can_pin_messages=member.can_pin_messages,
+            can_post_stories=member.can_post_stories,
+            can_edit_stories=member.can_edit_stories,
+            can_delete_stories=member.can_delete_stories,
+            can_manage_video_chats=member.can_manage_video_chats,
+            can_promote_members=member.can_promote_members,
+            is_anonymous=member.is_anonymous,
+            custom_title=title
+        )
+        
+        if title:
+            await send_bot_response(
+                update, context,
+                f"✅ Admin title for {user_name} set to: {title}"
+            )
+            # Log to channel
+            await log_to_channel(context,
+                f"👤 User: {user_id}\n"
+                f"🏷️ Action: Admin Title Set\n"
+                f"📝 Title: {title}\n"
+                f"📍 Group: {update.effective_chat.title} ({chat_id})\n"
+                f"👤 Admin: {sender_id}"
+            )
+        else:
+            await send_bot_response(
+                update, context,
+                f"✅ Admin title for {user_name} removed."
+            )
+            # Log to channel
+            await log_to_channel(context,
+                f"👤 User: {user_id}\n"
+                f"🏷️ Action: Admin Title Removed\n"
+                f"📍 Group: {update.effective_chat.title} ({chat_id})\n"
+                f"👤 Admin: {sender_id}"
+            )
+    except BadRequest as e:
+        await send_bot_response(update, context, f"❌ Failed to set admin title: {str(e)}")
+    except Exception as e:
+        await send_bot_response(update, context, f"❌ An error occurred: {str(e)}")
+
+async def delete_admin_title_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Delete/remove admin title from a user."""
+    chat_id = update.effective_chat.id
+    sender_id = update.effective_user.id
+    
+    # Check if user is admin/owner
+    if not await is_user_admin(chat_id, sender_id, context):
+        await send_bot_response(update, context, "You must be an admin to delete admin titles.")
+        return
+
+    # Check bot permissions (can_promote_members)
+    bot_member = await context.bot.get_chat_member(chat_id, context.bot.id)
+    if not (bot_member.status == 'creator' or (bot_member.status == 'administrator' and bot_member.can_promote_members)):
+        await send_bot_response(update, context, "❌ I don't have the 'Add New Admins' permission to delete admin titles.")
+        return
+
+    user_id, user_name = await get_user_id(update, context)
+    if not user_id:
+        if context.args and context.args[0].startswith('@'):
+            await send_bot_response(
+                update, context,
+                f"❌ Could not find user {context.args[0]} in my database.\n\n"
+                "**Why?** I only remember users who have spoken or joined since I was added.\n"
+                "**Fix:** Please reply to one of their messages instead."
+            )
+        else:
+            await send_bot_response(update, context, "Please reply to a user's message or provide a username/ID.")
+        return
+
+    try:
+        # Get current admin status
+        member = await context.bot.get_chat_member(chat_id, user_id)
+        
+        if member.status not in ['creator', 'administrator']:
+            await send_bot_response(update, context, "❌ User must be an admin to have their title removed.")
+            return
+
+        if not member.custom_title:
+            await send_bot_response(update, context, "❌ This admin doesn't have a custom title.")
+            return
+
+        # Promote with empty title (keeping existing permissions)
+        await context.bot.promote_chat_member(
+            chat_id=chat_id,
+            user_id=user_id,
+            can_change_info=member.can_change_info,
+            can_delete_messages=member.can_delete_messages,
+            can_restrict_members=member.can_restrict_members,
+            can_invite_users=member.can_invite_users,
+            can_pin_messages=member.can_pin_messages,
+            can_post_stories=member.can_post_stories,
+            can_edit_stories=member.can_edit_stories,
+            can_delete_stories=member.can_delete_stories,
+            can_manage_video_chats=member.can_manage_video_chats,
+            can_promote_members=member.can_promote_members,
+            is_anonymous=member.is_anonymous,
+            custom_title=""
+        )
+        
+        await send_bot_response(
+            update, context,
+            f"✅ Admin title for {user_name} has been removed."
+        )
+        
+        # Log to channel
+        await log_to_channel(context,
+            f"👤 User: {user_id}\n"
+            f"🏷️ Action: Admin Title Deleted\n"
+            f"📍 Group: {update.effective_chat.title} ({chat_id})\n"
+            f"👤 Admin: {sender_id}"
+        )
+    except BadRequest as e:
+        await send_bot_response(update, context, f"❌ Failed to delete admin title: {str(e)}")
+    except Exception as e:
+        await send_bot_response(update, context, f"❌ An error occurred: {str(e)}")
+
 def get_promotion_keyboard(user_id, current_perms, back_to_info=False):
     """Generate the keyboard with toggle buttons in a single column."""
     keyboard = []
@@ -385,6 +564,8 @@ def get_admin_handlers():
         CommandHandler("reload", reload_command),
         CommandHandler("pin", pin_command),
         CommandHandler("unpin", unpin_command),
+        CommandHandler("setadmintitle", set_admin_title_command),
+        CommandHandler("deladmintitle", delete_admin_title_command),
         CallbackQueryHandler(toggle_permission, pattern="^toggle_"),
         CallbackQueryHandler(confirm_promotion, pattern="^confirm_"),
         CallbackQueryHandler(cancel_promotion, pattern="^cancel_")

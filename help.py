@@ -72,6 +72,8 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "• /unpin - Unpin a message (reply only) or all pinned messages\n"
             "• /promote - Promote a user to admin with custom perms\n"
             "• /demote - Remove admin rights from a user\n"
+            "• /setadmintitle - Set custom admin title (16 chars max)\n"
+            "• /deladmintitle - Remove admin title from a user\n"
             "• /muter - Toggle 'Muter' role (can only mute/unmute)\n"
             "• /unmuter - Remove 'Muter' role from a user"
         )
