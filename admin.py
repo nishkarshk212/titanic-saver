@@ -130,22 +130,27 @@ async def set_admin_title_command(update: Update, context: ContextTypes.DEFAULT_
             return
 
         # Promote with the new title (keeping existing permissions)
-        await context.bot.promote_chat_member(
-            chat_id=chat_id,
-            user_id=user_id,
-            can_change_info=member.can_change_info,
-            can_delete_messages=member.can_delete_messages,
-            can_restrict_members=member.can_restrict_members,
-            can_invite_users=member.can_invite_users,
-            can_pin_messages=member.can_pin_messages,
-            can_post_stories=member.can_post_stories,
-            can_edit_stories=member.can_edit_stories,
-            can_delete_stories=member.can_delete_stories,
-            can_manage_video_chats=member.can_manage_video_chats,
-            can_promote_members=member.can_promote_members,
-            is_anonymous=member.is_anonymous,
-            custom_title=title
-        )
+        promote_kwargs = {
+            'chat_id': chat_id,
+            'user_id': user_id,
+            'can_change_info': member.can_change_info,
+            'can_delete_messages': member.can_delete_messages,
+            'can_restrict_members': member.can_restrict_members,
+            'can_invite_users': member.can_invite_users,
+            'can_pin_messages': member.can_pin_messages,
+            'can_post_stories': member.can_post_stories,
+            'can_edit_stories': member.can_edit_stories,
+            'can_delete_stories': member.can_delete_stories,
+            'can_manage_video_chats': member.can_manage_video_chats,
+            'can_promote_members': member.can_promote_members,
+            'is_anonymous': member.is_anonymous,
+        }
+        
+        # Add custom_title only if it's being set
+        if title:
+            promote_kwargs['custom_title'] = title
+        
+        await context.bot.promote_chat_member(**promote_kwargs)
         
         if title:
             await send_bot_response(
@@ -219,22 +224,24 @@ async def delete_admin_title_command(update: Update, context: ContextTypes.DEFAU
             return
 
         # Promote with empty title (keeping existing permissions)
-        await context.bot.promote_chat_member(
-            chat_id=chat_id,
-            user_id=user_id,
-            can_change_info=member.can_change_info,
-            can_delete_messages=member.can_delete_messages,
-            can_restrict_members=member.can_restrict_members,
-            can_invite_users=member.can_invite_users,
-            can_pin_messages=member.can_pin_messages,
-            can_post_stories=member.can_post_stories,
-            can_edit_stories=member.can_edit_stories,
-            can_delete_stories=member.can_delete_stories,
-            can_manage_video_chats=member.can_manage_video_chats,
-            can_promote_members=member.can_promote_members,
-            is_anonymous=member.is_anonymous,
-            custom_title=""
-        )
+        promote_kwargs = {
+            'chat_id': chat_id,
+            'user_id': user_id,
+            'can_change_info': member.can_change_info,
+            'can_delete_messages': member.can_delete_messages,
+            'can_restrict_members': member.can_restrict_members,
+            'can_invite_users': member.can_invite_users,
+            'can_pin_messages': member.can_pin_messages,
+            'can_post_stories': member.can_post_stories,
+            'can_edit_stories': member.can_edit_stories,
+            'can_delete_stories': member.can_delete_stories,
+            'can_manage_video_chats': member.can_manage_video_chats,
+            'can_promote_members': member.can_promote_members,
+            'is_anonymous': member.is_anonymous,
+            'custom_title': ''
+        }
+        
+        await context.bot.promote_chat_member(**promote_kwargs)
         
         await send_bot_response(
             update, context,
