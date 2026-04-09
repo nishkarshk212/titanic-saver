@@ -11,8 +11,7 @@ URL_PATTERN = re.compile(
     r'(https?://[^\s]+|'  # http:// or https://
     r'www\.[^\s]+|'  # www.
     r't\.me/[^\s]+|'  # t.me links
-    r'telegram\.me/[^\s]+|'  # telegram.me links
-    r'@[\w]+)',  # @mentions with links
+    r'telegram\.me/[^\s]+)',  # telegram.me links
     re.IGNORECASE
 )
 
