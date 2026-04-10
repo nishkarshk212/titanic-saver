@@ -2,9 +2,9 @@ import logging
 from telegram import Update
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes, ChatMemberHandler, MessageHandler, filters
-from settings_manager import get_chat_settings
+from settings_manager_mongo import get_chat_settings
 from config import send_bot_response
-from user_manager import is_user_admin
+from user_manager_mongo import is_user_admin
 
 async def kick_if_bot(update: Update, context: ContextTypes.DEFAULT_TYPE, user, added_by_user=None):
     """Kicks the bot if added by a member (not admin) and Bot Protection is enabled."""

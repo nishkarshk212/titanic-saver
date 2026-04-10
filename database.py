@@ -1,0 +1,130 @@
+import os
+from pymongo import MongoClient
+from pymongo.errors import ConnectionFailure, OperationFailure
+import ssl
+import logging
+
+# MongoDB Configuration
+MONGODB_URI = os.getenv("MONGODB_URI", "mongodb+srv://mybotpanda_db_user:hx0n5AI90lFGyl93@grouphelp.puxyti8.mongodb.net/?appName=GROUPHELP")
+DATABASE_NAME = "GROUPHELP"
+
+# Global database client and database instances
+client = None
+db = None
+
+def connect_to_mongodb():
+    """
+    Establish connection to MongoDB cluster.
+    Returns True if successful, False otherwise.
+    """
+    global client, db
+    
+    try:
+        if client is None:
+            # Add SSL/TLS parameters to the connection
+            import certifi
+            client = MongoClient(
+                MONGODB_URI,
+                serverSelectionTimeoutMS=10000,
+                tls=True,
+                tlsCAFile=certifi.where(),
+                connectTimeoutMS=10000,
+                socketTimeoutMS=10000
+            )
+            # Test the connection
+            client.admin.command('ping')
+            db = client[DATABASE_NAME]
+            logging.info(f"✅ Successfully connected to MongoDB: {DATABASE_NAME}")
+            return True
+        return True
+    except ConnectionFailure as e:
+        logging.error(f"❌ Failed to connect to MongoDB: {e}")
+        return False
+    except OperationFailure as e:
+        logging.error(f"❌ MongoDB authentication failed: {e}")
+        return False
+    except Exception as e:
+        logging.error(f"❌ Unexpected MongoDB error: {e}")
+        return False
+
+def get_database():
+    """Get the database instance."""
+    global db
+    if db is None:
+        if not connect_to_mongodb():
+            return None
+    return db
+
+def get_collection(collection_name):
+    """Get a collection from the database."""
+    database = get_database()
+    if database is None:
+        return None
+    return database[collection_name]
+
+def close_connection():
+    """Close the MongoDB connection."""
+    global client
+    if client:
+        client.close()
+        logging.info("MongoDB connection closed.")
+
+# Collection Names
+COLLECTIONS = {
+    "users": "users",
+    "settings": "chat_settings",
+    "warns": "warns",
+    "muters": "muters",
+    "voice_chat_managers": "voice_chat_managers",
+    "banned_channels": "banned_channels",
+    "blocked_content": "blocked_content",
+    "filters": "filters",
+    "group_muters": "group_muters"
+}
+
+def initialize_collections():
+    """Initialize all collections with proper indexes."""
+    database = get_database()
+    if database is None:
+        logging.error("Cannot initialize collections - database not connected")
+        return False
+    
+    try:
+        # Users collection indexes
+        users_col = database[COLLECTIONS["users"]]
+        users_col.create_index("id", unique=True)
+        users_col.create_index("username")
+        
+        # Settings collection indexes
+        settings_col = database[COLLECTIONS["settings"]]
+        settings_col.create_index("chat_id", unique=True)
+        
+        # Warns collection indexes
+        warns_col = database[COLLECTIONS["warns"]]
+        warns_col.create_index([("chat_id", 1), ("user_id", 1)], unique=True)
+        
+        # Muters collection indexes
+        muters_col = database[COLLECTIONS["muters"]]
+        muters_col.create_index([("chat_id", 1), ("user_id", 1)], unique=True)
+        
+        # Voice chat managers indexes
+        vcm_col = database[COLLECTIONS["voice_chat_managers"]]
+        vcm_col.create_index([("chat_id", 1), ("user_id", 1)], unique=True)
+        
+        # Banned channels indexes
+        banned_col = database[COLLECTIONS["banned_channels"]]
+        banned_col.create_index([("chat_id", 1), ("channel_id", 1)], unique=True)
+        
+        # Blocked content indexes
+        blocked_col = database[COLLECTIONS["blocked_content"]]
+        blocked_col.create_index("chat_id")
+        
+        # Filters indexes
+        filters_col = database[COLLECTIONS["filters"]]
+        filters_col.create_index([("chat_id", 1), ("trigger", 1)], unique=True)
+        
+        logging.info("✅ MongoDB collections and indexes initialized successfully")
+        return True
+    except Exception as e:
+        logging.error(f"❌ Error initializing collections: {e}")
+        return False

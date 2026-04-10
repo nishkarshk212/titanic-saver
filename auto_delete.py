@@ -1,7 +1,7 @@
 import logging
 from telegram import Update
 from telegram.ext import ContextTypes, MessageHandler, filters
-from settings_manager import get_chat_settings
+from settings_manager_mongo import get_chat_settings
 
 async def delete_msg_job(context: ContextTypes.DEFAULT_TYPE):
     """Job that deletes a message after a delay."""

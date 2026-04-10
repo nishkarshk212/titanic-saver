@@ -3,10 +3,10 @@ from telegram import Update, ChatPermissions
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes, CommandHandler, MessageHandler, filters
 from config import OWNER_ID, send_bot_response, log_to_channel
-from settings_manager import get_chat_settings
-from moderation_manager import add_warn, reset_warns
-from user_manager import is_user_admin, get_user_id
-from block_content_manager import add_blocked_content, remove_blocked_content, is_content_blocked, get_blocked_content
+from settings_manager_mongo import get_chat_settings
+from moderation_manager_mongo import add_warn, reset_warns
+from user_manager_mongo import is_user_admin, get_user_id
+from block_content_manager_mongo import add_blocked_content, remove_blocked_content, is_content_blocked, get_blocked_content
 
 async def block_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Command to block a specific content (text, media, etc.)."""

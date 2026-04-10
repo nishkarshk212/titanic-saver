@@ -1,9 +1,9 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler, MessageHandler, filters
 from telegram.error import BadRequest
-from settings_manager import get_chat_settings, update_chat_setting
+from settings_manager_mongo import get_chat_settings, update_chat_setting
 from config import OWNER_ID, send_bot_response, edit_bot_response
-from user_manager import can_user_configure_settings
+from user_manager_mongo import can_user_configure_settings
 from anonymous_admin import is_anonymous_admin, check_anonymous_admin_change_info_permission
 
 async def settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):

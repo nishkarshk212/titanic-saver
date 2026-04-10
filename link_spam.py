@@ -2,8 +2,8 @@ import logging
 import re
 from telegram import Update
 from telegram.ext import ContextTypes, MessageHandler, filters
-from settings_manager import get_chat_settings
-from user_manager import is_user_admin
+from settings_manager_mongo import get_chat_settings
+from user_manager_mongo import is_user_admin
 from config import OWNER_ID
 
 # Regular expression to detect URLs

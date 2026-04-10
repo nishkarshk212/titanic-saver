@@ -2,7 +2,7 @@ import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ChatPermissions, ChatAdministratorRights
 from telegram.ext import ContextTypes, CallbackQueryHandler, CommandHandler
 from telegram.error import BadRequest
-from user_manager import get_user_id, is_user_admin
+from user_manager_mongo import get_user_id, is_user_admin
 from config import OWNER_ID, send_bot_response, edit_bot_response, log_to_channel
 from anonymous_admin import is_anonymous_admin, check_anonymous_admin_promote_permission, check_anonymous_admin_pin_permission, check_anonymous_admin_change_info_permission
 

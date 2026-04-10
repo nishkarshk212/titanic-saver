@@ -3,7 +3,7 @@ import shlex
 from telegram import Update
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes, CommandHandler, MessageHandler, filters
-from filters_manager import get_chat_filters, add_chat_filter, remove_chat_filter, remove_all_chat_filters
+from filters_manager_mongo import get_chat_filters, add_chat_filter, remove_chat_filter, remove_all_chat_filters
 from config import OWNER_ID
 
 async def set_filter(update: Update, context: ContextTypes.DEFAULT_TYPE):

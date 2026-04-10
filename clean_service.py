@@ -1,7 +1,7 @@
 import logging
 from telegram import Update
 from telegram.ext import ContextTypes, MessageHandler, filters
-from settings_manager import get_chat_settings
+from settings_manager_mongo import get_chat_settings
 
 async def clean_service_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Automatically deletes service messages based on group settings."""

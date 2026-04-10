@@ -17,9 +17,11 @@ from link_spam import get_link_spam_handlers
 from forward_protection import get_forward_protection_handlers
 from settings import get_settings_handlers
 from help import get_help_handlers
+from ai_chat import get_chatgpt_handlers
+from translator import get_translation_handlers
 from config import BOT_TOKEN, LOG_CHANNEL_ID, OWNER_ID, log_to_channel, send_bot_response, send_bot_media, START_VIDEOS
-from user_manager import cache_user, increment_message_count, get_user_id, get_user_stats, is_user_admin
-from settings_manager import get_chat_settings
+from user_manager_mongo import cache_user, increment_message_count, get_user_id, get_user_stats, is_user_admin
+from settings_manager_mongo import get_chat_settings
 
 # Configure logging
 logging.basicConfig(
@@ -93,7 +95,7 @@ async def info_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             chat = await context.bot.get_chat(user_id)
             
-            from moderation_manager import is_channel_banned
+            from moderation_manager_mongo import is_channel_banned
             banned = is_channel_banned(chat_id, user_id)
             channel_status = "Banned ⛔" if banned else "Active ✅"
             
@@ -227,7 +229,7 @@ async def info_callback_handler(update: Update, context: ContextTypes.DEFAULT_TY
     
     # Import handlers locally to avoid circular imports
     from moderation import mute_command, unmute_command, ban_command, warn_command, unwarn_command, unban_command, muter_command
-    from moderation_manager import get_user_warns, is_muter as check_is_muter, is_channel_banned
+    from moderation_manager_mongo import get_user_warns, is_muter as check_is_muter, is_channel_banned
     from admin import promote_command, demote_command, DEFAULT_PERMISSIONS, get_promotion_keyboard
     
     # Create a mock update to reuse existing command logic
@@ -329,7 +331,7 @@ async def info_callback_handler(update: Update, context: ContextTypes.DEFAULT_TY
         return
     elif action == "doban":
         try:
-            from moderation_manager import add_banned_channel, remove_banned_channel
+            from moderation_manager_mongo import add_banned_channel, remove_banned_channel
             # Check if target is a channel
             is_channel = str(user_id).startswith('-100')
             
@@ -555,7 +557,7 @@ async def info_callback_handler(update: Update, context: ContextTypes.DEFAULT_TY
         # We need to delete the current menu first or just edit it back
         # Let's just edit it back to the original info text and main buttons
         # For simplicity, we can reuse the code from info_command
-        from user_manager import get_user_stats
+        from user_manager_mongo import get_user_stats
         import html
         stats = get_user_stats(user_id)
         username = stats.get("username") if stats else None
@@ -640,6 +642,15 @@ def main():
         print("BOT_TOKEN not found in .env file. Please add it.")
         return
 
+    # Initialize MongoDB connection
+    print("Connecting to MongoDB...")
+    from database import connect_to_mongodb, initialize_collections
+    if not connect_to_mongodb():
+        print("WARNING: Failed to connect to MongoDB. Bot will run with limited functionality.")
+    else:
+        initialize_collections()
+        print("✅ MongoDB database initialized successfully!")
+
     # Initialize the bot application
     application = ApplicationBuilder().token(BOT_TOKEN).build()
 
@@ -712,6 +723,14 @@ def main():
     # Add forward protection handlers (Group 7)
     for handler in get_forward_protection_handlers():
         application.add_handler(handler, group=7)
+
+    # Add AI Chat handlers (Group 8)
+    for handler in get_chatgpt_handlers():
+        application.add_handler(handler, group=8)
+
+    # Add Translation handlers (Group 9)
+    for handler in get_translation_handlers():
+        application.add_handler(handler, group=9)
 
     # Start the bot
     print("Bot is starting...")

@@ -2,8 +2,8 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler
 from telegram.constants import ParseMode
 from config import send_bot_response, edit_bot_response
-from settings_manager import get_chat_settings
-from user_manager import is_user_admin
+from settings_manager_mongo import get_chat_settings
+from user_manager_mongo import is_user_admin
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Main help command."""

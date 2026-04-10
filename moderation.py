@@ -4,14 +4,14 @@ from telegram.constants import ParseMode
 from telegram.ext import ContextTypes, CommandHandler
 from telegram.error import BadRequest
 from config import OWNER_ID, log_to_channel, send_bot_response
-from settings_manager import get_chat_settings
-from moderation_manager import (
+from settings_manager_mongo import get_chat_settings
+from moderation_manager_mongo import (
     get_user_warns, add_warn, reset_warns, 
     is_muter as check_is_muter, add_muter, remove_muter, get_all_muters,
     is_voice_chat_manager as check_is_voice_chat_manager,
     add_voice_chat_manager, remove_voice_chat_manager, get_all_voice_chat_managers
 )
-from user_manager import resolve_username, get_user_id, is_user_admin, load_users
+from user_manager_mongo import resolve_username, get_user_id, is_user_admin
 from anonymous_admin import is_anonymous_admin, check_anonymous_admin_ban_permission, check_anonymous_admin_mute_permission
 
 async def can_user_mute(chat_id, user_id, context):
