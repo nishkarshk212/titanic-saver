@@ -161,13 +161,17 @@ async def translate_text(text: str, source: str, target: str) -> str:
     
     Args:
         text: Text to translate
-        source: Source language code (or 'auto')
+        source: Source language code (use 'en' as default, 'auto' not supported)
         target: Target language code
     
     Returns:
         Translated text or None if error
     """
     try:
+        # API doesn't support 'auto', default to 'en' if auto specified
+        if source == 'auto' or not source:
+            source = 'en'
+        
         payload = json.dumps({
             "q": text,
             "source": source,
@@ -189,18 +193,17 @@ async def translate_text(text: str, source: str, target: str) -> str:
         if res.status == 200:
             response_data = json.loads(data.decode("utf-8"))
             
-            # Extract translated text (adjust based on actual API response structure)
-            if "data" in response_data and "translations" in response_data["data"]:
-                return response_data["data"]["translations"][0]["translatedText"]
-            elif "translatedText" in response_data:
-                return response_data["translatedText"]
-            elif "translation" in response_data:
-                return response_data["translation"]
-            elif "result" in response_data:
-                return response_data["result"]
-            else:
-                logging.error(f"Unexpected translation API response: {response_data}")
-                return None
+            # Extract translated text from actual API response structure
+            # Format: {"data": {"translations": {"translatedText": ["translated text"]}}}
+            if ("data" in response_data and 
+                "translations" in response_data["data"] and
+                "translatedText" in response_data["data"]["translations"]):
+                translated_list = response_data["data"]["translations"]["translatedText"]
+                if isinstance(translated_list, list) and len(translated_list) > 0:
+                    return translated_list[0]
+            
+            logging.error(f"Unexpected translation API response: {response_data}")
+            return None
         else:
             logging.error(f"Translation API error: {res.status} - {data.decode('utf-8')}")
             return None
