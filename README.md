@@ -25,10 +25,11 @@ A powerful, feature-rich Telegram bot for group management with AI capabilities,
 
 ### 🤖 AI Features (NEW!)
 - **ChatGPT Integration** - AI-powered conversations
+- **Auto-Reply Chatbot** - No commands needed in private chat!
 - **Multi-turn Context** - Remembers last 10 messages
 - **Smart Responses** - Powered by GPT-4
-- **Private Chat** - Chat directly with AI
-- **Group Mentions** - Ask AI in groups
+- **Private Chat** - Just message the bot directly
+- **Group Mentions** - Mention bot to ask questions
 
 ### 🌐 Translation (NEW!)
 - **40+ Languages** - Support for major world languages
@@ -103,6 +104,7 @@ python bot.py
 ### AI Commands 🤖
 | Command | Description |
 |---------|-------------|
+| (just message) | Auto-reply in private chat |
 | `/ai <message>` | Chat with AI |
 | `/gpt <message>` | Chat with AI (alias) |
 | `/clearchat` | Clear AI history |

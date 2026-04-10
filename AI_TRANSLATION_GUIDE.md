@@ -11,10 +11,23 @@ Your Telegram bot now includes two powerful AI features:
 
 ## 🤖 AI Chat Feature
 
+### How It Works
+
+**Private Chat (Auto-Reply):**
+- Just send any message - bot will automatically reply!
+- No commands needed
+- Maintains conversation context
+
+**Groups (Mention Required):**
+- Mention the bot: `@YourBotName your question`
+- Bot will respond when mentioned
+- Prevents spam in groups
+
 ### Commands
 
 | Command | Description | Example |
 |---------|-------------|---------|
+| (just message) | Auto-reply in PM | `Hello!` |
 | `/ai <message>` | Chat with AI | `/ai What is Python?` |
 | `/gpt <message>` | Same as /ai | `/gpt Write a poem` |
 | `/clearchat` | Clear conversation history | `/clearchat` |
@@ -29,19 +42,27 @@ Your Telegram bot now includes two powerful AI features:
 
 ### Usage Examples
 
+**In Private Chat (Just Type):**
+```
+Hello!
+What is machine learning?
+Explain quantum physics in simple terms
+Write a Python function to sort a list
+```
+
+**Using Commands (Works Anywhere):**
 ```
 /ai What is machine learning?
 /ai Explain quantum physics in simple terms
 /ai Write a Python function to sort a list
-/ai Translate "Hello" to French
 /gpt What are the benefits of exercise?
 ```
 
-### How It Works
-
-1. **Direct Command**: Use `/ai` or `/gpt` followed by your message
-2. **Private Chat**: Just send messages directly to the bot
-3. **Group Mention**: Mention the bot with `@YourBotName your question`
+**In Groups (Mention Bot):**
+```
+@YourBotName What is Python?
+@YourBotName Tell me a joke
+```
 
 ### Conversation History
 

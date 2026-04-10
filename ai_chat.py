@@ -1,6 +1,12 @@
 """
 ChatGPT API Integration using RapidAPI
 Provides AI conversation capabilities for the Telegram bot.
+
+Features:
+- Auto-reply in private chats (no command needed)
+- Mention-based replies in groups
+- Conversation history (last 10 messages)
+- Commands: /ai, /gpt, /clearchat
 """
 
 import http.client
@@ -155,10 +161,14 @@ async def clear_chat_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 async def ai_chat_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
-    Handle AI chat messages when bot is mentioned or in private chat.
+    Handle AI chat messages - Auto reply in private chats or when mentioned in groups.
     """
-    # Only respond in private chats or when bot is mentioned
+    # Auto-reply in private chats (no command needed)
     if update.effective_chat.type == "private":
+        # Don't respond to commands in private chat
+        if update.message.text and update.message.text.startswith('/'):
+            return
+            
         message = update.message.text
         user_id = update.effective_user.id
         
@@ -167,22 +177,25 @@ async def ai_chat_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         if response:
             await send_bot_response(update, context, response)
-    elif update.message.entities:
+    
+    # In groups, only respond when bot is mentioned
+    elif update.effective_chat.type in ["group", "supergroup"]:
         # Check if bot is mentioned
-        for entity in update.message.entities:
-            if entity.type == "mention":
-                username_text = update.message.text[entity.offset:entity.offset+entity.length]
-                bot_username = await context.bot.get_me()
-                if f"@{bot_username.username}" == username_text:
-                    # Extract message after mention
-                    message = update.message.text.replace(username_text, "").strip()
-                    if message:
-                        user_id = update.effective_user.id
-                        await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
-                        response = await get_chatgpt_response(message, user_id)
-                        
-                        if response:
-                            await send_bot_response(update, context, response)
+        if update.message.entities:
+            for entity in update.message.entities:
+                if entity.type == "mention":
+                    username_text = update.message.text[entity.offset:entity.offset+entity.length]
+                    bot_username = await context.bot.get_me()
+                    if f"@{bot_username.username}" == username_text:
+                        # Extract message after mention
+                        message = update.message.text.replace(username_text, "").strip()
+                        if message:
+                            user_id = update.effective_user.id
+                            await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
+                            response = await get_chatgpt_response(message, user_id)
+                            
+                            if response:
+                                await send_bot_response(update, context, response)
                         break
 
 def get_chatgpt_handlers():
