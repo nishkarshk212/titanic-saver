@@ -19,6 +19,19 @@ async def can_user_mute(chat_id, user_id, context):
         return True
     return check_is_muter(chat_id, user_id)
 
+async def can_user_manage_voice_chat(chat_id, user_id, context):
+    """Check if a user can manage voice chats (Admin, Muter, or Voice Chat Manager)."""
+    # Admins can always manage voice chats
+    if await is_user_admin(chat_id, user_id, context):
+        return True
+    # Muters can manage voice chats
+    if check_is_muter(chat_id, user_id):
+        return True
+    # Voice chat managers can manage voice chats
+    if check_is_voice_chat_manager(chat_id, user_id):
+        return True
+    return False
+
 async def can_user_ban(chat_id, user_id, context):
     """Check if a user can ban/unban (Admin with can_restrict_members permission)."""
     # Owner can always ban
@@ -234,7 +247,7 @@ async def muter_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await send_bot_response(update, context, f"✅ Removed {user_name} from muters.")
     else:
         add_muter(chat_id, user_id)
-        await send_bot_response(update, context, f"✅ {user_name} is now a muter. They can use /mute and /unmute.")
+        await send_bot_response(update, context, f"✅ {user_name} is now a muter. They can use /mute, /unmute, and manage voice chats.")
 
 async def unmuter_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Command to remove a muter specifically."""
