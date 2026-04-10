@@ -75,7 +75,9 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "• /setadmintitle - Set custom admin title (16 chars max)\n"
             "• /deladmintitle - Remove admin title from a user\n"
             "• /muter - Toggle 'Muter' role (can only mute/unmute)\n"
-            "• /unmuter - Remove 'Muter' role from a user"
+            "• /unmuter - Remove 'Muter' role from a user\n"
+            "• /voicechatmgr - Toggle 'Voice Chat Manager' role\n"
+            "• /unvoicechatmgr - Remove 'Voice Chat Manager' role from a user"
         )
     elif data == "help_settings":
         help_text = (

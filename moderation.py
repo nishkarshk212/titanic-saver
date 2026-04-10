@@ -7,7 +7,9 @@ from config import OWNER_ID, log_to_channel, send_bot_response
 from settings_manager import get_chat_settings
 from moderation_manager import (
     get_user_warns, add_warn, reset_warns, 
-    is_muter as check_is_muter, add_muter, remove_muter, get_all_muters
+    is_muter as check_is_muter, add_muter, remove_muter, get_all_muters,
+    is_voice_chat_manager as check_is_voice_chat_manager,
+    add_voice_chat_manager, remove_voice_chat_manager, get_all_voice_chat_managers
 )
 from user_manager import resolve_username, get_user_id, is_user_admin, load_users
 
@@ -296,6 +298,78 @@ async def unwarn_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reset_warns(chat_id, user_id)
     await send_bot_response(update, context, f"✅ Reset warnings for {user_name}.")
 
+async def voicechatmgr_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Command to add or remove a voice chat manager."""
+    chat_id = update.effective_chat.id
+    sender_id = update.effective_user.id
+    
+    if not await is_user_admin(chat_id, sender_id, context):
+        await send_bot_response(update, context, "Admin only command.")
+        return
+
+    # Check if we should list all voice chat managers
+    if not context.args and not update.message.reply_to_message:
+        manager_ids = get_all_voice_chat_managers(chat_id)
+        if not manager_ids:
+            await send_bot_response(update, context, "No voice chat managers set in this group.")
+            return
+        
+        manager_list = []
+        users_data = load_users()
+        for mid in manager_ids:
+            user_name = f"<code>{mid}</code>"
+            # Try to resolve username or use ID
+            found = False
+            for username, info in users_data.items():
+                if str(info["id"]) == str(mid):
+                    user_name = f"{info['name']} (@{username})"
+                    found = True
+                    break
+            if not found:
+                # If not in cache, just show ID
+                user_name = f"<code>{mid}</code>"
+            manager_list.append(f"• {user_name}")
+        
+        await send_bot_response(
+            update, context,
+            "🎙️ <b>Voice Chat Managers:</b>\n" + "\n".join(manager_list),
+            parse_mode=ParseMode.HTML
+        )
+        return
+
+    user_id, user_name = await get_user_id(update, context)
+    if not user_id:
+        await send_bot_response(update, context, "Please reply to a user or provide a username/ID to set as voice chat manager.")
+        return
+
+    if check_is_voice_chat_manager(chat_id, user_id):
+        remove_voice_chat_manager(chat_id, user_id)
+        await send_bot_response(update, context, f"✅ Removed {user_name} from voice chat managers.")
+    else:
+        add_voice_chat_manager(chat_id, user_id)
+        await send_bot_response(update, context, f"✅ {user_name} is now a voice chat manager. They can manage voice/video chats.")
+
+async def unvoicechatmgr_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Command to remove a voice chat manager specifically."""
+    chat_id = update.effective_chat.id
+    sender_id = update.effective_user.id
+    
+    if not await is_user_admin(chat_id, sender_id, context):
+        await send_bot_response(update, context, "Admin only command.")
+        return
+
+    user_id, user_name = await get_user_id(update, context)
+    if not user_id:
+        await send_bot_response(update, context, "Please reply to a user or provide a username/ID to remove from voice chat managers.")
+        return
+
+    if not check_is_voice_chat_manager(chat_id, user_id):
+        await send_bot_response(update, context, f"❌ {user_name} is not a voice chat manager.")
+        return
+
+    remove_voice_chat_manager(chat_id, user_id)
+    await send_bot_response(update, context, f"✅ Removed {user_name} from voice chat managers.")
+
 def get_moderation_handlers():
     return [
         CommandHandler("ban", ban_command),
@@ -305,5 +379,7 @@ def get_moderation_handlers():
         CommandHandler("muter", muter_command),
         CommandHandler("unmuter", unmuter_command),
         CommandHandler("warn", warn_command),
-        CommandHandler("unwarn", unwarn_command)
+        CommandHandler("unwarn", unwarn_command),
+        CommandHandler("voicechatmgr", voicechatmgr_command),
+        CommandHandler("unvoicechatmgr", unvoicechatmgr_command)
     ]

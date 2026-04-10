@@ -81,6 +81,49 @@ def remove_muter(chat_id, user_id):
         return True
     return False
 
+# Voice Chat Manager Functions
+VOICE_CHAT_MANAGERS_FILE = "voice_chat_managers.json"
+
+def is_voice_chat_manager(chat_id, user_id):
+    """Check if a user can manage voice chats."""
+    managers_data = load_data(VOICE_CHAT_MANAGERS_FILE)
+    chat_id_str = str(chat_id)
+    user_id_str = str(user_id)
+    if chat_id_str in managers_data:
+        return user_id_str in managers_data[chat_id_str]
+    return False
+
+def add_voice_chat_manager(chat_id, user_id):
+    """Add a user as voice chat manager."""
+    managers_data = load_data(VOICE_CHAT_MANAGERS_FILE)
+    chat_id_str = str(chat_id)
+    user_id_str = str(user_id)
+    if chat_id_str not in managers_data:
+        managers_data[chat_id_str] = []
+    
+    if user_id_str not in managers_data[chat_id_str]:
+        managers_data[chat_id_str].append(user_id_str)
+        save_data(VOICE_CHAT_MANAGERS_FILE, managers_data)
+        return True
+    return False
+
+def remove_voice_chat_manager(chat_id, user_id):
+    """Remove a user from voice chat managers."""
+    managers_data = load_data(VOICE_CHAT_MANAGERS_FILE)
+    chat_id_str = str(chat_id)
+    user_id_str = str(user_id)
+    if chat_id_str in managers_data and user_id_str in managers_data[chat_id_str]:
+        managers_data[chat_id_str].remove(user_id_str)
+        save_data(VOICE_CHAT_MANAGERS_FILE, managers_data)
+        return True
+    return False
+
+def get_all_voice_chat_managers(chat_id):
+    """Returns a list of user IDs for all voice chat managers in a chat."""
+    managers_data = load_data(VOICE_CHAT_MANAGERS_FILE)
+    chat_id_str = str(chat_id)
+    return managers_data.get(chat_id_str, [])
+
 BANNED_CHANNELS_FILE = "banned_channels.json"
 
 # ... (rest of the code)
