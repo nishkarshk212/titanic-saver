@@ -12,9 +12,15 @@ from moderation_manager import (
     add_voice_chat_manager, remove_voice_chat_manager, get_all_voice_chat_managers
 )
 from user_manager import resolve_username, get_user_id, is_user_admin, load_users
+from anonymous_admin import is_anonymous_admin, check_anonymous_admin_ban_permission, check_anonymous_admin_mute_permission
 
 async def can_user_mute(chat_id, user_id, context):
     """Check if a user can mute/unmute (Admin or Muter)."""
+    # Check if it's an anonymous admin
+    if is_anonymous_admin(user_id):
+        has_perm, error_msg = await check_anonymous_admin_mute_permission(chat_id, context)
+        return has_perm
+    
     if await is_user_admin(chat_id, user_id, context):
         return True
     return check_is_muter(chat_id, user_id)
@@ -38,6 +44,10 @@ async def can_user_ban(chat_id, user_id, context):
     from config import OWNER_ID
     if user_id == OWNER_ID:
         return True, None
+    
+    # Check if it's an anonymous admin
+    if is_anonymous_admin(user_id):
+        return await check_anonymous_admin_ban_permission(chat_id, context)
     
     try:
         member = await context.bot.get_chat_member(chat_id, user_id)

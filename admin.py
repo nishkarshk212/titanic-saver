@@ -3,7 +3,8 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ChatPer
 from telegram.ext import ContextTypes, CallbackQueryHandler, CommandHandler
 from telegram.error import BadRequest
 from user_manager import get_user_id, is_user_admin
-from config import OWNER_ID, log_to_channel, send_bot_response, edit_bot_response
+from config import OWNER_ID, send_bot_response, edit_bot_response, log_to_channel
+from anonymous_admin import is_anonymous_admin, check_anonymous_admin_promote_permission, check_anonymous_admin_pin_permission, check_anonymous_admin_change_info_permission
 
 # Permission names to display
 PERMISSIONS_MAP = {
@@ -40,10 +41,17 @@ async def promote_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     sender_id = update.effective_user.id
     
-    # Check if user is admin/owner
-    if not await is_user_admin(chat_id, sender_id, context):
-        await send_bot_response(update, context, "You must be an admin to promote others.")
-        return
+    # Check if it's an anonymous admin
+    if is_anonymous_admin(sender_id):
+        has_perm, error_msg = await check_anonymous_admin_promote_permission(chat_id, context)
+        if not has_perm:
+            await send_bot_response(update, context, error_msg)
+            return
+    else:
+        # Check if user is admin/owner
+        if not await is_user_admin(chat_id, sender_id, context):
+            await send_bot_response(update, context, "You must be an admin to promote others.")
+            return
 
     # Check bot permissions (can_promote_members)
     bot_member = await context.bot.get_chat_member(chat_id, context.bot.id)
@@ -79,10 +87,17 @@ async def set_admin_title_command(update: Update, context: ContextTypes.DEFAULT_
     chat_id = update.effective_chat.id
     sender_id = update.effective_user.id
     
-    # Check if user is admin/owner
-    if not await is_user_admin(chat_id, sender_id, context):
-        await send_bot_response(update, context, "You must be an admin to set admin titles.")
-        return
+    # Check if it's an anonymous admin
+    if is_anonymous_admin(sender_id):
+        has_perm, error_msg = await check_anonymous_admin_promote_permission(chat_id, context)
+        if not has_perm:
+            await send_bot_response(update, context, error_msg)
+            return
+    else:
+        # Check if user is admin/owner
+        if not await is_user_admin(chat_id, sender_id, context):
+            await send_bot_response(update, context, "You must be an admin to set admin titles.")
+            return
 
     # Check bot permissions (can_promote_members)
     bot_member = await context.bot.get_chat_member(chat_id, context.bot.id)
@@ -187,10 +202,17 @@ async def delete_admin_title_command(update: Update, context: ContextTypes.DEFAU
     chat_id = update.effective_chat.id
     sender_id = update.effective_user.id
     
-    # Check if user is admin/owner
-    if not await is_user_admin(chat_id, sender_id, context):
-        await send_bot_response(update, context, "You must be an admin to delete admin titles.")
-        return
+    # Check if it's an anonymous admin
+    if is_anonymous_admin(sender_id):
+        has_perm, error_msg = await check_anonymous_admin_promote_permission(chat_id, context)
+        if not has_perm:
+            await send_bot_response(update, context, error_msg)
+            return
+    else:
+        # Check if user is admin/owner
+        if not await is_user_admin(chat_id, sender_id, context):
+            await send_bot_response(update, context, "You must be an admin to delete admin titles.")
+            return
 
     # Check bot permissions (can_promote_members)
     bot_member = await context.bot.get_chat_member(chat_id, context.bot.id)
@@ -419,9 +441,17 @@ async def demote_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     sender_id = update.effective_user.id
     
-    if not await is_user_admin(chat_id, sender_id, context):
-        await send_bot_response(update, context, "You must be an admin to demote others.")
-        return
+    # Check if it's an anonymous admin
+    if is_anonymous_admin(sender_id):
+        has_perm, error_msg = await check_anonymous_admin_promote_permission(chat_id, context)
+        if not has_perm:
+            await send_bot_response(update, context, error_msg)
+            return
+    else:
+        # Check if user is admin/owner
+        if not await is_user_admin(chat_id, sender_id, context):
+            await send_bot_response(update, context, "You must be an admin to demote others.")
+            return
 
     # Check bot permissions (can_promote_members)
     bot_member = await context.bot.get_chat_member(chat_id, context.bot.id)
@@ -515,10 +545,17 @@ async def pin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
     
-    # Check if user is admin/owner
-    if not await is_user_admin(chat_id, user_id, context):
-        await send_bot_response(update, context, "You must be an admin to use the /pin command.")
-        return
+    # Check if it's an anonymous admin
+    if is_anonymous_admin(user_id):
+        has_perm, error_msg = await check_anonymous_admin_pin_permission(chat_id, context)
+        if not has_perm:
+            await send_bot_response(update, context, error_msg)
+            return
+    else:
+        # Check if user is admin/owner
+        if not await is_user_admin(chat_id, user_id, context):
+            await send_bot_response(update, context, "You must be an admin to use the /pin command.")
+            return
 
     # Check bot permissions (can_pin_messages)
     bot_member = await context.bot.get_chat_member(chat_id, context.bot.id)
@@ -542,10 +579,17 @@ async def unpin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
     
-    # Check if user is admin/owner
-    if not await is_user_admin(chat_id, user_id, context):
-        await send_bot_response(update, context, "You must be an admin to use the /unpin command.")
-        return
+    # Check if it's an anonymous admin
+    if is_anonymous_admin(user_id):
+        has_perm, error_msg = await check_anonymous_admin_pin_permission(chat_id, context)
+        if not has_perm:
+            await send_bot_response(update, context, error_msg)
+            return
+    else:
+        # Check if user is admin/owner
+        if not await is_user_admin(chat_id, user_id, context):
+            await send_bot_response(update, context, "You must be an admin to use the /unpin command.")
+            return
 
     # Check bot permissions (can_pin_messages)
     bot_member = await context.bot.get_chat_member(chat_id, context.bot.id)
