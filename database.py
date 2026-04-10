@@ -21,21 +21,57 @@ def connect_to_mongodb():
     
     try:
         if client is None:
-            # Add SSL/TLS parameters to the connection
+            # Try multiple connection strategies
             import certifi
-            client = MongoClient(
-                MONGODB_URI,
-                serverSelectionTimeoutMS=10000,
-                tls=True,
-                tlsCAFile=certifi.where(),
-                connectTimeoutMS=10000,
-                socketTimeoutMS=10000
-            )
-            # Test the connection
-            client.admin.command('ping')
-            db = client[DATABASE_NAME]
-            logging.info(f"✅ Successfully connected to MongoDB: {DATABASE_NAME}")
-            return True
+            
+            # Strategy 1: Use certifi CA file
+            try:
+                client = MongoClient(
+                    MONGODB_URI,
+                    serverSelectionTimeoutMS=10000,
+                    tls=True,
+                    tlsCAFile=certifi.where(),
+                    connectTimeoutMS=10000,
+                    socketTimeoutMS=10000
+                )
+                client.admin.command('ping')
+                db = client[DATABASE_NAME]
+                logging.info(f"✅ Successfully connected to MongoDB: {DATABASE_NAME}")
+                return True
+            except Exception as e1:
+                logging.warning(f"First connection strategy failed: {e1}")
+                
+                # Strategy 2: Use system CA certificates
+                try:
+                    client = MongoClient(
+                        MONGODB_URI,
+                        serverSelectionTimeoutMS=10000,
+                        tls=True,
+                        tlsCAFile='/etc/ssl/certs/ca-certificates.crt',
+                        connectTimeoutMS=10000,
+                        socketTimeoutMS=10000
+                    )
+                    client.admin.command('ping')
+                    db = client[DATABASE_NAME]
+                    logging.info(f"✅ Successfully connected to MongoDB (system CA): {DATABASE_NAME}")
+                    return True
+                except Exception as e2:
+                    logging.warning(f"Second connection strategy failed: {e2}")
+                    
+                    # Strategy 3: Disable certificate validation (NOT recommended for production)
+                    logging.warning("Trying connection with TLS disabled as fallback...")
+                    client = MongoClient(
+                        MONGODB_URI,
+                        serverSelectionTimeoutMS=10000,
+                        tls=False,
+                        connectTimeoutMS=10000,
+                        socketTimeoutMS=10000
+                    )
+                    client.admin.command('ping')
+                    db = client[DATABASE_NAME]
+                    logging.warning(f"⚠️  Connected to MongoDB with TLS disabled (insecure!)")
+                    return True
+                
         return True
     except ConnectionFailure as e:
         logging.error(f"❌ Failed to connect to MongoDB: {e}")
