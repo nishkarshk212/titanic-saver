@@ -17,6 +17,32 @@ async def can_user_mute(chat_id, user_id, context):
         return True
     return check_is_muter(chat_id, user_id)
 
+async def can_user_ban(chat_id, user_id, context):
+    """Check if a user can ban/unban (Admin with can_restrict_members permission)."""
+    # Owner can always ban
+    from config import OWNER_ID
+    if user_id == OWNER_ID:
+        return True, None
+    
+    try:
+        member = await context.bot.get_chat_member(chat_id, user_id)
+        
+        # Must be admin or creator
+        if member.status not in ['administrator', 'creator']:
+            return False, "You must be an admin to ban users."
+        
+        # Creator has all permissions
+        if member.status == 'creator':
+            return True, None
+        
+        # Check if admin has can_restrict_members permission
+        if not member.can_restrict_members:
+            return False, "❌ You don't have permission to ban users. You need the 'Ban Users' permission."
+        
+        return True, None
+    except Exception as e:
+        return False, f"❌ Error checking permissions: {str(e)}"
+
 async def check_bot_admin_rights(chat_id, context, required_rights=None):
     """Checks if the bot has the required administrative rights."""
     try:
@@ -43,10 +69,11 @@ async def ban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     sender_id = update.effective_user.id if update.effective_user else None
     chat_type = update.effective_chat.type
     
-    # Check if user is admin/owner
+    # Check if user has ban permission (not just admin status)
     if chat_type != 'channel':
-        if not await is_user_admin(chat_id, sender_id, context):
-            await send_bot_response(update, context, "You must be an admin to ban users.")
+        can_ban, error_msg = await can_user_ban(chat_id, sender_id, context)
+        if not can_ban:
+            await send_bot_response(update, context, error_msg)
             return
     
     # Check bot rights
@@ -81,8 +108,11 @@ async def unban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     sender_id = update.effective_user.id if update.effective_user else None
     chat_type = update.effective_chat.type
     
+    # Check if user has ban permission (not just admin status)
     if chat_type != 'channel':
-        if not await is_user_admin(chat_id, sender_id, context):
+        can_ban, error_msg = await can_user_ban(chat_id, sender_id, context)
+        if not can_ban:
+            await send_bot_response(update, context, error_msg)
             return
     
     target_id, target_name = await get_user_id(update, context)
