@@ -27,15 +27,20 @@ def detect_language(text: str) -> str:
     # Count characters in different scripts
     hindi_chars = 0
     latin_chars = 0
+    other_chars = 0
     total_chars = 0
     
     for char in text:
         if '\u0900' <= char <= '\u097F':  # Devanagari (Hindi)
             hindi_chars += 1
             total_chars += 1
-        elif char.isalpha():  # Latin alphabet (English)
+        elif char.isascii() and char.isalpha():  # Latin alphabet (English)
             latin_chars += 1
             total_chars += 1
+        elif char.isalpha():  # Other alphabets (Russian, Arabic, Chinese, etc.)
+            other_chars += 1
+            total_chars += 1
+        # Skip spaces, punctuation, numbers, emojis
     
     if total_chars == 0:
         return 'unknown'
@@ -43,16 +48,23 @@ def detect_language(text: str) -> str:
     # Calculate percentages
     hindi_pct = (hindi_chars / total_chars) * 100
     latin_pct = (latin_chars / total_chars) * 100
+    other_pct = (other_chars / total_chars) * 100
     
     # Detection logic
-    if hindi_pct > 70:
+    if other_pct > 50:
+        return 'other'  # Mostly non-Hindi, non-English characters
+    elif hindi_pct > 70:
         return 'hi'  # Pure Hindi
     elif latin_pct > 70:
         return 'en'  # Pure English
     elif hindi_pct > 20 and latin_pct > 20:
         return 'hinglish'  # Mix of Hindi and English
+    elif hindi_pct > 50:
+        return 'hi'  # Mostly Hindi
+    elif latin_pct > 50:
+        return 'en'  # Mostly English
     else:
-        return 'other'  # Other language
+        return 'other'  # Mixed or other languages
 
 async def check_language_filter(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     """
