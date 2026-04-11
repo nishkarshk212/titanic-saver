@@ -127,12 +127,30 @@ async def check_language_filter(update: Update, context: ContextTypes.DEFAULT_TY
     # Detect language
     detected_lang = detect_language(text)
     
-    # Safe messages (emojis, numbers, punctuation only) are always allowed
+    # Handle safe messages (emojis, numbers, punctuation only)
     if detected_lang == 'safe':
-        return False  # Don't delete
+        # Check if emoji blocking is enabled
+        if emojis > 0 and settings.get('emoji_block_enabled', False):
+            if settings.get('block_emoji_only', True) and total_alphabetic == 0:
+                # Delete emoji-only messages if blocking enabled
+                pass  # Will be deleted below
+            else:
+                return False  # Allow mixed content
+        
+        # Check if punctuation blocking is enabled  
+        if punctuation > 0 and settings.get('block_punctuation_only', True):
+            if total_alphabetic == 0 and emojis == 0 and numbers == 0:
+                # Delete punctuation-only messages if blocking enabled
+                pass  # Will be deleted below
+            else:
+                return False  # Allow mixed content
+        
+        # If no blocking enabled for safe content, allow
+        if not settings.get('emoji_block_enabled', False) and not settings.get('block_punctuation_only', True):
+            return False  # Don't delete safe messages
     
     # If detected language is not allowed, delete message
-    if detected_lang not in allowed_languages:
+    if detected_lang not in allowed_languages and detected_lang != 'safe':
         try:
             # Delete the message
             await message.delete()

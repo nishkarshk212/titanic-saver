@@ -36,7 +36,11 @@ DEFAULT_CHAT_SETTINGS = {
     "forward_protection_enabled": False,
     # Language filter settings
     "language_filter_enabled": False,
-    "allowed_languages": ["en", "hi", "hinglish"]
+    "allowed_languages": ["en", "hi", "hinglish"],
+    # Emoji and special character blocking
+    "emoji_block_enabled": False,
+    "block_emoji_only": True,
+    "block_punctuation_only": True
 }
 
 def get_chat_settings(chat_id):

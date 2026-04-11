@@ -240,11 +240,20 @@ def get_language_filter_settings_keyboard(settings):
     hi_status = "✅" if "hi" in allowed else "❌"
     hinglish_status = "✅" if "hinglish" in allowed else "❌"
     
+    # Emoji blocking settings
+    emoji_block = "✅" if settings.get("emoji_block_enabled", False) else "❌"
+    block_emoji_only = "✅" if settings.get("block_emoji_only", True) else "❌"
+    block_punct_only = "✅" if settings.get("block_punctuation_only", True) else "❌"
+    
     keyboard = [
         [InlineKeyboardButton(f"Language Filter: {status}", callback_data="set_toggle_language_filter_enabled")],
         [InlineKeyboardButton(f"🇬🇧 English: {en_status}", callback_data="set_toggle_lang_en")],
         [InlineKeyboardButton(f"🇮🇳 Hindi: {hi_status}", callback_data="set_toggle_lang_hi")],
         [InlineKeyboardButton(f"💬 Hinglish: {hinglish_status}", callback_data="set_toggle_lang_hinglish")],
+        [InlineKeyboardButton("── Emoji & Symbols ──", callback_data="set_none")],
+        [InlineKeyboardButton(f"Block Emojis: {emoji_block}", callback_data="set_toggle_emoji_block_enabled")],
+        [InlineKeyboardButton(f"  Emoji Only: {block_emoji_only}", callback_data="set_toggle_block_emoji_only")],
+        [InlineKeyboardButton(f"  Punctuation Only: {block_punct_only}", callback_data="set_toggle_block_punctuation_only")],
         [InlineKeyboardButton("ℹ️ Deletes messages in other languages", callback_data="set_none")],
         [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
     ]
@@ -426,7 +435,7 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             await edit_bot_response(
                 query, context,
-                "🌐 Language Filter Settings\n\nAutomatically delete messages in languages other than allowed ones.\n\nAllowed: English, Hindi, Hinglish",
+                "🌐 Language Filter Settings\n\nAutomatically delete messages in languages other than allowed ones.\n\nAllowed: English, Hindi, Hinglish\n\nEmoji & Symbol Blocking Options:",
                 reply_markup=get_language_filter_settings_keyboard(settings)
             )
         except BadRequest: pass
