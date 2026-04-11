@@ -19,6 +19,7 @@ from settings import get_settings_handlers
 from help import get_help_handlers
 from ai_chat import get_chatgpt_handlers
 from translator import get_translation_handlers
+from language_filter import get_language_handlers
 from config import BOT_TOKEN, LOG_CHANNEL_ID, OWNER_ID, log_to_channel, send_bot_response, send_bot_media, START_VIDEOS
 from user_manager_mongo import cache_user, increment_message_count, get_user_id, get_user_stats, is_user_admin
 from settings_manager_mongo import get_chat_settings
@@ -731,6 +732,10 @@ def main():
     # Add Translation handlers (Group 9)
     for handler in get_translation_handlers():
         application.add_handler(handler, group=9)
+
+    # Add Language Filter handlers (Group 10)
+    for handler in get_language_handlers():
+        application.add_handler(handler, group=10)
 
     # Start the bot
     print("Bot is starting...")

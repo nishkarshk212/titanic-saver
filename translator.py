@@ -1,6 +1,6 @@
 """
 Enhanced Translation Features
-Adds reply-to-translate functionality
+Adds reply-to-translate functionality with TranslateAI API
 """
 
 import http.client
@@ -10,6 +10,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler
 from telegram.constants import ParseMode
 from config import send_bot_response
+from translator_ai import translate_text as translate_with_ai
 
 # API Configuration
 RAPIDAPI_KEY = "79115cebe8msh7aeb0698c33cb2bp140b6cjsn20d3c311c6f4"
@@ -92,8 +93,8 @@ async def translate_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Show typing action
         await context.bot.send_chat_action(chat_id=chat_id, action="typing")
         
-        # Perform translation
-        translated_text = await translate_text(text_to_translate, "auto", target_lang)
+        # Perform translation using AI
+        translated_text = await translate_with_ai(text_to_translate, "en", target_lang)
         
         if translated_text:
             # Get user info from replied message
@@ -138,8 +139,8 @@ async def translate_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Show typing action
     await context.bot.send_chat_action(chat_id=chat_id, action="typing")
     
-    # Get translation
-    translated_text = await translate_text(text, "auto", target_lang)
+    # Get translation using AI
+    translated_text = await translate_with_ai(text, "en", target_lang)
     
     if translated_text:
         target_name = LANGUAGES.get(target_lang, target_lang)
@@ -307,8 +308,8 @@ async def translate_callback_handler(update: Update, context: ContextTypes.DEFAU
     # Show typing action
     await context.bot.send_chat_action(chat_id=query.message.chat_id, action="typing")
     
-    # Perform translation
-    translated_text = await translate_text(text, "auto", target_lang)
+    # Perform translation using AI
+    translated_text = await translate_with_ai(text, "en", target_lang)
     
     if translated_text:
         target_name = LANGUAGES.get(target_lang, target_lang)

@@ -36,6 +36,7 @@ def get_main_settings_keyboard():
         [InlineKeyboardButton("🔗 Link Spam Protection", callback_data="set_view_link_spam")],
         [InlineKeyboardButton("🔄 Forward Protection", callback_data="set_view_forward_protection")],
         [InlineKeyboardButton("🔑 Command Access", callback_data="set_view_command_access")],
+        [InlineKeyboardButton("🌐 Language Filter", callback_data="set_view_language_filter")],
         [InlineKeyboardButton("❌ Close Menu", callback_data="set_close")]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -230,6 +231,25 @@ def get_forward_protection_settings_keyboard(settings):
     ]
     return InlineKeyboardMarkup(keyboard)
 
+def get_language_filter_settings_keyboard(settings):
+    """Get language filter settings keyboard."""
+    status = "✅" if settings.get("language_filter_enabled", False) else "❌"
+    allowed = settings.get("allowed_languages", ["en", "hi", "hinglish"])
+    
+    en_status = "✅" if "en" in allowed else "❌"
+    hi_status = "✅" if "hi" in allowed else "❌"
+    hinglish_status = "✅" if "hinglish" in allowed else "❌"
+    
+    keyboard = [
+        [InlineKeyboardButton(f"Language Filter: {status}", callback_data="set_toggle_language_filter_enabled")],
+        [InlineKeyboardButton(f"🇬🇧 English: {en_status}", callback_data="set_toggle_lang_en")],
+        [InlineKeyboardButton(f"🇮🇳 Hindi: {hi_status}", callback_data="set_toggle_lang_hi")],
+        [InlineKeyboardButton(f"💬 Hinglish: {hinglish_status}", callback_data="set_toggle_lang_hinglish")],
+        [InlineKeyboardButton("ℹ️ Deletes messages in other languages", callback_data="set_none")],
+        [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
 async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     chat_id = update.effective_chat.id
@@ -401,6 +421,18 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer()
         return
 
+    if data == "set_view_language_filter":
+        settings = get_chat_settings(chat_id)
+        try:
+            await edit_bot_response(
+                query, context,
+                "🌐 Language Filter Settings\n\nAutomatically delete messages in languages other than allowed ones.\n\nAllowed: English, Hindi, Hinglish",
+                reply_markup=get_language_filter_settings_keyboard(settings)
+            )
+        except BadRequest: pass
+        await query.answer()
+        return
+
     if data.startswith("set_toggle_"):
         key = data.replace("set_toggle_", "")
         settings = get_chat_settings(chat_id)
@@ -431,6 +463,16 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             new_val = not settings.get(key, default_val)
             update_chat_setting(chat_id, key, new_val)
         
+        # Handle language toggles
+        if key.startswith("lang_"):
+            lang_code = key.replace("lang_", "")
+            allowed = settings.get("allowed_languages", ["en", "hi", "hinglish"])
+            if lang_code in allowed:
+                allowed.remove(lang_code)
+            else:
+                allowed.append(lang_code)
+            update_chat_setting(chat_id, "allowed_languages", allowed)
+        
         # Refresh current menu
         new_settings = get_chat_settings(chat_id)
         try:
@@ -455,6 +497,8 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await query.edit_message_reply_markup(reply_markup=get_link_spam_settings_keyboard(new_settings))
             elif "forward_protection" in key:
                 await query.edit_message_reply_markup(reply_markup=get_forward_protection_settings_keyboard(new_settings))
+            elif "language_filter" in key or key.startswith("lang_"):
+                await query.edit_message_reply_markup(reply_markup=get_language_filter_settings_keyboard(new_settings))
             elif "command_access" in key: 
                 await query.edit_message_reply_markup(reply_markup=get_command_access_keyboard(new_settings))
         except BadRequest: pass

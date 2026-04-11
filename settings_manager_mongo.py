@@ -33,7 +33,10 @@ DEFAULT_CHAT_SETTINGS = {
     "command_access": "all",
     "bot_protection_enabled": False,
     "link_spam_protection_enabled": False,
-    "forward_protection_enabled": False
+    "forward_protection_enabled": False,
+    # Language filter settings
+    "language_filter_enabled": False,
+    "allowed_languages": ["en", "hi", "hinglish"]
 }
 
 def get_chat_settings(chat_id):
