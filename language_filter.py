@@ -19,36 +19,48 @@ SUPPORTED_LANGUAGES = {
 def detect_language(text: str) -> str:
     """
     Detect the language of the text.
-    Returns: 'en', 'hi', 'hinglish', or 'other'
+    Returns: 'en', 'hi', 'hinglish', 'other', or 'safe' (emojis/numbers only)
     """
     if not text:
         return 'unknown'
     
-    # Count characters in different scripts
+    # Count characters in different categories
     hindi_chars = 0
     latin_chars = 0
     other_chars = 0
-    total_chars = 0
+    numbers = 0
+    emojis = 0
+    punctuation = 0
+    spaces = 0
+    total_alphabetic = 0
     
     for char in text:
         if '\u0900' <= char <= '\u097F':  # Devanagari (Hindi)
             hindi_chars += 1
-            total_chars += 1
+            total_alphabetic += 1
         elif char.isascii() and char.isalpha():  # Latin alphabet (English)
             latin_chars += 1
-            total_chars += 1
+            total_alphabetic += 1
         elif char.isalpha():  # Other alphabets (Russian, Arabic, Chinese, etc.)
             other_chars += 1
-            total_chars += 1
-        # Skip spaces, punctuation, numbers, emojis
+            total_alphabetic += 1
+        elif char.isdigit():  # Numbers
+            numbers += 1
+        elif char.isspace():  # Spaces
+            spaces += 1
+        elif is_emoji(char):  # Emojis
+            emojis += 1
+        else:  # Punctuation, special characters
+            punctuation += 1
     
-    if total_chars == 0:
-        return 'unknown'
+    # If no alphabetic characters, it's safe (emojis, numbers, punctuation only)
+    if total_alphabetic == 0:
+        return 'safe'
     
-    # Calculate percentages
-    hindi_pct = (hindi_chars / total_chars) * 100
-    latin_pct = (latin_chars / total_chars) * 100
-    other_pct = (other_chars / total_chars) * 100
+    # Calculate percentages based on alphabetic characters only
+    hindi_pct = (hindi_chars / total_alphabetic) * 100
+    latin_pct = (latin_chars / total_alphabetic) * 100
+    other_pct = (other_chars / total_alphabetic) * 100
     
     # Detection logic
     if other_pct > 50:
@@ -65,6 +77,23 @@ def detect_language(text: str) -> str:
         return 'en'  # Mostly English
     else:
         return 'other'  # Mixed or other languages
+
+def is_emoji(char: str) -> bool:
+    """Check if character is an emoji."""
+    code_point = ord(char)
+    # Common emoji ranges
+    return (
+        0x1F600 <= code_point <= 0x1F64F or  # Emoticons
+        0x1F300 <= code_point <= 0x1F5FF or  # Misc Symbols and Pictographs
+        0x1F680 <= code_point <= 0x1F6FF or  # Transport and Map
+        0x1F1E0 <= code_point <= 0x1F1FF or  # Regional Indicators (flags)
+        0x2600 <= code_point <= 0x26FF or    # Misc symbols
+        0x2700 <= code_point <= 0x27BF or    # Dingbats
+        0xFE00 <= code_point <= 0xFE0F or    # Variation Selectors
+        0x1F900 <= code_point <= 0x1F9FF or  # Supplemental Symbols
+        0x1FA00 <= code_point <= 0x1FA6F or  # Chess Symbols
+        0x1FA70 <= code_point <= 0x1FAFF     # Symbols and Pictographs Extended
+    )
 
 async def check_language_filter(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     """
@@ -97,6 +126,10 @@ async def check_language_filter(update: Update, context: ContextTypes.DEFAULT_TY
     
     # Detect language
     detected_lang = detect_language(text)
+    
+    # Safe messages (emojis, numbers, punctuation only) are always allowed
+    if detected_lang == 'safe':
+        return False  # Don't delete
     
     # If detected language is not allowed, delete message
     if detected_lang not in allowed_languages:
