@@ -98,6 +98,11 @@ def get_collection(collection_name):
         return None
     return database[collection_name]
 
+def is_connected():
+    """Check if MongoDB is connected."""
+    global db
+    return db is not None
+
 def close_connection():
     """Close the MongoDB connection."""
     global client
