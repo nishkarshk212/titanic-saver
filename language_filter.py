@@ -45,7 +45,14 @@ def detect_language(text: str) -> str:
         elif is_stylish_font(char):  # Stylish/font characters
             stylish_fonts += 1
             total_alphabetic += 1
-            latin_chars += 1  # Count as Latin since they're styled Latin characters
+            # Check if it's Cyrillic/Greek used as aesthetic
+            cp = ord(char)
+            if (0x0400 <= cp <= 0x04FF) or (0x0370 <= cp <= 0x03FF):
+                # Only count as Latin if mixed with other stylish/Latin chars
+                # This allows ѕαмαєℓ but detects pure Russian
+                pass  # Don't add to latin_chars yet
+            else:
+                latin_chars += 1  # Count other stylish fonts as Latin
         elif char.isalpha():  # Other alphabets (Russian, Arabic, Chinese, etc.)
             other_chars += 1
             total_alphabetic += 1
@@ -61,6 +68,24 @@ def detect_language(text: str) -> str:
     # If no alphabetic characters, it's safe (emojis, numbers, punctuation only)
     if total_alphabetic == 0:
         return 'safe'
+    
+    # Check if Cyrillic/Greek chars are aesthetic (mixed with other stylish) or real Russian
+    # Count Cyrillic/Greek that are in stylish_font range
+    aesthetic_chars = 0
+    for char in text:
+        cp = ord(char)
+        if is_stylish_font(char) and ((0x0400 <= cp <= 0x04FF) or (0x0370 <= cp <= 0x03FF)):
+            aesthetic_chars += 1
+    
+    # If there's a mix of aesthetic Cyrillic/Greek + other stylish fonts, treat as English
+    # If it's ONLY Cyrillic/Greek with no other stylish, treat as 'other' (real Russian/Greek)
+    if aesthetic_chars > 0 and stylish_fonts > aesthetic_chars:
+        # Mixed aesthetic (ѕαмαєℓ with other stylish) - count as English
+        latin_chars += aesthetic_chars
+    elif aesthetic_chars > 0 and stylish_fonts == aesthetic_chars:
+        # Pure Cyrillic/Greek aesthetic without other stylish - check context
+        # If mostly Cyrillic, it might be real Russian
+        pass  # Let the detection logic below handle it
     
     # Calculate percentages based on alphabetic characters only
     hindi_pct = (hindi_chars / total_alphabetic) * 100
@@ -112,12 +137,14 @@ def is_stylish_font(char: str) -> bool:
         0x1E00 <= code_point <= 0x1EFF or    # Latin Extended Additional
         0x2090 <= code_point <= 0x209C or    # Subscript
         0x2070 <= code_point <= 0x209F or    # Superscripts and Subscripts
-        0x2100 <= code_point <= 0x214F or    # Letterlike Symbols
+        0x2100 <= code_point <= 0x214F or    # Letterlike Symbols (includes ℓ)
         0x2C60 <= code_point <= 0x2C7F or    # Latin Extended-C
         0xA720 <= code_point <= 0xA7FF or    # Latin Extended-D (includes small caps)
         0xFB00 <= code_point <= 0xFB06 or    # Alphabetic Presentation Forms
         0xFF01 <= code_point <= 0xFF5E or    # Fullwidth ASCII variants
-        0x2460 <= code_point <= 0x24FF       # Enclosed Alphanumerics (circled letters)
+        0x2460 <= code_point <= 0x24FF or    # Enclosed Alphanumerics (circled letters)
+        0x0400 <= code_point <= 0x04FF or    # Cyrillic (used as aesthetic Latin lookalikes: ѕ, м, є, etc.)
+        0x0370 <= code_point <= 0x03FF       # Greek (used as aesthetic: α, β, etc.)
     )
 
 async def check_language_filter(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
