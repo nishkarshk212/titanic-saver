@@ -32,6 +32,7 @@ def detect_language(text: str) -> str:
     emojis = 0
     punctuation = 0
     spaces = 0
+    stylish_fonts = 0
     total_alphabetic = 0
     
     for char in text:
@@ -41,6 +42,10 @@ def detect_language(text: str) -> str:
         elif char.isascii() and char.isalpha():  # Latin alphabet (English)
             latin_chars += 1
             total_alphabetic += 1
+        elif is_stylish_font(char):  # Stylish/font characters
+            stylish_fonts += 1
+            total_alphabetic += 1
+            latin_chars += 1  # Count as Latin since they're styled Latin characters
         elif char.isalpha():  # Other alphabets (Russian, Arabic, Chinese, etc.)
             other_chars += 1
             total_alphabetic += 1
@@ -93,6 +98,26 @@ def is_emoji(char: str) -> bool:
         0x1F900 <= code_point <= 0x1F9FF or  # Supplemental Symbols
         0x1FA00 <= code_point <= 0x1FA6F or  # Chess Symbols
         0x1FA70 <= code_point <= 0x1FAFF     # Symbols and Pictographs Extended
+    )
+
+def is_stylish_font(char: str) -> bool:
+    """Check if character is a stylish/font character (mathematical alphanumerics, small caps, etc.)."""
+    code_point = ord(char)
+    # Mathematical Alphanumerics and other font styles
+    return (
+        0x1D400 <= code_point <= 0x1D7FF or  # Mathematical Alphanumerics
+        0x1D00 <= code_point <= 0x1D7F or    # Phonetic Extensions
+        0x1D80 <= code_point <= 0x1DBF or    # Phonetic Extensions Supplement
+        0x0250 <= code_point <= 0x02AF or    # IPA Extensions
+        0x1E00 <= code_point <= 0x1EFF or    # Latin Extended Additional
+        0x2090 <= code_point <= 0x209C or    # Subscript
+        0x2070 <= code_point <= 0x209F or    # Superscripts and Subscripts
+        0x2100 <= code_point <= 0x214F or    # Letterlike Symbols
+        0x2C60 <= code_point <= 0x2C7F or    # Latin Extended-C
+        0xA720 <= code_point <= 0xA7FF or    # Latin Extended-D (includes small caps)
+        0xFB00 <= code_point <= 0xFB06 or    # Alphabetic Presentation Forms
+        0xFF01 <= code_point <= 0xFF5E or    # Fullwidth ASCII variants
+        0x2460 <= code_point <= 0x24FF       # Enclosed Alphanumerics (circled letters)
     )
 
 async def check_language_filter(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
