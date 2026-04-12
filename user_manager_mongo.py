@@ -134,8 +134,12 @@ async def get_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 3. Check arguments (ID or Username)
     if context.args:
         arg = context.args[0]
+        # Safety check: arg could be None
+        if arg is None:
+            return None, None
+            
         # Check if ID
-        if arg.startswith('-') or arg.isdigit():
+        if str(arg).startswith('-') or str(arg).isdigit():
             try:
                 chat_id = int(arg)
                 # Try to get chat info
@@ -149,7 +153,7 @@ async def get_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 pass
         
         # If it's a username but not found in entities
-        if arg.startswith('@'):
+        if str(arg).startswith('@'):
             user_id, user_name = resolve_username(arg)
             if user_id: return user_id, user_name
             
