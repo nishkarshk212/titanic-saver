@@ -144,7 +144,21 @@ def is_stylish_font(char: str) -> bool:
         0xFF01 <= code_point <= 0xFF5E or    # Fullwidth ASCII variants
         0x2460 <= code_point <= 0x24FF or    # Enclosed Alphanumerics (circled letters)
         0x0400 <= code_point <= 0x04FF or    # Cyrillic (used as aesthetic Latin lookalikes: ѕ, м, є, etc.)
-        0x0370 <= code_point <= 0x03FF       # Greek (used as aesthetic: α, β, etc.)
+        0x0370 <= code_point <= 0x03FF or    # Greek (used as aesthetic: α, β, etc.)
+        0x20D0 <= code_point <= 0x20FF or    # Combining Diacritical Marks (⃝, etc.)
+        0xA700 <= code_point <= 0xA71F or    # Modifier Tone Letters
+        0xA600 <= code_point <= 0xA6FF or    # Bamum (decorative)
+        0xA500 <= code_point <= 0xA63F or    # Yi Syllables (decorative)
+        0xA78F <= code_point <= 0xA78F or    # Latin letter (decorative)
+        0xAA00 <= code_point <= 0xAA5F or    # Cham (decorative)
+        0xAA60 <= code_point <= 0xAA7F or    # Myanmar Extended-A
+        0xAA80 <= code_point <= 0xAADF or    # Tai Viet
+        0x16A0 <= code_point <= 0x16EA or    # Runic (decorative)
+        0x10300 <= code_point <= 0x1032F or  # Old Italic (decorative)
+        0x10330 <= code_point <= 0x1034F or  # Gothic letters (decorative)
+        0x16800 <= code_point <= 0x16A3F or  # Bamum Supplement (decorative symbols)
+        0x16F00 <= code_point <= 0x16F9F or  # Miao (decorative)
+        0x1B000 <= code_point <= 0x1B0FF     # Kana Supplement (decorative)
     )
 
 async def check_language_filter(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
