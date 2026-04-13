@@ -97,9 +97,14 @@ async def save_emoji_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await update.message.reply_text("❌ Only bot owner can save emojis!")
         return
     
-    # Check if replying to a message with custom emoji
+    # Check if replying to a message
     if not update.message.reply_to_message:
-        await update.message.reply_text("❌ Reply to a message containing custom emoji")
+        await update.message.reply_text(
+            "❌ Reply to a message containing custom emoji with:\n"
+            "<code>/save_emoji &lt;category&gt;</code>\n\n"
+            "Example: <code>/save_emoji premium_pack</code>",
+            parse_mode='HTML'
+        )
         return
     
     # Get category
@@ -109,33 +114,71 @@ async def save_emoji_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     # Extract custom emoji entities
     message = update.message.reply_to_message
+    
+    # Method 1: Check for custom_emoji_id directly (standalone emoji)
+    if hasattr(message, 'custom_emoji_id') and message.custom_emoji_id:
+        emoji_id = message.custom_emoji_id
+        
+        emoji_data = {
+            'file_id': str(emoji_id),
+            'unique_id': str(emoji_id),
+            'category': category,
+            'saved_by': user_id,
+            'is_premium': True,
+            'usage_count': 0
+        }
+        
+        # Check if exists
+        existing = emojis_collection.find_one({'unique_id': str(emoji_id)})
+        if existing:
+            await update.message.reply_text(f"⚠️ Emoji already saved in category: {existing.get('category', 'general')}")
+            return
+        
+        emojis_collection.insert_one(emoji_data)
+        await update.message.reply_text(
+            f"✅ Custom emoji saved!\n\n"
+            f"📂 Category: {category}\n"
+            f"🆔 ID: {emoji_id}"
+        )
+        logger.info(f"💾 Emoji saved: {emoji_id} in {category}")
+        return
+    
+    # Method 2: Check for custom emoji entities in text
     if message.entities:
         for entity in message.entities:
             if entity.type == 'custom_emoji':
+                emoji_id = entity.custom_emoji_id
+                
                 emoji_data = {
-                    'file_id': entity.custom_emoji_id,
-                    'unique_id': entity.custom_emoji_id,
+                    'file_id': str(emoji_id),
+                    'unique_id': str(emoji_id),
                     'category': category,
                     'saved_by': user_id,
+                    'is_premium': True,
                     'usage_count': 0
                 }
                 
                 # Check if exists
-                existing = emojis_collection.find_one({'unique_id': entity.custom_emoji_id})
+                existing = emojis_collection.find_one({'unique_id': str(emoji_id)})
                 if existing:
-                    await update.message.reply_text(f"⚠️ Emoji already saved!")
+                    await update.message.reply_text(f"⚠️ Emoji already saved in category: {existing.get('category', 'general')}")
                     return
                 
                 emojis_collection.insert_one(emoji_data)
                 await update.message.reply_text(
                     f"✅ Custom emoji saved!\n\n"
                     f"📂 Category: {category}\n"
-                    f"🆔 ID: {entity.custom_emoji_id}"
+                    f"🆔 ID: {emoji_id}"
                 )
-                logger.info(f"💾 Emoji saved: {entity.custom_emoji_id}")
+                logger.info(f"💾 Emoji saved: {emoji_id}")
                 return
     
-    await update.message.reply_text("❌ No custom emoji found in message")
+    await update.message.reply_text(
+        "❌ No custom emoji found!\n\n"
+        "💡 <b>How to save:</b>\n"
+        "1. Send a custom emoji from any premium pack\n"
+        "2. Reply to it with: <code>/save_emoji premium_pack</code>"
+    )
 
 async def get_sticker_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Get random sticker from category"""
