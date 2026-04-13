@@ -70,8 +70,23 @@ async def extract_all_premium_emoji_packs():
         # Process each pack
         for idx, stickerset in enumerate(all_stickers.sets, 1):
             try:
-                # Check if it's an emoji pack (emojis flag)
-                if not stickerset.emojis:
+                # Check if it's a custom emoji pack (not regular stickers)
+                # Custom emoji packs have: installed_date attribute or are marked differently
+                is_emoji_pack = False
+                
+                # Method 1: Check emojis attribute (count > 0 and not regular stickers)
+                if hasattr(stickerset, 'emojis') and stickerset.emojis:
+                    is_emoji_pack = True
+                
+                # Method 2: Check if it's marked as custom emoji pack
+                if hasattr(stickerset, 'custom_emoji') and stickerset.custom_emoji:
+                    is_emoji_pack = True
+                
+                # Method 3: Check by title/name patterns
+                if any(keyword in stickerset.title.lower() for keyword in ['emoji', 'emojis']):
+                    is_emoji_pack = True
+                
+                if not is_emoji_pack:
                     continue
                 
                 emoji_pack_count += 1
