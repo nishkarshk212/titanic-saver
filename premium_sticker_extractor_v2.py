@@ -17,7 +17,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # MongoDB connection
-MONGO_URI = os.getenv('MONGODB_URI')
+MONGO_URI = os.getenv('MONGODB_URI', 'mongodb+srv://mybotpanda_db_user:hx0n5AI90lFGyl93@grouphelp.puxyti8.mongodb.net/?appName=GROUPHELP')
 client = MongoClient(MONGO_URI)
 db = client['GROUPHELP']
 stickers_collection = db['premium_stickers']
