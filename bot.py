@@ -21,6 +21,7 @@ from ai_chat import get_chatgpt_handlers
 from translator import get_translation_handlers
 from language_filter import get_language_handlers
 from sticker_manager import get_sticker_handlers
+from blocking_handler import get_blocking_handlers
 from config import BOT_TOKEN, LOG_CHANNEL_ID, OWNER_ID, log_to_channel, send_bot_response, send_bot_media, START_VIDEOS
 from user_manager_mongo import cache_user, increment_message_count, get_user_id, get_user_stats, is_user_admin
 from settings_manager_mongo import get_chat_settings
@@ -33,6 +34,18 @@ logging.basicConfig(
 
 async def start(update, context):
     """Start command handler."""
+    # Check if this is a deep link for settings
+    if context.args and context.args[0].startswith('settings_'):
+        group_chat_id = int(context.args[0].split('_')[1])
+        
+        # Store the group chat_id in user_data
+        context.user_data['settings_chat_id'] = group_chat_id
+        
+        # Import and call the settings panel
+        from settings import show_settings_panel
+        await show_settings_panel(update, context, group_chat_id, is_private=True)
+        return
+    
     bot_info = await context.bot.get_me()
     bot_name = bot_info.first_name
     bot_username = bot_info.username
@@ -66,7 +79,7 @@ async def cache_user_handler(update, context):
     if update.effective_user:
         user = update.effective_user
         cache_user(user.id, user.username, user.first_name)
-        if update.message and not update.message.text.startswith('/'):
+        if update.message and update.message.text and not update.message.text.startswith('/'):
             increment_message_count(user.id)
     
     # 2. Cache any users mentioned in the message
@@ -197,6 +210,72 @@ async def info_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup = InlineKeyboardMarkup(keyboard)
 
     await send_bot_response(update, context, info_text, parse_mode=ParseMode.HTML, reply_markup=reply_markup)
+
+async def report_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Report a user/message to group admins."""
+    chat_id = update.effective_chat.id
+    user_id = update.effective_user.id
+    
+    # Check if replying to a message
+    if not update.message.reply_to_message:
+        await send_bot_response(update, context, 
+            "Usage: Reply to a message with /report or @admin\n\n"
+            "This will notify all admins about the reported message.")
+        return
+    
+    reported_user = update.message.reply_to_message.from_user
+    if not reported_user:
+        await send_bot_response(update, context, "Could not find the user to report.")
+        return
+    
+    # Get all admins
+    try:
+        admins = await context.bot.get_chat_administrators(chat_id)
+        admin_mentions = []
+        
+        for admin in admins:
+            if admin.user.is_bot:
+                continue
+            admin_mentions.append(f"[admin](tg://user?id={admin.user.id})")
+        
+        if not admin_mentions:
+            await send_bot_response(update, context, "No admins found in this group.")
+            return
+        
+        # Create report message
+        report_text = (
+            f"🚨 <b>Report</b>\n\n"
+            f"👤 <b>Reported by:</b> {update.effective_user.first_name}\n"
+            f"👤 <b>Reported user:</b> {reported_user.first_name} (ID: <code>{reported_user.id}</code>)\n\n"
+            f"{' '.join(admin_mentions)}"
+        )
+        
+        # Forward the reported message to show context
+        try:
+            await context.bot.forward_message(
+                chat_id=chat_id,
+                from_chat_id=chat_id,
+                message_id=update.message.reply_to_message.message_id
+            )
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=report_text,
+                parse_mode='HTML',
+                disable_web_page_preview=True
+            )
+        except:
+            await send_bot_response(update, context, report_text, parse_mode='HTML')
+        
+        await send_bot_response(update, context, "✅ Report sent to admins!")
+        
+    except Exception as e:
+        logging.error(f"Error in report command: {e}")
+        await send_bot_response(update, context, "Failed to send report. Please try again.")
+
+async def handle_admin_mention(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle @admin or @admins mentions - same as /report."""
+    # Reuse the report command logic
+    await report_command(update, context)
 
 async def info_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle management buttons from the /info command."""
@@ -660,6 +739,11 @@ def main():
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("id", get_id_command))
     application.add_handler(CommandHandler("info", info_command))
+    application.add_handler(CommandHandler("report", report_command))
+    application.add_handler(MessageHandler(
+        filters.Regex(r'^@admin(s)?\b') & filters.ChatType.GROUPS,
+        handle_admin_mention
+    ))
     application.add_handler(CallbackQueryHandler(info_callback_handler, pattern="^info_"))
     application.add_handler(MessageHandler(filters.ALL & (filters.ChatType.GROUPS | filters.ChatType.SUPERGROUP), cache_user_handler), group=-1)
 
@@ -741,6 +825,10 @@ def main():
     # Add Sticker handlers (Group 11)
     for handler in get_sticker_handlers():
         application.add_handler(handler, group=11)
+
+    # Add Blocking handlers (Group 12)
+    for handler in get_blocking_handlers():
+        application.add_handler(handler, group=12)
 
     # Start the bot
     print("Bot is starting...")

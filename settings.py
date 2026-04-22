@@ -5,8 +5,19 @@ from settings_manager_mongo import get_chat_settings, update_chat_setting
 from config import OWNER_ID, send_bot_response, edit_bot_response
 from user_manager_mongo import can_user_configure_settings
 from anonymous_admin import is_anonymous_admin, check_anonymous_admin_change_info_permission
+from blocking_handler import DEFAULT_BLOCKING_SETTINGS
+import logging
+import asyncio
+
+async def delete_saved_message(context, message):
+    """Delete the saved message job."""
+    try:
+        await message.delete()
+    except Exception as e:
+        logging.warning(f"Failed to delete saved message: {e}")
 
 async def settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Settings command handler - shows option to open in group or private."""
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
     
@@ -14,29 +25,173 @@ async def settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await can_user_configure_settings(chat_id, user_id, context):
         await send_bot_response(update, context, "You need both 'Change Group Info' and 'Ban Users' permissions to configure settings.")
         return
-
-    keyboard = get_main_settings_keyboard()
-    await send_bot_response(
-        update, context,
-        f"⚙️ Group Settings for: {update.effective_chat.title}\n\nSelect a section to configure:",
-        reply_markup=keyboard
+    
+    # Create bot URL for private chat
+    bot_info = await context.bot.get_me()
+    bot_username = bot_info.username
+    
+    # Store chat_id in user_data to retrieve later
+    context.user_data['settings_chat_id'] = chat_id
+    
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("📖 Open Here", callback_data=f"settings_open_here_{chat_id}")],
+        [InlineKeyboardButton("💬 Open in Private", url=f"https://t.me/{bot_username}?start=settings_{chat_id}")]
+    ])
+    
+    settings_text = (
+        f"How would you like to open the settings?"
     )
+    
+    await send_bot_response(update, context, settings_text, reply_markup=keyboard)
 
-def get_main_settings_keyboard():
+async def open_settings_here(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Open settings directly in the group."""
+    query = update.callback_query
+    
+    # Extract chat_id from callback data
+    chat_id = int(query.data.split("_")[-1])
+    
+    # Store chat_id in user_data
+    context.user_data['settings_chat_id'] = chat_id
+    
+    try:
+        await query.answer()
+    except Exception as e:
+        logging.warning(f"Callback query answer failed: {e}")
+    
+    await show_settings_panel(update, context, chat_id)
+
+async def show_settings_panel(query_or_update, context, chat_id, is_private=False):
+    """Show the actual settings panel."""
+    # First check if it has message attribute (Update object from deep link)
+    if hasattr(query_or_update, 'message') and hasattr(query_or_update, 'effective_user'):
+        # It's an Update object (from deep link)
+        update = query_or_update
+        user_id = update.effective_user.id
+        
+        # Check permissions
+        if not await can_user_configure_settings(chat_id, user_id, context):
+            await send_bot_response(update, context, "You need both 'Change Group Info' and 'Ban Users' permissions to configure settings.")
+            return
+        
+        keyboard = get_main_settings_keyboard(chat_id)
+        
+        # Get group info
+        try:
+            chat = await context.bot.get_chat(chat_id)
+            group_name = chat.title or "Unknown"
+        except:
+            group_name = "Unknown"
+        
+        group_id = chat_id
+        user_mention = f"<a href='tg://user?id={user_id}'>{update.effective_user.first_name}</a>"
+        
+        settings_text = (
+            f"🛠 <b>ʙᴏᴛ ꜱᴇᴛᴛɪɴɢꜱ 🛠</b>\n\n"
+            f"ɢʀᴏᴜᴘ: {group_name}\n"
+            f"ɪᴅ: {group_id}\n"
+            f"ᴏᴘᴇɴᴇᴅ ʙʏ: {user_mention}\n\n"
+            f"ꜱᴇʟᴇᴄᴛ ᴏɴᴇ ᴏꜰ ᴛʜᴇ ꜱᴇᴛᴛɪɴɢꜱ ᴛʜᴀᴛ ʏᴏᴜ ᴡᴀɴᴛ ᴛᴏ ᴄʜᴀɴɢᴇ:"
+        )
+        
+        # Send directly with HTML parse mode to preserve links
+        try:
+            msg = await update.message.reply_text(settings_text, reply_markup=keyboard, parse_mode='HTML')
+        except:
+            msg = await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=settings_text,
+                reply_markup=keyboard,
+                parse_mode='HTML'
+            )
+    elif hasattr(query_or_update, 'callback_query'):
+        # It's a CallbackQuery wrapped in Update
+        query = query_or_update.callback_query
+        if query is None:
+            logging.error("callback_query is None")
+            return
+        user_id = query.from_user.id
+        
+        # Check permissions
+        if not await can_user_configure_settings(chat_id, user_id, context):
+            await query.answer("You don't have permission to access settings.", show_alert=True)
+            return
+        
+        keyboard = get_main_settings_keyboard(chat_id)
+        
+        # Get group info
+        try:
+            chat = await context.bot.get_chat(chat_id)
+            group_name = chat.title or "Unknown"
+        except:
+            group_name = "Unknown"
+        
+        group_id = chat_id
+        user_mention = f"<a href='tg://user?id={user_id}'>{query.from_user.first_name}</a>"
+        
+        settings_text = (
+            f"🛠 <b>ʙᴏᴛ ꜱᴇᴛᴛɪɴɢꜱ 🛠</b>\n\n"
+            f"ɢʀᴏᴜᴘ: {group_name}\n"
+            f"ɪᴅ: {group_id}\n"
+            f"ᴏᴘᴇɴᴇᴅ ʙʏ: {user_mention}\n\n"
+            f"ꜱᴇʟᴇᴄᴛ ᴏɴᴇ ᴏꜰ ᴛʜᴇ ꜱᴇᴛᴛɪɴɢꜱ ᴛʜᴀᴛ ʏᴏᴜ ᴡᴀɴᴛ ᴛᴏ ᴄʜᴀɴɢᴇ:"
+        )
+        
+        try:
+            await query.edit_message_text(settings_text, reply_markup=keyboard, parse_mode='HTML')
+        except BadRequest:
+            await query.message.edit_text(settings_text, reply_markup=keyboard, parse_mode='HTML')
+    else:
+        # It's a CallbackQuery directly
+        query = query_or_update
+        user_id = query.from_user.id
+        
+        # Check permissions
+        if not await can_user_configure_settings(chat_id, user_id, context):
+            await query.answer("You don't have permission to access settings.", show_alert=True)
+            return
+        
+        keyboard = get_main_settings_keyboard(chat_id)
+        
+        # Get group info
+        try:
+            chat = await context.bot.get_chat(chat_id)
+            group_name = chat.title or "Unknown"
+        except:
+            group_name = "Unknown"
+        
+        group_id = chat_id
+        user_mention = f"<a href='tg://user?id={user_id}'>{query.from_user.first_name}</a>"
+        
+        settings_text = (
+            f"🛠 <b>ʙᴏᴛ ꜱᴇᴛᴛɪɴɢꜱ 🛠</b>\n\n"
+            f"ɢʀᴏᴜᴘ: {group_name}\n"
+            f"ɪᴅ: {group_id}\n"
+            f"ᴏᴘᴇɴᴇᴅ ʙʏ: {user_mention}\n\n"
+            f"ꜱᴇʟᴇᴄᴛ ᴏɴᴇ ᴏꜰ ᴛʜᴇ ꜱᴇᴛᴛɪɴɢꜱ ᴛʜᴀᴛ ʏᴏᴜ ᴡᴀɴᴛ ᴛᴏ ᴄʜᴀɴɢᴇ:"
+        )
+        
+        try:
+            await query.edit_message_text(settings_text, reply_markup=keyboard, parse_mode='HTML')
+        except BadRequest:
+            await query.message.edit_text(settings_text, reply_markup=keyboard, parse_mode='HTML')
+
+def get_main_settings_keyboard(chat_id=None):
     keyboard = [
-        [InlineKeyboardButton("👋 Welcome Settings", callback_data="set_view_welcome")],
-        [InlineKeyboardButton("🧹 Clean Service", callback_data="set_view_clean")],
-        [InlineKeyboardButton("💣 Auto Delete", callback_data="set_view_auto_delete")],
-        [InlineKeyboardButton("🚫 Block Content", callback_data="set_view_block_content")],
-        [InlineKeyboardButton("📏 Message Length", callback_data="set_view_msg_length")],
-        [InlineKeyboardButton("🛡️ Moderation Settings", callback_data="set_view_mod")],
-        [InlineKeyboardButton("🗑️ Command Deletion", callback_data="set_view_command_deletion")],
-        [InlineKeyboardButton("📌 Pinned Messages", callback_data="set_view_pinned_messages")],
-        [InlineKeyboardButton("🤖 Bot Protection", callback_data="set_view_bot_protection")],
-        [InlineKeyboardButton("🔗 Link Spam Protection", callback_data="set_view_link_spam")],
-        [InlineKeyboardButton("🔄 Forward Protection", callback_data="set_view_forward_protection")],
-        [InlineKeyboardButton("🔑 Command Access", callback_data="set_view_command_access")],
-        [InlineKeyboardButton("🌐 Language Filter", callback_data="set_view_language_filter")],
+        [InlineKeyboardButton("👋 Welcome", callback_data="set_view_welcome"), 
+         InlineKeyboardButton("🧹 Clean Service", callback_data="set_view_clean")],
+        [InlineKeyboardButton("💣 Auto Delete", callback_data="set_view_auto_delete"), 
+         InlineKeyboardButton("🚫 Block Content", callback_data="set_view_block_content")],
+        [InlineKeyboardButton("📏 Msg Length", callback_data="set_view_msg_length"), 
+         InlineKeyboardButton("🛡️ Moderation", callback_data="set_view_mod")],
+        [InlineKeyboardButton("🗑️ Cmd Deletion", callback_data="set_view_command_deletion"), 
+         InlineKeyboardButton("📌 Pinned Msg", callback_data="set_view_pinned_messages")],
+        [InlineKeyboardButton("🤖 Bot Protection", callback_data="set_view_bot_protection"), 
+         InlineKeyboardButton("🔗 Link Spam", callback_data="set_view_link_spam")],
+        [InlineKeyboardButton("🔄 Forward Protect", callback_data="set_view_forward_protection"), 
+         InlineKeyboardButton("🔑 Cmd Access", callback_data="set_view_command_access")],
+        [InlineKeyboardButton("🌐 Language Filter", callback_data="set_view_language_filter"), 
+         InlineKeyboardButton("🚧 Blocking", callback_data="set_view_blocking")],
         [InlineKeyboardButton("❌ Close Menu", callback_data="set_close")]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -127,21 +282,6 @@ def get_auto_delete_settings_keyboard(settings):
             InlineKeyboardButton(f"{s} Seconds", callback_data="set_none"),
             InlineKeyboardButton("+S", callback_data="set_time_add_1")
         ],
-        [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
-    ]
-    return InlineKeyboardMarkup(keyboard)
-
-def get_block_content_settings_keyboard(settings):
-    limit = settings.get("block_warn_limit", 3)
-    penalty = settings.get("block_warn_penalty", "warn").title()
-    
-    keyboard = [
-        [
-            InlineKeyboardButton("-", callback_data="set_block_warn_limit_sub"),
-            InlineKeyboardButton(f"Block Warn Limit: {limit}", callback_data="set_none"),
-            InlineKeyboardButton("+", callback_data="set_block_warn_limit_add")
-        ],
-        [InlineKeyboardButton(f"Block Penalty: {penalty}", callback_data="set_toggle_block_warn_penalty")],
         [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -259,10 +399,91 @@ def get_language_filter_settings_keyboard(settings):
     ]
     return InlineKeyboardMarkup(keyboard)
 
+def get_blocking_settings_keyboard(settings):
+    """Get blocking settings keyboard."""
+    # Merge with defaults if needed
+    for key, value in DEFAULT_BLOCKING_SETTINGS.items():
+        if key not in settings:
+            settings[key] = value
+    
+    master_status = "✅" if settings.get("blocking_enabled", True) else "❌"
+    stickers_status = "✅" if settings.get("block_stickers", False) else "❌"
+    premium_sticker_status = "✅" if settings.get("block_premium_sticker", False) else "❌"
+    link_status = "✅" if settings.get("block_link", False) else "❌"
+    embed_link_status = "✅" if settings.get("block_embed_link", False) else "❌"
+    media_status = "✅" if settings.get("block_media", False) else "❌"
+    documents_status = "✅" if settings.get("block_documents", False) else "❌"
+    forward_status = "✅" if settings.get("block_forward", False) else "❌"
+    channel_post_status = "✅" if settings.get("block_channel_post", False) else "❌"
+    command_status = "✅" if settings.get("block_command", False) else "❌"
+    contact_status = "✅" if settings.get("block_contact", False) else "❌"
+    location_status = "✅" if settings.get("block_location", False) else "❌"
+    voice_status = "✅" if settings.get("block_voice", False) else "❌"
+    audio_status = "✅" if settings.get("block_audio", False) else "❌"
+    video_note_status = "✅" if settings.get("block_video_note", False) else "❌"
+    poll_status = "✅" if settings.get("block_poll", False) else "❌"
+    dice_status = "✅" if settings.get("block_dice", False) else "❌"
+    game_status = "✅" if settings.get("block_game", False) else "❌"
+    
+    keyboard = [
+        [InlineKeyboardButton(f"Master Blocking: {master_status}", callback_data="set_toggle_blocking_enabled")],
+        [InlineKeyboardButton("── Stickers ──", callback_data="set_none")],
+        [InlineKeyboardButton(f"Block Stickers: {stickers_status}", callback_data="set_toggle_block_stickers")],
+        [InlineKeyboardButton(f"Block Premium Stickers: {premium_sticker_status}", callback_data="set_toggle_block_premium_sticker")],
+        [InlineKeyboardButton("── Links ──", callback_data="set_none")],
+        [InlineKeyboardButton(f"Block Links: {link_status}", callback_data="set_toggle_block_link")],
+        [InlineKeyboardButton(f"Block Embed Links: {embed_link_status}", callback_data="set_toggle_block_embed_link")],
+        [InlineKeyboardButton("── Media & Files ──", callback_data="set_none")],
+        [InlineKeyboardButton(f"Block Media: {media_status}", callback_data="set_toggle_block_media")],
+        [InlineKeyboardButton(f"Block Documents: {documents_status}", callback_data="set_toggle_block_documents")],
+        [InlineKeyboardButton(f"Block Audio/Music: {audio_status}", callback_data="set_toggle_block_audio")],
+        [InlineKeyboardButton("── Messages ──", callback_data="set_none")],
+        [InlineKeyboardButton(f"Block Forward: {forward_status}", callback_data="set_toggle_block_forward")],
+        [InlineKeyboardButton(f"Block Channel Posts: {channel_post_status}", callback_data="set_toggle_block_channel_post")],
+        [InlineKeyboardButton(f"Block Commands: {command_status}", callback_data="set_toggle_block_command")],
+        [InlineKeyboardButton("── Other ──", callback_data="set_none")],
+        [InlineKeyboardButton(f"Block Contact: {contact_status}", callback_data="set_toggle_block_contact")],
+        [InlineKeyboardButton(f"Block Location: {location_status}", callback_data="set_toggle_block_location")],
+        [InlineKeyboardButton(f"Block Voice: {voice_status}", callback_data="set_toggle_block_voice")],
+        [InlineKeyboardButton(f"Block Video Note: {video_note_status}", callback_data="set_toggle_block_video_note")],
+        [InlineKeyboardButton(f"Block Poll: {poll_status}", callback_data="set_toggle_block_poll")],
+        [InlineKeyboardButton(f"Block Dice: {dice_status}", callback_data="set_toggle_block_dice")],
+        [InlineKeyboardButton(f"Block Game: {game_status}", callback_data="set_toggle_block_game")],
+        [InlineKeyboardButton("ℹ️ Toggle to block content instantly", callback_data="set_none")],
+        [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
 async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
+    
+    # Handle "Open Here" button
+    if query.data.startswith("settings_open_here_"):
+        await open_settings_here(update, context)
+        return
+    
+    # Handle "Go to Private" button
+    if query.data.startswith("settings_go_private_"):
+        group_chat_id = int(query.data.split("_")[-1])
+        bot_info = await context.bot.get_me()
+        bot_username = bot_info.username
+        
+        await query.answer("Opening settings in private chat...", show_alert=False)
+        
+        # Send message with button to go to private
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("💬 Click Here to Open in Private", url=f"https://t.me/{bot_username}?start=settings_{group_chat_id}")]
+        ])
+        
+        await query.edit_message_text(
+            "💬 <b>Settings will be opened in private chat.</b>\n\n"
+            "Click the button below to continue:",
+            reply_markup=keyboard,
+            parse_mode='HTML'
+        )
+        return
     
     # Granular permission check
     if not await can_user_configure_settings(chat_id, user_id, context):
@@ -272,17 +493,32 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
     
     if data == "set_close":
-        await query.message.delete()
+        # Delete the settings message
+        try:
+            await query.message.delete()
+        except:
+            pass
+        
+        # Send "Settings saved" message
+        saved_msg = await query.message.reply_text("ꜱᴇᴛᴛɪɴɢ ꜱᴀᴠᴇᴅ ✅")
+        
+        # Delete the saved message after 5 seconds
+        if context.job_queue:
+            async def delete_job(ctx):
+                try:
+                    await saved_msg.delete()
+                except:
+                    pass
+            
+            context.job_queue.run_once(delete_job, 5)
+        
+        await query.answer()
         return
         
     if data == "set_view_main":
-        try:
-            await edit_bot_response(
-                query, context,
-                f"⚙️ Group Settings for: {update.effective_chat.title}\n\nSelect a section to configure:",
-                reply_markup=get_main_settings_keyboard()
-            )
-        except BadRequest: pass
+        # Determine the actual chat_id (could be from private chat with stored group_id)
+        actual_chat_id = context.user_data.get('settings_chat_id', chat_id)
+        await show_settings_panel(query, context, actual_chat_id)
         await query.answer()
         return
 
@@ -323,12 +559,13 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if data == "set_view_block_content":
+        # Redirect to new blocking settings
         settings = get_chat_settings(chat_id)
         try:
             await edit_bot_response(
                 query, context,
-                "🚫 Block Content Configuration\n\nConfigure penalties for using blocked words/media:",
-                reply_markup=get_block_content_settings_keyboard(settings)
+                "🚧 Blocking Settings",
+                reply_markup=get_blocking_settings_keyboard(settings)
             )
         except BadRequest: pass
         await query.answer()
@@ -442,6 +679,18 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer()
         return
 
+    if data == "set_view_blocking":
+        settings = get_chat_settings(chat_id)
+        try:
+            await edit_bot_response(
+                query, context,
+                "🚧 Blocking Settings",
+                reply_markup=get_blocking_settings_keyboard(settings)
+            )
+        except BadRequest: pass
+        await query.answer()
+        return
+
     if data.startswith("set_toggle_"):
         key = data.replace("set_toggle_", "")
         settings = get_chat_settings(chat_id)
@@ -451,16 +700,6 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             current = settings.get("warn_penalty", "ban")
             new_val = "mute" if current == "ban" else "kick" if current == "mute" else "ban"
             update_chat_setting(chat_id, "warn_penalty", new_val)
-        elif key == "block_warn_penalty":
-            # Rotate: warn -> mute -> ban -> kick -> warn
-            current = settings.get("block_warn_penalty", "warn")
-            order = ["warn", "mute", "ban", "kick"]
-            try:
-                idx = order.index(current)
-                new_val = order[(idx + 1) % len(order)]
-            except ValueError:
-                new_val = "warn"
-            update_chat_setting(chat_id, "block_warn_penalty", new_val)
         elif key == "command_access":
             # Toggle: all -> admins -> all
             current = settings.get("command_access", "all")
@@ -494,8 +733,8 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     await query.edit_message_reply_markup(reply_markup=get_clean_settings_keyboard(new_settings))
             elif "auto_delete" in key: 
                 await query.edit_message_reply_markup(reply_markup=get_auto_delete_settings_keyboard(new_settings))
-            elif "block" in key: 
-                await query.edit_message_reply_markup(reply_markup=get_block_content_settings_keyboard(new_settings))
+            elif key.startswith("block_") or key == "blocking_enabled":
+                await query.edit_message_reply_markup(reply_markup=get_blocking_settings_keyboard(new_settings))
             elif "warn" in key: 
                 await query.edit_message_reply_markup(reply_markup=get_mod_settings_keyboard(new_settings))
             elif "command_deletion" in key: 
@@ -510,6 +749,8 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await query.edit_message_reply_markup(reply_markup=get_language_filter_settings_keyboard(new_settings))
             elif "command_access" in key: 
                 await query.edit_message_reply_markup(reply_markup=get_command_access_keyboard(new_settings))
+            elif key.startswith("block_") or key == "blocking_enabled":
+                await query.edit_message_reply_markup(reply_markup=get_blocking_settings_keyboard(new_settings))
         except BadRequest: pass
         await query.answer(f"Setting updated!")
         return
@@ -525,19 +766,6 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_reply_markup(reply_markup=get_mod_settings_keyboard(new_settings))
         except BadRequest: pass
         await query.answer(f"Warn limit set to {new_limit}")
-        return
-
-    if data.startswith("set_block_warn_limit_"):
-        action = data.replace("set_block_warn_limit_", "")
-        settings = get_chat_settings(chat_id)
-        current = settings.get("block_warn_limit", 3)
-        new_limit = current + 1 if action == "add" else max(1, current - 1)
-        update_chat_setting(chat_id, "block_warn_limit", new_limit)
-        new_settings = get_chat_settings(chat_id)
-        try:
-            await query.edit_message_reply_markup(reply_markup=get_block_content_settings_keyboard(new_settings))
-        except BadRequest: pass
-        await query.answer(f"Block warn limit set to {new_limit}")
         return
 
     if data.startswith("set_msg_length_"):
@@ -706,7 +934,9 @@ async def handle_setting_input(update: Update, context: ContextTypes.DEFAULT_TYP
 
 def get_settings_handlers():
     return [
-        CommandHandler(["config"], settings_menu),
+        CommandHandler(["settings", "config"], settings_menu),
+        CallbackQueryHandler(open_settings_here, pattern="^settings_open_here_"),
         CallbackQueryHandler(settings_callback, pattern="^set_"),
+        CallbackQueryHandler(settings_callback, pattern="^settings_"),
         MessageHandler(filters.ALL & ~filters.COMMAND, handle_setting_input)
     ]
