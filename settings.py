@@ -567,12 +567,16 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Redirect to new blocking settings
         settings = get_chat_settings(chat_id)
         try:
-            await edit_bot_response(
-                query, context,
-                "🚧 Blocking Settings",
-                reply_markup=get_blocking_settings_keyboard(settings)
+            await query.edit_message_text(
+                "🚧 <b>ʙʟᴏᴄᴋɪɴɢ ꜱᴇᴛᴛɪɴɢꜱ 🚧</b>\n\n"
+                "ᴄᴏɴᴛʀᴏʟ ᴡʜᴀᴛ ᴛʏᴘᴇꜱ ᴏꜰ ᴄᴏɴᴛᴇɴᴛ ᴀʀᴇ ᴀʟʟᴏᴡᴇᴅ ɪɴ ʏᴏᴜʀ ɢʀᴏᴜᴘ.\n"
+                "ᴛᴏɢɢʟᴇ ᴇᴀᴄʜ ꜱᴇᴛᴛɪɴɢ ᴛᴏ ʙʟᴏᴄᴋ ᴏʀ ᴀʟʟᴏᴡ ꜱᴘᴇᴄɪꜰɪᴄ ᴄᴏɴᴛᴇɴᴛ:",
+                reply_markup=get_blocking_settings_keyboard(settings),
+                parse_mode='HTML'
             )
-        except BadRequest: pass
+        except BadRequest as e:
+            logging.error(f"Error opening blocking settings: {e}")
+            await query.answer("Error opening settings. Please try again.", show_alert=True)
         await query.answer()
         return
 
