@@ -116,10 +116,11 @@ async def handle_blocking(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return False
         
     user_id = update.effective_user.id
-    user_perms = settings.get("user_permissions", {}).get(user_id, {})
+    user_perms = settings.get("user_permissions", {}).get(str(user_id), {})
 
     # Helper to check if user is freed from a specific block
     def is_user_freed(block_key):
+        # In user_permissions, True means freed/allowed, False/missing means blocked
         return user_perms.get(block_key, False)
 
     # Check for basic types
