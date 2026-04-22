@@ -346,6 +346,34 @@ async def handle_clean_service(update: Update, context: ContextTypes.DEFAULT_TYP
             
     return False
 
+async def resolve_user(context, chat_id, arg=None, reply_to_message=None):
+    """Resolve a user from reply, user ID, or username."""
+    # Method 1: Reply to a message
+    if reply_to_message and reply_to_message.from_user:
+        return reply_to_message.from_user
+    
+    # Method 2 & 3: User ID or username from argument
+    if arg:
+        # Remove @ if present
+        arg = arg.replace('@', '')
+        
+        # Try to parse as user ID
+        try:
+            user_id = int(arg)
+            chat = await context.bot.get_chat(user_id)
+            return chat
+        except (ValueError, Exception) as e:
+            logging.info(f"Could not resolve as user ID: {e}")
+        
+        # Try to resolve as username
+        try:
+            chat = await context.bot.get_chat(f'@{arg}')
+            return chat
+        except Exception as e:
+            logging.info(f"Could not resolve as username: {e}")
+    
+    return None
+
 async def free_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Command to exempt a user from specific blocking rules."""
     chat_id = update.effective_chat.id
@@ -356,71 +384,26 @@ async def free_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await send_bot_response(update, context, "Only admins can use the /free command.")
         return
     
-    # Check if replying to a user
-    if not update.message.reply_to_message:
+    # Try to resolve the target user
+    target_user = None
+    
+    # Check if there's an argument (user ID or username)
+    if context.args:
+        arg = context.args[0]
+        target_user = await resolve_user(context, chat_id, arg=arg, reply_to_message=update.message.reply_to_message if update.message else None)
+    elif update.message and update.message.reply_to_message:
+        # No argument, check for reply
+        target_user = await resolve_user(context, chat_id, reply_to_message=update.message.reply_to_message)
+    
+    if not target_user:
         await send_bot_response(update, context, 
-            "Usage: Reply to a user's message with /free\n\n"
+            "Usage:\n"
+            "• Reply to a user's message with /free\n"
+            "• /free <user_id> - e.g., /free 123456789\n"
+            "• /free @username - e.g., /free @exampleuser\n\n"
             "This will exempt them from all blocking rules.")
         return
     
-    target_user = update.message.reply_to_message.from_user
-    if not target_user:
-        await send_bot_response(update, context, "Could not find the user to free.")
-        return
-    
-    # Get current settings
-    settings = get_chat_settings(chat_id)
-    user_permissions = settings.get("user_permissions", {})
-    
-    # Check if user is already freed
-    already_freed = str(target_user.id) in user_permissions
-    
-    # Grant all exemptions
-    exemptions = {
-        "block_stickers": True,
-        "block_premium_sticker": True,
-        "block_link": True,
-        "block_embed_link": True,
-        "block_media": True,
-        "block_documents": True,
-        "block_forward": True,
-        "block_channel_post": True,
-        "block_command": True,
-        "block_contact": True,
-        "block_location": True,
-        "block_voice": True,
-        "block_audio": True,
-        "block_video_note": True,
-        "block_poll": True,
-        "block_dice": True,
-        "block_game": True,
-    }
-    
-    # Store with string key for MongoDB compatibility
-    user_permissions[str(target_user.id)] = exemptions
-    
-    # Update settings
-    update_chat_setting(chat_id, "user_permissions", user_permissions)
-    
-    # Create keyboard with permission button
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🛡 Permissions", callback_data=f"free_perms_{target_user.id}")]
-    ])
-    
-    # Show different message based on whether user was already freed
-    if already_freed:
-        message_text = (
-            f"[{target_user.id}] ᴡɪʟʟ ʙᴇ ᴀʟʀᴇᴀᴅʏ ꜰʀᴇᴇᴅ!\n\n"
-            f"💡 ʏᴏᴜ ᴄᴀɴ ꜱᴛɪʟʟ ᴍᴀɴᴀɢᴇ ᴛʜᴇɪʀ ʙʟᴏᴄᴋɪɴɢ ᴘᴇʀᴍɪꜱꜱɪᴏɴꜱ ʙᴇʟᴏᴡ:"
-        )
-    else:
-        message_text = (
-            f"[{target_user.id}] ᴡɪʟʟ ʙᴇ ꜰʀᴇᴇᴅ ꜰʀᴏᴍ ʙʟᴏᴄᴋɪɴɢ :\n\n"
-            f"💡 ʏᴏᴜ ᴄᴀɴ ꜱᴛɪʟʟ ᴍᴀɴᴀɢᴇ ᴛʜᴇɪʀ ʙʟᴏᴄᴋɪɴɢ ᴘᴇʀᴍɪꜱꜱɪᴏɴꜱ ʙᴇʟᴏᴡ:"
-        )
-    
-    await send_bot_response(update, context, message_text, reply_markup=keyboard)
-
 async def unfree_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Command to remove exemptions from a user."""
     chat_id = update.effective_chat.id
