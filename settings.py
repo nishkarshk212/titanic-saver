@@ -493,6 +493,8 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
     
     if data == "set_close":
+        chat_id = update.effective_chat.id
+        
         # Delete the settings message
         try:
             await query.message.delete()
@@ -500,17 +502,20 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             pass
         
         # Send "Settings saved" message
-        saved_msg = await query.message.reply_text("ꜱᴇᴛᴛɪɴɢ ꜱᴀᴠᴇᴅ ✅")
-        
-        # Delete the saved message after 5 seconds
-        if context.job_queue:
-            async def delete_job(ctx):
-                try:
-                    await saved_msg.delete()
-                except:
-                    pass
+        try:
+            saved_msg = await context.bot.send_message(chat_id=chat_id, text="ꜱᴇᴛᴛɪɴɢ ꜱᴀᴠᴇᴅ ✅")
             
-            context.job_queue.run_once(delete_job, 5)
+            # Delete the saved message after 5 seconds
+            if context.job_queue:
+                async def delete_job(ctx):
+                    try:
+                        await saved_msg.delete()
+                    except:
+                        pass
+                
+                context.job_queue.run_once(delete_job, 5)
+        except:
+            pass
         
         await query.answer()
         return
