@@ -404,6 +404,59 @@ async def free_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "This will exempt them from all blocking rules.")
         return
     
+    # Get current settings
+    settings = get_chat_settings(chat_id)
+    user_permissions = settings.get("user_permissions", {})
+    
+    # Check if user is already freed
+    already_freed = str(target_user.id) in user_permissions
+    
+    # Grant all exemptions
+    exemptions = {
+        "block_stickers": True,
+        "block_premium_sticker": True,
+        "block_link": True,
+        "block_embed_link": True,
+        "block_media": True,
+        "block_documents": True,
+        "block_forward": True,
+        "block_channel_post": True,
+        "block_command": True,
+        "block_contact": True,
+        "block_location": True,
+        "block_voice": True,
+        "block_audio": True,
+        "block_video_note": True,
+        "block_poll": True,
+        "block_dice": True,
+        "block_game": True,
+    }
+    
+    # Store with string key for MongoDB compatibility
+    user_permissions[str(target_user.id)] = exemptions
+    
+    # Update settings
+    update_chat_setting(chat_id, "user_permissions", user_permissions)
+    
+    # Create keyboard with permission button
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🛡 Permissions", callback_data=f"free_perms_{target_user.id}")]
+    ])
+    
+    # Show different message based on whether user was already freed
+    if already_freed:
+        message_text = (
+            f"[{target_user.id}] ᴡɪʟʟ ʙᴇ ᴀʟʀᴇᴀᴅʏ ꜰʀᴇᴇᴅ!\n\n"
+            f"💡 ʏᴏᴜ ᴄᴀɴ ꜱᴛɪʟʟ ᴍᴀɴᴀɢᴇ ᴛʜᴇɪʀ ʙʟᴏᴄᴋɪɴɢ ᴘᴇʀᴍɪꜱꜱɪᴏɴꜱ ʙᴇʟᴏᴡ:"
+        )
+    else:
+        message_text = (
+            f"[{target_user.id}] ᴡɪʟʟ ʙᴇ ꜰʀᴇᴇᴅ ꜰʀᴏᴍ ʙʟᴏᴄᴋɪɴɢ :\n\n"
+            f"💡 ʏᴏᴜ ᴄᴀɴ ꜱᴛɪʟʟ ᴍᴀɴᴀɢᴇ ᴛʜᴇɪʀ ʙʟᴏᴄᴋɪɴɢ ᴘᴇʀᴍɪꜱꜱɪᴏɴꜱ ʙᴇʟᴏᴡ:"
+        )
+    
+    await send_bot_response(update, context, message_text, reply_markup=keyboard)
+
 async def unfree_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Command to remove exemptions from a user."""
     chat_id = update.effective_chat.id
