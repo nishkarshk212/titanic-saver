@@ -51,6 +51,35 @@ async def get_total_zombies_count(bot):
         logging.error(f"Error counting zombies: {e}")
         return {"total_zombies": 0, "groups_checked": 0}
 
+async def get_total_blocked_count(bot):
+    """Get total count of banned/blocked members across all groups."""
+    try:
+        from moderation_manager_mongo import get_collection as get_mod_collection
+        from database import COLLECTIONS
+        
+        # Get moderation collection
+        moderation_col = get_collection(COLLECTIONS.get("moderation", "moderation"))
+        if moderation_col is None:
+            # Try alternative: check settings for banned users
+            return {"total_blocked": 0, "groups_with_bans": 0}
+        
+        total_blocked = 0
+        groups_with_bans = 0
+        
+        # Count all banned users across all groups
+        all_moderation = moderation_col.find({})
+        async for mod_doc in all_moderation:
+            if "banned_users" in mod_doc and mod_doc["banned_users"]:
+                banned_list = mod_doc["banned_users"]
+                if isinstance(banned_list, list):
+                    total_blocked += len(banned_list)
+                    groups_with_bans += 1
+        
+        return {"total_blocked": total_blocked, "groups_with_bans": groups_with_bans}
+    except Exception as e:
+        logging.error(f"Error counting blocked members: {e}")
+        return {"total_blocked": 0, "groups_with_bans": 0}
+
 def mention_html(user):
     """Create HTML mention."""
     name = html.escape((user.first_name or "User").strip())

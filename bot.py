@@ -843,7 +843,7 @@ def main():
     async def startup_notification(context: ContextTypes.DEFAULT_TYPE):
         """Send startup notification with statistics."""
         from config import log_to_channel
-        from Manager.zombie import get_total_zombies_count
+        from Manager.zombie import get_total_blocked_count, get_total_zombies_count
         from database import get_collection, COLLECTIONS
         
         try:
@@ -854,10 +854,14 @@ def main():
             total_groups = settings_col.count_documents({}) if settings_col else 0
             total_users = users_col.count_documents({}) if users_col else 0
             
-            # Get zombie count
+            # Get blocked/banned members count
+            blocked_info = await get_total_blocked_count(context.bot)
+            total_blocked = blocked_info["total_blocked"]
+            groups_with_bans = blocked_info["groups_with_bans"]
+            
+            # Get zombie count (optional)
             zombie_info = await get_total_zombies_count(context.bot)
             total_zombies = zombie_info["total_zombies"]
-            groups_checked = zombie_info["groups_checked"]
             
             # Create startup message
             startup_msg = (
@@ -865,8 +869,9 @@ def main():
                 f"📊 <b>Statistics:</b>\n"
                 f"• 👥 Total Groups: {total_groups}\n"
                 f"• 👤 Cached Users: {total_users}\n"
-                f"• 🧹 Total Freed Members: {total_zombies}\n"
-                f"• 📁 Groups Scanned: {groups_checked}\n\n"
+                f"• 🔨 Total Blocked Members: {total_blocked}\n"
+                f"• 📁 Groups with Bans: {groups_with_bans}\n"
+                f"• 🧹 Total Freed Members: {total_zombies}\n\n"
                 f"✅ Bot is now running!\n"
                 f"⏰ {__import__('datetime').datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
             )
@@ -874,7 +879,7 @@ def main():
             # Log to channel
             await log_to_channel(context, startup_msg)
             print(f"\n✅ Bot started successfully!")
-            print(f"📊 Groups: {total_groups} | Users: {total_users} | Freed Members: {total_zombies}\n")
+            print(f"📊 Groups: {total_groups} | Users: {total_users} | Blocked: {total_blocked} | Freed: {total_zombies}\n")
             
         except Exception as e:
             logging.error(f"Startup notification error: {e}")
