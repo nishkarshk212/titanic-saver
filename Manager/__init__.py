@@ -11,7 +11,6 @@ This module contains:
 - promote.py: Promote, demote, tempadmin
 - purge.py: Delete messages in bulk
 - staff.py: List admins and bots
-- sg.py: Sangmata username history checker
 - zombie.py: Clean deleted accounts
 """
 
@@ -23,7 +22,6 @@ from Manager.mass_actions import get_mass_actions_handlers
 from Manager.promote import get_promote_handlers
 from Manager.purge import get_purge_handlers
 from Manager.staff import get_staff_handlers
-from Manager.sg import get_sg_handlers
 from Manager.zombie import get_zombie_handlers
 
 def get_manager_handlers():
@@ -37,7 +35,6 @@ def get_manager_handlers():
     handlers.extend(get_promote_handlers())
     handlers.extend(get_purge_handlers())
     handlers.extend(get_staff_handlers())
-    handlers.extend(get_sg_handlers())
     handlers.extend(get_zombie_handlers())
     
     return handlers
@@ -52,6 +49,5 @@ __all__ = [
     'get_promote_handlers',
     'get_purge_handlers',
     'get_staff_handlers',
-    'get_sg_handlers',
     'get_zombie_handlers',
 ]

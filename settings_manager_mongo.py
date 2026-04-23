@@ -78,7 +78,6 @@ DEFAULT_CHAT_SETTINGS = {
     "cmd_access_staff": "all",
     "cmd_access_bots": "all",
     "cmd_access_zombies": "admin",
-    "cmd_access_sg": "all",
     "cmd_access_mass_actions": "admin"
 }
 
