@@ -21,6 +21,12 @@ async def settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
     
+    # Check command access for settings
+    from settings_manager_mongo import check_command_access
+    if not await check_command_access(chat_id, user_id, 'settings', context):
+        await send_bot_response(update, context, "You don't have permission to use the /settings command.")
+        return
+    
     # Check granular permissions (Change Info + Ban Users)
     if not await can_user_configure_settings(chat_id, user_id, context):
         await send_bot_response(update, context, "You need both 'Change Group Info' and 'Ban Users' permissions to configure settings.")
@@ -189,8 +195,10 @@ def get_main_settings_keyboard(chat_id=None):
         [InlineKeyboardButton("🔗 Link Spam", callback_data="set_view_link_spam"), 
          InlineKeyboardButton("🔄 Forward Protect", callback_data="set_view_forward_protection")],
         [InlineKeyboardButton("🔑 Cmd Access", callback_data="set_view_command_access"), 
-         InlineKeyboardButton("🌐 Language Filter", callback_data="set_view_language_filter")],
-        [InlineKeyboardButton("🚧 Blocking", callback_data="set_view_blocking")],
+         InlineKeyboardButton("🎛️ Command Perms", callback_data="set_view_command_permissions")],
+        [InlineKeyboardButton("🌐 Language Filter", callback_data="set_view_language_filter")],
+        [InlineKeyboardButton("🚧 Blocking", callback_data="set_view_blocking"),
+         InlineKeyboardButton("👥 Manager", callback_data="set_view_manager")],
         [InlineKeyboardButton("❌ Close Menu", callback_data="set_close")]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -331,8 +339,62 @@ def get_command_access_keyboard(settings):
     access = settings.get("command_access", "all").title()
     keyboard = [
         [InlineKeyboardButton(f"Command Access: {access}", callback_data="set_toggle_command_access")],
+        [InlineKeyboardButton("ℹ️ Global setting for basic commands", callback_data="set_none")],
         [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
     ]
+    return InlineKeyboardMarkup(keyboard)
+
+def get_command_permissions_keyboard(settings):
+    """Get detailed command permissions keyboard."""
+    # Define command categories with their access levels
+    commands = [
+        ("📖 Basic Commands", [
+            ("Start", "cmd_access_start"),
+            ("Help", "cmd_access_help"),
+            ("ID", "cmd_access_id"),
+            ("Info", "cmd_access_info"),
+            ("Report", "cmd_access_report"),
+        ]),
+        ("🛡️ Moderation Commands", [
+            ("Ban", "cmd_access_ban"),
+            ("Unban", "cmd_access_unban"),
+            ("Mute", "cmd_access_mute"),
+            ("Unmute", "cmd_access_unmute"),
+            ("Warn", "cmd_access_warn"),
+            ("Unwarn", "cmd_access_unwarn"),
+            ("Kick", "cmd_access_kick"),
+        ]),
+        ("👥 Management Commands", [
+            ("Purge", "cmd_access_purge"),
+            ("Pin", "cmd_access_pin"),
+            ("Unpin", "cmd_access_unpin"),
+            ("Promote", "cmd_access_promote"),
+            ("Demote", "cmd_access_demote"),
+        ]),
+        ("📋 Info & Utilities", [
+            ("Staff", "cmd_access_staff"),
+            ("Bots", "cmd_access_bots"),
+            ("Zombies", "cmd_access_zombies"),
+            ("SG (Username History)", "cmd_access_sg"),
+        ]),
+        ("⚠️ Mass Actions", [
+            ("Mass Actions", "cmd_access_mass_actions"),
+        ]),
+        ("⚙️ Settings", [
+            ("Settings/Config", "cmd_access_settings"),
+        ]),
+    ]
+    
+    keyboard = []
+    for category, cmds in commands:
+        keyboard.append([InlineKeyboardButton(f"── {category} ──", callback_data="set_none")])
+        for cmd_name, cmd_key in cmds:
+            current_access = settings.get(cmd_key, "admin").title()
+            keyboard.append([InlineKeyboardButton(f"/{cmd_name.lower()}: {current_access}", callback_data=f"set_cmd_perm_{cmd_key}")])
+    
+    keyboard.append([InlineKeyboardButton("ℹ️ Tap a command to toggle access level", callback_data="set_none")])
+    keyboard.append([InlineKeyboardButton("🔙 Back", callback_data="set_view_main")])
+    
     return InlineKeyboardMarkup(keyboard)
 
 def get_pinned_message_settings_keyboard(settings):
@@ -449,6 +511,48 @@ def get_blocking_settings_keyboard(settings):
         [InlineKeyboardButton(f"Block Dice: {dice_status}", callback_data="set_toggle_block_dice")],
         [InlineKeyboardButton(f"Block Game: {game_status}", callback_data="set_toggle_block_game")],
         [InlineKeyboardButton("ℹ️ Toggle to block content instantly", callback_data="set_none")],
+        [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+def get_manager_settings_keyboard(settings):
+    """Get Manager module settings keyboard."""
+    ban_status = "✅" if settings.get("manager_ban_enabled", True) else "❌"
+    unban_status = "✅" if settings.get("manager_unban_enabled", True) else "❌"
+    mute_status = "✅" if settings.get("manager_mute_enabled", True) else "❌"
+    unmute_status = "✅" if settings.get("manager_unmute_enabled", True) else "❌"
+    kick_status = "✅" if settings.get("manager_kick_enabled", True) else "❌"
+    promote_status = "✅" if settings.get("manager_promote_enabled", True) else "❌"
+    demote_status = "✅" if settings.get("manager_demote_enabled", True) else "❌"
+    purge_status = "✅" if settings.get("manager_purge_enabled", True) else "❌"
+    pin_status = "✅" if settings.get("manager_pin_enabled", True) else "❌"
+    mass_status = "✅" if settings.get("manager_mass_actions_enabled", True) else "❌"
+    zombie_status = "✅" if settings.get("manager_zombie_enabled", True) else "❌"
+    sg_status = "✅" if settings.get("manager_sg_enabled", True) else "❌"
+    id_status = "✅" if settings.get("manager_id_enabled", True) else "❌"
+    info_status = "✅" if settings.get("manager_info_enabled", True) else "❌"
+    
+    keyboard = [
+        [InlineKeyboardButton("── Moderation Actions ──", callback_data="set_none")],
+        [InlineKeyboardButton(f"Ban: {ban_status}", callback_data="set_toggle_manager_ban_enabled")],
+        [InlineKeyboardButton(f"Unban: {unban_status}", callback_data="set_toggle_manager_unban_enabled")],
+        [InlineKeyboardButton(f"Mute: {mute_status}", callback_data="set_toggle_manager_mute_enabled")],
+        [InlineKeyboardButton(f"Unmute: {unmute_status}", callback_data="set_toggle_manager_unmute_enabled")],
+        [InlineKeyboardButton(f"Kick: {kick_status}", callback_data="set_toggle_manager_kick_enabled")],
+        [InlineKeyboardButton("── Admin Management ──", callback_data="set_none")],
+        [InlineKeyboardButton(f"Promote: {promote_status}", callback_data="set_toggle_manager_promote_enabled")],
+        [InlineKeyboardButton(f"Demote: {demote_status}", callback_data="set_toggle_manager_demote_enabled")],
+        [InlineKeyboardButton("── Message Control ──", callback_data="set_none")],
+        [InlineKeyboardButton(f"Purge: {purge_status}", callback_data="set_toggle_manager_purge_enabled")],
+        [InlineKeyboardButton(f"Pin/Unpin: {pin_status}", callback_data="set_toggle_manager_pin_enabled")],
+        [InlineKeyboardButton("── Mass Actions ──", callback_data="set_none")],
+        [InlineKeyboardButton(f"Mass Actions: {mass_status}", callback_data="set_toggle_manager_mass_actions_enabled")],
+        [InlineKeyboardButton("── Utilities ──", callback_data="set_none")],
+        [InlineKeyboardButton(f"Zombie Clean: {zombie_status}", callback_data="set_toggle_manager_zombie_enabled")],
+        [InlineKeyboardButton(f"Username History (SG): {sg_status}", callback_data="set_toggle_manager_sg_enabled")],
+        [InlineKeyboardButton(f"ID Command: {id_status}", callback_data="set_toggle_manager_id_enabled")],
+        [InlineKeyboardButton(f"Info Command: {info_status}", callback_data="set_toggle_manager_info_enabled")],
+        [InlineKeyboardButton("ℹ️ Toggle to enable/disable commands", callback_data="set_none")],
         [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -627,6 +731,18 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer()
         return
 
+    if data == "set_view_command_permissions":
+        settings = get_chat_settings(chat_id)
+        try:
+            await edit_bot_response(
+                query, context,
+                "🎛️ <b>Command Permissions</b>\n\nConfigure who can use each command:\n• <b>All</b> - Everyone can use it\n• <b>Admin</b> - Only admins can use it\n• <b>Owner</b> - Only group owner can use it\n\nTap a command to change its access level:",
+                reply_markup=get_command_permissions_keyboard(settings)
+            )
+        except BadRequest: pass
+        await query.answer()
+        return
+
     if data == "set_view_pinned_messages":
         settings = get_chat_settings(chat_id)
         try:
@@ -699,6 +815,18 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer()
         return
 
+    if data == "set_view_manager":
+        settings = get_chat_settings(chat_id)
+        try:
+            await edit_bot_response(
+                query, context,
+                "👥 Manager Module Settings\n\nEnable or disable Manager commands:",
+                reply_markup=get_manager_settings_keyboard(settings)
+            )
+        except BadRequest: pass
+        await query.answer()
+        return
+
     if data.startswith("set_toggle_"):
         key = data.replace("set_toggle_", "")
         settings = get_chat_settings(chat_id)
@@ -759,8 +887,36 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await query.edit_message_reply_markup(reply_markup=get_command_access_keyboard(new_settings))
             elif key.startswith("block_") or key == "blocking_enabled":
                 await query.edit_message_reply_markup(reply_markup=get_blocking_settings_keyboard(new_settings))
+            elif key.startswith("manager_"):
+                await query.edit_message_reply_markup(reply_markup=get_manager_settings_keyboard(new_settings))
         except BadRequest: pass
         await query.answer(f"Setting updated!")
+        return
+
+    # Handle command permission toggles
+    if data.startswith("set_cmd_perm_"):
+        cmd_key = data.replace("set_cmd_perm_", "")
+        settings = get_chat_settings(chat_id)
+        
+        # Rotate: all -> admin -> owner -> all
+        current = settings.get(cmd_key, "admin")
+        if current == "all":
+            new_val = "admin"
+        elif current == "admin":
+            new_val = "owner"
+        else:
+            new_val = "all"
+        
+        update_chat_setting(chat_id, cmd_key, new_val)
+        
+        # Refresh the command permissions menu
+        new_settings = get_chat_settings(chat_id)
+        try:
+            await query.edit_message_reply_markup(reply_markup=get_command_permissions_keyboard(new_settings))
+        except BadRequest: pass
+        
+        access_label = new_val.title()
+        await query.answer(f"Command access set to: {access_label}")
         return
 
     if data.startswith("set_warn_limit_"):

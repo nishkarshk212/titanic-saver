@@ -40,7 +40,46 @@ DEFAULT_CHAT_SETTINGS = {
     # Emoji and special character blocking
     "emoji_block_enabled": False,
     "block_emoji_only": True,
-    "block_punctuation_only": True
+    "block_punctuation_only": True,
+    # Manager module settings
+    "manager_ban_enabled": True,
+    "manager_unban_enabled": True,
+    "manager_mute_enabled": True,
+    "manager_unmute_enabled": True,
+    "manager_kick_enabled": True,
+    "manager_promote_enabled": True,
+    "manager_demote_enabled": True,
+    "manager_purge_enabled": True,
+    "manager_pin_enabled": True,
+    "manager_mass_actions_enabled": True,
+    "manager_zombie_enabled": True,
+    "manager_sg_enabled": True,
+    "manager_id_enabled": True,
+    "manager_info_enabled": True,
+    # Command access levels (admin, member, owner)
+    "cmd_access_start": "all",
+    "cmd_access_help": "all",
+    "cmd_access_id": "all",
+    "cmd_access_info": "all",
+    "cmd_access_report": "all",
+    "cmd_access_settings": "admin",
+    "cmd_access_ban": "admin",
+    "cmd_access_unban": "admin",
+    "cmd_access_mute": "admin",
+    "cmd_access_unmute": "admin",
+    "cmd_access_warn": "admin",
+    "cmd_access_unwarn": "admin",
+    "cmd_access_kick": "admin",
+    "cmd_access_purge": "admin",
+    "cmd_access_pin": "admin",
+    "cmd_access_unpin": "admin",
+    "cmd_access_promote": "admin",
+    "cmd_access_demote": "admin",
+    "cmd_access_staff": "all",
+    "cmd_access_bots": "all",
+    "cmd_access_zombies": "admin",
+    "cmd_access_sg": "all",
+    "cmd_access_mass_actions": "admin"
 }
 
 def get_chat_settings(chat_id):
@@ -150,3 +189,51 @@ def get_all_chat_settings():
     except Exception as e:
         logging.error(f"Error getting all chat settings: {e}")
         return {}
+
+async def check_command_access(chat_id, user_id, command_name, context):
+    """
+    Check if a user has access to use a specific command.
+    
+    Args:
+        chat_id: The chat ID
+        user_id: The user ID trying to use the command
+        command_name: The command name (e.g., 'ban', 'help', 'settings')
+        context: The bot context
+    
+    Returns:
+        bool: True if user has access, False otherwise
+    """
+    from user_manager_mongo import is_user_admin
+    
+    settings = get_chat_settings(chat_id)
+    cmd_key = f"cmd_access_{command_name.lower()}"
+    access_level = settings.get(cmd_key, "admin")  # Default to admin if not set
+    
+    # Owner can always use all commands
+    try:
+        chat = await context.bot.get_chat(chat_id)
+        if chat.type in ['group', 'supergroup']:
+            admins = await context.bot.get_chat_administrators(chat_id)
+            for admin in admins:
+                if admin.user.id == user_id and admin.status == 'creator':
+                    return True  # User is the creator/owner
+    except:
+        pass
+    
+    # Check access level
+    if access_level == "all":
+        return True  # Everyone can use it
+    elif access_level == "admin":
+        return await is_user_admin(chat_id, user_id, context)  # Only admins
+    elif access_level == "owner":
+        # Only group creator
+        try:
+            admins = await context.bot.get_chat_administrators(chat_id)
+            for admin in admins:
+                if admin.user.id == user_id and admin.status == 'creator':
+                    return True
+            return False
+        except:
+            return False
+    
+    return False  # Default deny

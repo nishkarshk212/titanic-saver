@@ -22,6 +22,7 @@ from translator import get_translation_handlers
 from language_filter import get_language_handlers
 from sticker_manager import get_sticker_handlers
 from blocking_handler import get_blocking_handlers
+from Manager import get_manager_handlers
 from config import BOT_TOKEN, LOG_CHANNEL_ID, OWNER_ID, log_to_channel, send_bot_response, send_bot_media, START_VIDEOS
 from user_manager_mongo import cache_user, increment_message_count, get_user_id, get_user_stats, is_user_admin
 from settings_manager_mongo import get_chat_settings
@@ -91,18 +92,18 @@ async def cache_user_handler(update, context):
 async def info_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Command to show detailed user info."""
     chat_id = update.effective_chat.id
-    settings = get_chat_settings(chat_id)
+    user_id = update.effective_user.id
     
-    # Check access (Admin only if setting enabled)
-    if settings.get("command_access") == "admins":
-        if not await is_user_admin(chat_id, update.effective_user.id, context):
-            return # Silently ignore or send error
+    # Check command access
+    from settings_manager_mongo import check_command_access
+    if not await check_command_access(chat_id, user_id, 'info', context):
+        await send_bot_response(update, context, "You don't have permission to use the /info command.")
+        return
 
     user_id, first_name = await get_user_id(update, context)
     if not user_id:
         user = update.effective_user
         user_id, first_name = user.id, user.first_name
-    
     # Check if target is a channel
     is_channel = str(user_id).startswith('-100')
     
@@ -691,12 +692,13 @@ async def info_callback_handler(update: Update, context: ContextTypes.DEFAULT_TY
 async def get_id_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Simple command to show user ID and ensure they are cached."""
     chat_id = update.effective_chat.id
-    settings = get_chat_settings(chat_id)
+    user_id = update.effective_user.id
     
-    # Check access
-    if settings.get("command_access") == "admins":
-        if not await is_user_admin(chat_id, update.effective_user.id, context):
-            return
+    # Check command access
+    from settings_manager_mongo import check_command_access
+    if not await check_command_access(chat_id, user_id, 'id', context):
+        await send_bot_response(update, context, "You don't have permission to use the /id command.")
+        return
 
     user = update.effective_user
     chat = update.effective_chat
@@ -829,6 +831,10 @@ def main():
     # Add Blocking handlers (Group 12)
     for handler in get_blocking_handlers():
         application.add_handler(handler, group=12)
+    
+    # Add Manager handlers (Group 0) - Group management commands
+    for handler in get_manager_handlers():
+        application.add_handler(handler)
 
     # Start the bot
     print("Bot is starting...")

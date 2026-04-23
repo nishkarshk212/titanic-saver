@@ -1,0 +1,297 @@
+"""
+Manager Promote/Demote - Admin management
+Ported from AnnieXMusic to python-telegram-bot
+"""
+
+import asyncio
+from datetime import datetime, timedelta
+from telegram import Update, ChatAdministratorRights
+from telegram.ext import ContextTypes, CommandHandler
+from Manager.actions import parse_time, is_admin
+from settings_manager_mongo import get_chat_settings
+
+# Privilege presets
+LIMITED_PRIVS = ChatAdministratorRights(
+    can_change_info=False,
+    can_delete_messages=True,
+    can_invite_users=True,
+    can_pin_messages=True,
+    can_restrict_members=False,
+    can_promote_members=False,
+    can_manage_chat=True,
+    can_manage_video_chats=True,
+    is_anonymous=False,
+)
+
+FULL_PRIVS = ChatAdministratorRights(
+    can_manage_chat=True,
+    can_change_info=True,
+    can_delete_messages=True,
+    can_invite_users=True,
+    can_restrict_members=True,
+    can_pin_messages=True,
+    can_promote_members=True,
+    can_manage_video_chats=True,
+    is_anonymous=False,
+)
+
+DEMOTE_PRIVS = ChatAdministratorRights(
+    can_change_info=False,
+    can_delete_messages=False,
+    can_invite_users=False,
+    can_pin_messages=False,
+    can_restrict_members=False,
+    can_promote_members=False,
+    can_manage_chat=False,
+    can_manage_video_chats=False,
+    is_anonymous=False,
+)
+
+def get_user_and_title(update, context):
+    """Extract user and title from command."""
+    if update.message.reply_to_message:
+        user = update.message.reply_to_message.from_user
+        title = " ".join(context.args) if context.args else None
+        return user.id, user.full_name, title
+    
+    if not context.args:
+        return None, None, None
+    
+    target = context.args[0]
+    try:
+        if target.isdigit():
+            user_id = int(target)
+            title = " ".join(context.args[1:]) if len(context.args) > 1 else None
+            return user_id, str(user_id), title
+        else:
+            return target, target, " ".join(context.args[1:]) if len(context.args) > 1 else None
+    except:
+        return None, None, None
+
+async def promote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Promote user with limited rights."""
+    chat = update.effective_chat
+    user = update.effective_user
+    
+    # Check if command is enabled
+    settings = get_chat_settings(chat.id)
+    if not settings.get("manager_promote_enabled", True):
+        return await update.message.reply_text("❌ The /promote command is currently disabled.")
+    
+    if not await is_admin(chat, user.id):
+        return await update.message.reply_text("You need to be an admin to use this command.")
+    
+    user_id, name, title = get_user_and_title(update, context)
+    if not user_id:
+        return await update.message.reply_text("Usage: /promote @username [title] or reply with /promote [title]")
+    
+    try:
+        member = await chat.get_member(user_id)
+        if member.status == 'administrator':
+            return await update.message.reply_text("User is already an admin.")
+        
+        await context.bot.promote_chat_member(
+            chat.id, user_id,
+            can_change_info=LIMITED_PRIVS.can_change_info,
+            can_delete_messages=LIMITED_PRIVS.can_delete_messages,
+            can_invite_users=LIMITED_PRIVS.can_invite_users,
+            can_pin_messages=LIMITED_PRIVS.can_pin_messages,
+            can_restrict_members=LIMITED_PRIVS.can_restrict_members,
+            can_promote_members=LIMITED_PRIVS.can_promote_members,
+            can_manage_chat=LIMITED_PRIVS.can_manage_chat,
+        )
+        
+        if title:
+            try:
+                await context.bot.set_chat_administrator_custom_title(chat.id, user_id, title)
+            except:
+                title = "⚠️ Couldn't set custom title (not a supergroup)"
+        
+        admin_name = user.full_name
+        text = f"» Promoted a user in {chat.title}\n"
+        text += f" User  : {name}\n"
+        text += f" Admin : {admin_name}"
+        if title:
+            text += f"\nTitle: {title}"
+        
+        await update.message.reply_text(text)
+    except Exception as e:
+        await update.message.reply_text(f"Failed to promote user: {str(e)}")
+
+async def fullpromote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Promote user with full rights."""
+    chat = update.effective_chat
+    user = update.effective_user
+    
+    if not await is_admin(chat, user.id):
+        return await update.message.reply_text("You need to be an admin to use this command.")
+    
+    user_id, name, title = get_user_and_title(update, context)
+    if not user_id:
+        return await update.message.reply_text("Usage: /fullpromote @username [title] or reply with /fullpromote [title]")
+    
+    try:
+        member = await chat.get_member(user_id)
+        if member.status == 'administrator':
+            return await update.message.reply_text("User is already an admin.")
+        
+        await context.bot.promote_chat_member(
+            chat.id, user_id,
+            can_change_info=FULL_PRIVS.can_change_info,
+            can_delete_messages=FULL_PRIVS.can_delete_messages,
+            can_invite_users=FULL_PRIVS.can_invite_users,
+            can_pin_messages=FULL_PRIVS.can_pin_messages,
+            can_restrict_members=FULL_PRIVS.can_restrict_members,
+            can_promote_members=FULL_PRIVS.can_promote_members,
+            can_manage_chat=FULL_PRIVS.can_manage_chat,
+        )
+        
+        if title:
+            try:
+                await context.bot.set_chat_administrator_custom_title(chat.id, user_id, title)
+            except:
+                title = "⚠️ Couldn't set custom title (not a supergroup)"
+        
+        admin_name = user.full_name
+        text = f"» Fully promoted a user in {chat.title}\n"
+        text += f" User  : {name}\n"
+        text += f" Admin : {admin_name}"
+        if title:
+            text += f"\nTitle: {title}"
+        
+        await update.message.reply_text(text)
+    except Exception as e:
+        await update.message.reply_text(f"Failed to fully promote user: {str(e)}")
+
+async def demote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Demote user (remove admin rights)."""
+    chat = update.effective_chat
+    user = update.effective_user
+    
+    # Check if command is enabled
+    settings = get_chat_settings(chat.id)
+    if not settings.get("manager_demote_enabled", True):
+        return await update.message.reply_text("❌ The /demote command is currently disabled.")
+    
+    if not await is_admin(chat, user.id):
+        return await update.message.reply_text("You need to be an admin to use this command.")
+    
+    user_id, name, _ = get_user_and_title(update, context)
+    if not user_id:
+        return await update.message.reply_text("Usage: /demote @username or reply to a user with /demote")
+    
+    try:
+        member = await chat.get_member(user_id)
+        if member.status != 'administrator':
+            return await update.message.reply_text("User is not an admin.")
+        
+        await context.bot.promote_chat_member(
+            chat.id, user_id,
+            can_change_info=DEMOTE_PRIVS.can_change_info,
+            can_delete_messages=DEMOTE_PRIVS.can_delete_messages,
+            can_invite_users=DEMOTE_PRIVS.can_invite_users,
+            can_pin_messages=DEMOTE_PRIVS.can_pin_messages,
+            can_restrict_members=DEMOTE_PRIVS.can_restrict_members,
+            can_promote_members=DEMOTE_PRIVS.can_promote_members,
+            can_manage_chat=DEMOTE_PRIVS.can_manage_chat,
+        )
+        
+        admin_name = user.full_name
+        text = f"» Demoted a user in {chat.title}\n"
+        text += f" User  : {name}\n"
+        text += f" Admin : {admin_name}"
+        
+        await update.message.reply_text(text)
+    except Exception as e:
+        await update.message.reply_text(f"Failed to demote user: {str(e)}")
+
+async def tempadmin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Promote user temporarily."""
+    chat = update.effective_chat
+    user = update.effective_user
+    
+    if not await is_admin(chat, user.id):
+        return await update.message.reply_text("You need to be an admin to use this command.")
+    
+    if update.message.reply_to_message:
+        if len(context.args) < 1:
+            return await update.message.reply_text("Usage: /tempadmin @username <time> [title] or reply with /tempadmin <time> [title]")
+        target_user = update.message.reply_to_message.from_user
+        user_id = target_user.id
+        name = target_user.full_name
+        time_str = context.args[0]
+        title = " ".join(context.args[1:]) if len(context.args) > 1 else None
+    else:
+        if len(context.args) < 2:
+            return await update.message.reply_text("Usage: /tempadmin @username <time> [title] or reply with /tempadmin <time> [title]")
+        user_id = context.args[0]
+        name = user_id
+        time_str = context.args[1]
+        title = " ".join(context.args[2:]) if len(context.args) > 2 else None
+    
+    delta = parse_time(time_str)
+    if not delta:
+        return await update.message.reply_text("Invalid time format. Use s/m/h/d suffix (e.g., 1h, 30m, 2d).")
+    
+    try:
+        member = await chat.get_member(user_id)
+        if member.status == 'administrator':
+            return await update.message.reply_text("User is already an admin.")
+        
+        await context.bot.promote_chat_member(
+            chat.id, user_id,
+            can_change_info=FULL_PRIVS.can_change_info,
+            can_delete_messages=FULL_PRIVS.can_delete_messages,
+            can_invite_users=FULL_PRIVS.can_invite_users,
+            can_pin_messages=FULL_PRIVS.can_pin_messages,
+            can_restrict_members=FULL_PRIVS.can_restrict_members,
+            can_promote_members=FULL_PRIVS.can_promote_members,
+            can_manage_chat=FULL_PRIVS.can_manage_chat,
+        )
+        
+        if title:
+            try:
+                await context.bot.set_chat_administrator_custom_title(chat.id, user_id, title)
+            except:
+                title = "⚠️ Couldn't set custom title (not a supergroup)"
+        
+        admin_name = user.full_name
+        text = f"» Temp-promoted for {time_str} in {chat.title}\n"
+        text += f" User  : {name}\n"
+        text += f" Admin : {admin_name}"
+        if title:
+            text += f"\nTitle: {title}"
+        
+        await update.message.reply_text(text)
+        
+        # Auto-demote after time
+        async def auto_demote():
+            await asyncio.sleep(delta.total_seconds())
+            try:
+                await context.bot.promote_chat_member(
+                    chat.id, user_id,
+                    can_change_info=DEMOTE_PRIVS.can_change_info,
+                    can_delete_messages=DEMOTE_PRIVS.can_delete_messages,
+                    can_invite_users=DEMOTE_PRIVS.can_invite_users,
+                    can_pin_messages=DEMOTE_PRIVS.can_pin_messages,
+                    can_restrict_members=DEMOTE_PRIVS.can_restrict_members,
+                    can_promote_members=DEMOTE_PRIVS.can_promote_members,
+                    can_manage_chat=DEMOTE_PRIVS.can_manage_chat,
+                )
+                await context.bot.send_message(chat.id, f"Auto-demoted {name} after {time_str}.")
+            except:
+                pass
+        
+        asyncio.create_task(auto_demote())
+        
+    except Exception as e:
+        await update.message.reply_text(f"Failed to temporarily promote user: {str(e)}")
+
+def get_promote_handlers():
+    """Return promote handlers."""
+    return [
+        CommandHandler("promote", promote_user),
+        CommandHandler("fullpromote", fullpromote_user),
+        CommandHandler("demote", demote_user),
+        CommandHandler("tempadmin", tempadmin),
+    ]

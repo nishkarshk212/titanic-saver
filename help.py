@@ -8,12 +8,13 @@ from user_manager_mongo import is_user_admin
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Main help command."""
     chat_id = update.effective_chat.id
-    settings = get_chat_settings(chat_id)
+    user_id = update.effective_user.id
     
-    # Check access
-    if settings.get("command_access") == "admins":
-        if not await is_user_admin(chat_id, update.effective_user.id, context):
-            return
+    # Check command access
+    from settings_manager_mongo import check_command_access
+    if not await check_command_access(chat_id, user_id, 'help', context):
+        await send_bot_response(update, context, "You don't have permission to use the /help command.")
+        return
 
     keyboard = get_help_keyboard()
     await send_bot_response(
