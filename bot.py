@@ -851,8 +851,8 @@ def main():
             settings_col = get_collection(COLLECTIONS["settings"])
             users_col = get_collection(COLLECTIONS["users"])
             
-            total_groups = settings_col.count_documents({}) if settings_col else 0
-            total_users = users_col.count_documents({}) if users_col else 0
+            total_groups = settings_col.count_documents({}) if settings_col is not None else 0
+            total_users = users_col.count_documents({}) if users_col is not None else 0
             
             # Get blocked/banned members count
             blocked_info = await get_total_blocked_count(context.bot)
