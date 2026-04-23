@@ -891,7 +891,7 @@ def main():
         import asyncio
         # Wait 5 seconds for bot to fully initialize
         await asyncio.sleep(5)
-        await startup_notification(application._bot)
+        await startup_notification(application.bot)
     
     application.post_init = post_init
     
