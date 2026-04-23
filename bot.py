@@ -840,9 +840,9 @@ def main():
     print("Bot is starting...")
     
     # Add startup hook to show zombie count
-    async def startup_notification(context: ContextTypes.DEFAULT_TYPE):
+    async def startup_notification(bot):
         """Send startup notification with statistics."""
-        from config import log_to_channel
+        from config import log_to_channel, LOG_CHANNEL_ID
         from Manager.zombie import get_total_blocked_count, get_total_zombies_count
         from database import get_collection, COLLECTIONS
         
@@ -855,12 +855,12 @@ def main():
             total_users = users_col.count_documents({}) if users_col is not None else 0
             
             # Get blocked/banned members count
-            blocked_info = await get_total_blocked_count(context.bot)
+            blocked_info = await get_total_blocked_count(bot)
             total_blocked = blocked_info["total_blocked"]
             groups_with_bans = blocked_info["groups_with_bans"]
             
             # Get zombie count (optional)
-            zombie_info = await get_total_zombies_count(context.bot)
+            zombie_info = await get_total_zombies_count(bot)
             total_zombies = zombie_info["total_zombies"]
             
             # Create startup message
@@ -876,8 +876,10 @@ def main():
                 f"⏰ {__import__('datetime').datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
             )
             
-            # Log to channel
-            await log_to_channel(context, startup_msg)
+            # Send to log channel directly
+            if LOG_CHANNEL_ID:
+                await bot.send_message(chat_id=LOG_CHANNEL_ID, text=f"🔔 #LOG\n\n{startup_msg}", parse_mode='HTML')
+            
             print(f"\n✅ Bot started successfully!")
             print(f"📊 Groups: {total_groups} | Users: {total_users} | Blocked: {total_blocked} | Freed: {total_zombies}\n")
             

@@ -21,14 +21,14 @@ async def get_total_zombies_count(bot):
     try:
         settings_col = get_collection(COLLECTIONS["settings"])
         if settings_col is None:
-            return 0
+            return {"total_zombies": 0, "groups_checked": 0}
         
         # Get all group chat IDs
-        groups = settings_col.find({})
+        groups = list(settings_col.find({}))
         total_zombies = 0
         groups_checked = 0
         
-        async for group in groups:
+        for group in groups:
             chat_id = int(group["chat_id"])
             try:
                 # Count deleted accounts in this group
@@ -54,21 +54,19 @@ async def get_total_zombies_count(bot):
 async def get_total_blocked_count(bot):
     """Get total count of banned/blocked members across all groups."""
     try:
-        from moderation_manager_mongo import get_collection as get_mod_collection
         from database import COLLECTIONS
         
         # Get moderation collection
         moderation_col = get_collection(COLLECTIONS.get("moderation", "moderation"))
         if moderation_col is None:
-            # Try alternative: check settings for banned users
             return {"total_blocked": 0, "groups_with_bans": 0}
         
         total_blocked = 0
         groups_with_bans = 0
         
         # Count all banned users across all groups
-        all_moderation = moderation_col.find({})
-        async for mod_doc in all_moderation:
+        all_moderation = list(moderation_col.find({}))
+        for mod_doc in all_moderation:
             if "banned_users" in mod_doc and mod_doc["banned_users"]:
                 banned_list = mod_doc["banned_users"]
                 if isinstance(banned_list, list):
