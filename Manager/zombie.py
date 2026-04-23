@@ -5,14 +5,51 @@ Ported from AnnieXMusic to python-telegram-bot
 
 import asyncio
 import html
+import logging
 from typing import List
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler
 from telegram.constants import ChatMemberStatus
 from settings_manager_mongo import get_chat_settings
+from database import get_collection, COLLECTIONS
 
 chatQueue = set()
 stopProcess = {}
+
+async def get_total_zombies_count(bot):
+    """Get total count of deleted accounts across all groups."""
+    try:
+        settings_col = get_collection(COLLECTIONS["settings"])
+        if settings_col is None:
+            return 0
+        
+        # Get all group chat IDs
+        groups = settings_col.find({})
+        total_zombies = 0
+        groups_checked = 0
+        
+        async for group in groups:
+            chat_id = int(group["chat_id"])
+            try:
+                # Count deleted accounts in this group
+                zombie_count = 0
+                async for member in bot.get_chat_members(chat_id):
+                    if member.user.is_deleted:
+                        zombie_count += 1
+                
+                total_zombies += zombie_count
+                groups_checked += 1
+                
+                # Small delay to avoid rate limiting
+                await asyncio.sleep(0.1)
+            except Exception as e:
+                logging.warning(f"Could not check group {chat_id}: {e}")
+                continue
+        
+        return {"total_zombies": total_zombies, "groups_checked": groups_checked}
+    except Exception as e:
+        logging.error(f"Error counting zombies: {e}")
+        return {"total_zombies": 0, "groups_checked": 0}
 
 def mention_html(user):
     """Create HTML mention."""

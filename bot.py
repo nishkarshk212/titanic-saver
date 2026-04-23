@@ -838,6 +838,59 @@ def main():
 
     # Start the bot
     print("Bot is starting...")
+    
+    # Add startup hook to show zombie count
+    async def startup_notification(context: ContextTypes.DEFAULT_TYPE):
+        """Send startup notification with statistics."""
+        from config import log_to_channel
+        from Manager.zombie import get_total_zombies_count
+        from database import get_collection, COLLECTIONS
+        
+        try:
+            # Get database stats
+            settings_col = get_collection(COLLECTIONS["settings"])
+            users_col = get_collection(COLLECTIONS["users"])
+            
+            total_groups = settings_col.count_documents({}) if settings_col else 0
+            total_users = users_col.count_documents({}) if users_col else 0
+            
+            # Get zombie count
+            zombie_info = await get_total_zombies_count(context.bot)
+            total_zombies = zombie_info["total_zombies"]
+            groups_checked = zombie_info["groups_checked"]
+            
+            # Create startup message
+            startup_msg = (
+                f"🚀 <b>BOT RESTARTED</b>\n\n"
+                f"📊 <b>Statistics:</b>\n"
+                f"• 👥 Total Groups: {total_groups}\n"
+                f"• 👤 Cached Users: {total_users}\n"
+                f"• 🧹 Total Freed Members: {total_zombies}\n"
+                f"• 📁 Groups Scanned: {groups_checked}\n\n"
+                f"✅ Bot is now running!\n"
+                f"⏰ {__import__('datetime').datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            )
+            
+            # Log to channel
+            await log_to_channel(context, startup_msg)
+            print(f"\n✅ Bot started successfully!")
+            print(f"📊 Groups: {total_groups} | Users: {total_users} | Freed Members: {total_zombies}\n")
+            
+        except Exception as e:
+            logging.error(f"Startup notification error: {e}")
+            print(f"Bot started (with error: {e})")
+    
+    # Run startup notification after bot starts
+    async def post_init(application):
+        """Called after bot initialization."""
+        import asyncio
+        # Wait 5 seconds for bot to fully initialize
+        await asyncio.sleep(5)
+        await startup_notification(application._bot)
+    
+    application.post_init = post_init
+    
+    print("Bot is starting...")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == '__main__':
