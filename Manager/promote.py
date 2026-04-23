@@ -21,6 +21,9 @@ LIMITED_PRIVS = ChatAdministratorRights(
     can_manage_chat=True,
     can_manage_video_chats=True,
     is_anonymous=False,
+    can_post_stories=False,
+    can_edit_stories=False,
+    can_delete_stories=False,
 )
 
 FULL_PRIVS = ChatAdministratorRights(
@@ -33,6 +36,9 @@ FULL_PRIVS = ChatAdministratorRights(
     can_promote_members=True,
     can_manage_video_chats=True,
     is_anonymous=False,
+    can_post_stories=True,
+    can_edit_stories=True,
+    can_delete_stories=True,
 )
 
 DEMOTE_PRIVS = ChatAdministratorRights(
@@ -45,6 +51,9 @@ DEMOTE_PRIVS = ChatAdministratorRights(
     can_manage_chat=False,
     can_manage_video_chats=False,
     is_anonymous=False,
+    can_post_stories=False,
+    can_edit_stories=False,
+    can_delete_stories=False,
 )
 
 def get_user_and_title(update, context):

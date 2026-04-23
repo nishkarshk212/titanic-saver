@@ -1,0 +1,19 @@
+[Unit]
+Description=Titanic Saver Telegram Bot
+After=network.target mongod.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/telegram-bot
+ExecStart=/root/telegram-bot/venv/bin/python3 bot.py
+Restart=always
+RestartSec=10
+StandardOutput=append:/root/telegram-bot/bot.log
+StandardError=append:/root/telegram-bot/bot.log
+
+# Environment
+Environment=PATH=/root/telegram-bot/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+[Install]
+WantedBy=multi-user.target
