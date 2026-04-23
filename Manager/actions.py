@@ -6,7 +6,7 @@ Ported from AnnieXMusic to python-telegram-bot
 import asyncio
 from datetime import datetime, timedelta
 from telegram import Update, ChatPermissions, ChatMemberAdministrator, ChatMemberOwner, ChatMemberBanned, ChatMemberRestricted
-from telegram.ext import ContextTypes
+from telegram.ext import ContextTypes, CommandHandler
 from telegram.constants import ChatMemberStatus
 from settings_manager_mongo import get_chat_settings
 
