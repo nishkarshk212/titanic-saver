@@ -419,51 +419,71 @@ async def free_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_permissions = settings.get("user_permissions", {})
     
     # Check if user is already freed
-    already_freed = str(target_user.id) in user_permissions
+    user_id_str = str(target_user.id)
+    already_freed = user_id_str in user_permissions
     
-    # Grant all exemptions (default to False/disabled)
-    exemptions = {
-        "block_stickers": False,
-        "block_premium_sticker": False,
-        "block_link": False,
-        "block_embed_link": False,
-        "block_media": False,
-        "block_documents": False,
-        "block_forward": False,
-        "block_channel_post": False,
-        "block_command": False,
-        "block_contact": False,
-        "block_location": False,
-        "block_voice": False,
-        "block_audio": False,
-        "block_video_note": False,
-        "block_poll": False,
-        "block_dice": False,
-        "block_game": False,
+    # Define labels for permissions
+    blocking_labels = {
+        "block_stickers": "🎫 Stickers",
+        "block_premium_sticker": "✨ Premium",
+        "block_link": "🔗 Links",
+        "block_embed_link": "🔘 Embed",
+        "block_media": "🖼️ Media",
+        "block_documents": "📄 Files",
+        "block_audio": "🎵 Audio",
+        "block_forward": "🔄 Fwd",
+        "block_channel_post": "📢 Channel",
+        "block_command": "⌨️ Cmds",
+        "block_contact": "📱 Contact",
+        "block_location": "📍 Location",
+        "block_voice": "🎤 Voice",
+        "block_video_note": "📹 Video",
+        "block_poll": "📊 Poll",
+        "block_dice": "🎲 Dice",
+        "block_game": "🎮 Game",
     }
     
-    # Store with string key for MongoDB compatibility
-    user_permissions[str(target_user.id)] = exemptions
-    
-    # Update settings
-    update_chat_setting(chat_id, "user_permissions", user_permissions)
+    if already_freed:
+        # Get existing exemptions
+        exemptions = user_permissions[user_id_str]
+        
+        # List which ones are freed (True)
+        freed_list = []
+        for key, label in blocking_labels.items():
+            if exemptions.get(key, False):
+                freed_list.append(f"• {label} ✅")
+        
+        if freed_list:
+            freed_text = "\n".join(freed_list)
+            message_text = (
+                f"[{target_user.id}] ᴡɪʟʟ ʙᴇ ᴀʟʀᴇᴀᴅʏ ꜰʀᴇᴇᴅ!\n\n"
+                f"<b>ᴄᴜʀʀᴇɴᴛ ᴇxᴇᴍᴘᴛɪᴏɴꜱ:</b>\n{freed_text}\n\n"
+                f"💡 ʏᴏᴜ ᴄᴀɴ ꜱᴛɪʟʟ ᴍᴀɴᴀɢᴇ ᴛʜᴇɪʀ ʙʟᴏᴄᴋɪɴɢ ᴘᴇʀᴍɪꜱꜱɪᴏɴꜱ ʙᴇʟᴏᴡ:"
+            )
+        else:
+            message_text = (
+                f"[{target_user.id}] ᴡɪʟʟ ʙᴇ ᴀʟʀᴇᴀᴅʏ ꜰʀᴇᴇᴅ!\n\n"
+                f"💡 ʏᴏᴜ ᴄᴀɴ ꜱᴛɪʟʟ ᴍᴀɴᴀɢᴇ ᴛʜᴇɪʀ ʙʟᴏᴄᴋɪɴɢ ᴘᴇʀᴍɪꜱꜱɪᴏɴꜱ ʙᴇʟᴏᴡ:"
+            )
+    else:
+        # Grant all exemptions (default to False/disabled)
+        exemptions = {key: False for key in blocking_labels.keys()}
+        
+        # Store with string key for MongoDB compatibility
+        user_permissions[user_id_str] = exemptions
+        
+        # Update settings
+        update_chat_setting(chat_id, "user_permissions", user_permissions)
+        
+        message_text = (
+            f"[{target_user.id}] ᴡɪʟʟ ʙᴇ ꜰʀᴇᴇᴅ ꜰʀᴏᴍ ʙʟᴏᴄᴋɪɴɢ :\n\n"
+            f"💡 ʏᴏᴜ ᴄᴀɴ ꜱᴛɪʟʟ ᴍᴀɴᴀɢᴇ ᴛʜᴇɪʀ ʙʟᴏᴄᴋɪɴɢ ᴘᴇʀᴍɪꜱꜱɪᴏɴꜱ ʙᴇʟᴏᴡ:"
+        )
     
     # Create keyboard with permission button
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("🛡 Permissions", callback_data=f"free_perms_{target_user.id}")]
     ])
-    
-    # Show different message based on whether user was already freed
-    if already_freed:
-        message_text = (
-            f"[{target_user.id}] ᴡɪʟʟ ʙᴇ ᴀʟʀᴇᴀᴅʏ ꜰʀᴇᴇᴅ!\n\n"
-            f"💡 ʏᴏᴜ ᴄᴀɴ ꜱᴛɪʟʟ ᴍᴀɴᴀɢᴇ ᴛʜᴇɪʀ ʙʟᴏᴄᴋɪɴɢ ᴘᴇʀᴍɪꜱꜱɪᴏɴꜱ ʙᴇʟᴏᴡ:"
-        )
-    else:
-        message_text = (
-            f"[{target_user.id}] ᴡɪʟʟ ʙᴇ ꜰʀᴇᴇᴅ ꜰʀᴏᴍ ʙʟᴏᴄᴋɪɴɢ :\n\n"
-            f"💡 ʏᴏᴜ ᴄᴀɴ ꜱᴛɪʟʟ ᴍᴀɴᴀɢᴇ ᴛʜᴇɪʀ ʙʟᴏᴄᴋɪɴɢ ᴘᴇʀᴍɪꜱꜱɪᴏɴꜱ ʙᴇʟᴏᴡ:"
-        )
     
     await send_bot_response(update, context, message_text, reply_markup=keyboard)
 
