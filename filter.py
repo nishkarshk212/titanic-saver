@@ -4,6 +4,7 @@ from telegram import Update
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes, CommandHandler, MessageHandler, filters
 from filters_manager_mongo import get_chat_filters, add_chat_filter, remove_chat_filter, remove_all_chat_filters
+from user_manager_mongo import can_user_configure_settings
 from config import OWNER_ID
 
 async def set_filter(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -13,12 +14,10 @@ async def set_filter(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
     
-    # Check permissions
-    if user_id != OWNER_ID:
-        member = await context.bot.get_chat_member(chat_id, user_id)
-        if member.status not in ['administrator', 'creator']:
-            await update.message.reply_text("You must be an admin to set filters.")
-            return
+    # Check permissions (only admins with Ban + Change Info)
+    if not await can_user_configure_settings(chat_id, user_id, context):
+        await update.message.reply_text("Only admins with 'Ban Users' and 'Change Group Info' permissions can use the /filter command.")
+        return
 
     # Check if it's a reply or has enough arguments
     args = context.args
@@ -77,6 +76,13 @@ async def set_filter(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def list_filters(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """List all filters in the current chat."""
     chat_id = update.effective_chat.id
+    user_id = update.effective_user.id
+    
+    # Check permissions (only admins with Ban + Change Info)
+    if not await can_user_configure_settings(chat_id, user_id, context):
+        await update.message.reply_text("Only admins with 'Ban Users' and 'Change Group Info' permissions can use this command.")
+        return
+
     chat_filters = get_chat_filters(chat_id)
     
     if not chat_filters:
@@ -94,11 +100,10 @@ async def stop_filter(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
     
-    if user_id != OWNER_ID:
-        member = await context.bot.get_chat_member(chat_id, user_id)
-        if member.status not in ['administrator', 'creator']:
-            await update.message.reply_text("Admin only command.")
-            return
+    # Check permissions (only admins with Ban + Change Info)
+    if not await can_user_configure_settings(chat_id, user_id, context):
+        await update.message.reply_text("Only admins with 'Ban Users' and 'Change Group Info' permissions can use this command.")
+        return
 
     if not context.args:
         await update.message.reply_text("Usage: `/stop <trigger>`", parse_mode=ParseMode.MARKDOWN)
@@ -115,11 +120,10 @@ async def stop_all_filters(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
     
-    if user_id != OWNER_ID:
-        member = await context.bot.get_chat_member(chat_id, user_id)
-        if member.status not in ['administrator', 'creator']:
-            await update.message.reply_text("Admin only command.")
-            return
+    # Check permissions (only admins with Ban + Change Info)
+    if not await can_user_configure_settings(chat_id, user_id, context):
+        await update.message.reply_text("Only admins with 'Ban Users' and 'Change Group Info' permissions can use this command.")
+        return
 
     if remove_all_chat_filters(chat_id):
         await update.message.reply_text("🗑 All filters have been deleted. This cannot be undone.")

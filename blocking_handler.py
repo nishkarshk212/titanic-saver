@@ -53,7 +53,7 @@ def get_random_premium_emoji():
 
 from config import OWNER_ID, send_bot_response
 from settings_manager_mongo import get_chat_settings, update_chat_setting
-from user_manager_mongo import is_user_admin, cache_user
+from user_manager_mongo import is_user_admin, cache_user, can_user_configure_settings
 
 # DEFAULT_SETTINGS for blocking (will be merged with MongoDB settings)
 DEFAULT_BLOCKING_SETTINGS = {
@@ -435,9 +435,9 @@ async def free_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
     
-    # Only admins can use this command
-    if user_id != OWNER_ID and not await is_user_admin(chat_id, user_id, context):
-        await send_bot_response(update, context, "Only admins can use the /free command.")
+    # Only admins with specific permissions can use this command
+    if not await can_user_configure_settings(chat_id, user_id, context):
+        await send_bot_response(update, context, "Only admins with 'Ban Users' and 'Change Group Info' permissions can use the /free command.")
         return
     
     # Try to resolve the target user
@@ -540,9 +540,9 @@ async def unfree_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
     
-    # Only admins can use this command
-    if user_id != OWNER_ID and not await is_user_admin(chat_id, user_id, context):
-        await send_bot_response(update, context, "Only admins can use the /unfree command.")
+    # Only admins with specific permissions can use this command
+    if not await can_user_configure_settings(chat_id, user_id, context):
+        await send_bot_response(update, context, "Only admins with 'Ban Users' and 'Change Group Info' permissions can use the /unfree command.")
         return
     
     # Check if replying to a user
@@ -653,26 +653,33 @@ def get_user_permission_keyboard(user_id, settings):
 async def free_permission_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Show permission settings for a freed user."""
     query = update.callback_query
+    admin_id = update.effective_user.id
+    chat_id = update.effective_chat.id
+    
+    # Check permissions
+    if not await can_user_configure_settings(chat_id, admin_id, context):
+        await query.answer("You don't have permission to manage blocking exemptions.", show_alert=True)
+        return
+
     await query.answer()
     
-    user_id = int(query.data.split("_")[-1])
-    chat_id = update.effective_chat.id
+    target_user_id = int(query.data.split("_")[-1])
     
     settings = get_chat_settings(chat_id)
     
     try:
-        chat = await context.bot.get_chat(user_id)
+        chat = await context.bot.get_chat(target_user_id)
         user_name = chat.first_name or "Unknown"
     except:
         user_name = "Unknown User"
     
     message_text = (
         f"🛡 <b>ʙʟᴏᴄᴋɪɴɢ ꜱᴇᴛᴛɪɴɢꜱ 🛡</b>\n\n"
-        f"[{user_id}] ᴡɪʟʟ ʙᴇ ᴇxᴇᴍᴘᴛᴇᴅ ꜰʀᴏᴍ:\n\n"
+        f"[{target_user_id}] ᴡɪʟʟ ʙᴇ ᴇxᴇᴍᴘᴛᴇᴅ ꜰʀᴏᴍ:\n\n"
         f"ᴛᴏɢɢʟᴇ ꜰᴇᴀᴛᴜʀᴇꜱ ᴛᴏ ʙʟᴏᴄᴋ ᴄᴏɴᴛᴇɴᴛ:"
     )
     
-    keyboard = get_user_permission_keyboard(user_id, settings)
+    keyboard = get_user_permission_keyboard(target_user_id, settings)
     
     try:
         await query.edit_message_text(message_text, reply_markup=keyboard, parse_mode='HTML')
@@ -682,6 +689,14 @@ async def free_permission_callback(update: Update, context: ContextTypes.DEFAULT
 async def free_permission_toggle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Toggle a permission for a user and auto-save to database."""
     query = update.callback_query
+    admin_id = update.effective_user.id
+    chat_id = update.effective_chat.id
+    
+    # Check permissions
+    if not await can_user_configure_settings(chat_id, admin_id, context):
+        await query.answer("You don't have permission to manage blocking exemptions.", show_alert=True)
+        return
+
     await query.answer()
     
     # Parse user_id and permission key
@@ -747,16 +762,22 @@ async def free_permission_toggle(update: Update, context: ContextTypes.DEFAULT_T
 async def free_permission_save(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Save permission changes for a user (now just closes the panel since auto-save is enabled)."""
     query = update.callback_query
+    admin_id = update.effective_user.id
+    chat_id = update.effective_chat.id
+    
+    # Check permissions
+    if not await can_user_configure_settings(chat_id, admin_id, context):
+        await query.answer("You don't have permission to manage blocking exemptions.", show_alert=True)
+        return
     
     user_id = int(query.data.split("_")[-1])
     user_id_str = str(user_id)
-    chat_id = update.effective_chat.id
     
     # Clean up any temporary data (if exists from old sessions)
     if f'free_perms_{chat_id}_{user_id_str}' in context.user_data:
         del context.user_data[f'free_perms_{chat_id}_{user_id_str}']
     
-    await query.answer("✅ Permissions are already saved!", show_alert=True)
+    await query.answer("Settings saved!")
     
     # Delete the message after saving
     try:
