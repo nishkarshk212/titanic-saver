@@ -410,23 +410,51 @@ async def resolve_user(context, chat_id, arg=None, reply_to_message=None):
     
     # Method 2 & 3: User ID or username from argument
     if arg:
-        # Remove @ if present
-        arg = arg.replace('@', '')
+        # Check if it's a mention from entities
+        if isinstance(arg, str) and arg.startswith('@'):
+            from user_manager_mongo import resolve_username
+            user_id, first_name = resolve_username(arg)
+            if user_id:
+                try:
+                    chat = await context.bot.get_chat(user_id)
+                    return chat
+                except:
+                    # If bot can't get chat, return a dummy object with id and first_name
+                    class DummyUser:
+                        def __init__(self, id, first_name):
+                            self.id = id
+                            self.first_name = first_name
+                            self.username = arg.replace('@', '')
+                    return DummyUser(user_id, first_name)
+
+        # Remove @ if present for ID/Username lookup
+        clean_arg = str(arg).replace('@', '')
         
         # Try to parse as user ID
         try:
-            user_id = int(arg)
+            user_id = int(clean_arg)
             chat = await context.bot.get_chat(user_id)
             return chat
         except (ValueError, Exception) as e:
             logging.info(f"Could not resolve as user ID: {e}")
         
-        # Try to resolve as username
+        # Try to resolve as username via bot
         try:
-            chat = await context.bot.get_chat(f'@{arg}')
+            chat = await context.bot.get_chat(f'@{clean_arg}')
             return chat
         except Exception as e:
             logging.info(f"Could not resolve as username: {e}")
+            
+        # Try to resolve via database cache as last resort
+        from user_manager_mongo import resolve_username
+        user_id, first_name = resolve_username(clean_arg)
+        if user_id:
+            class DummyUser:
+                def __init__(self, id, first_name):
+                    self.id = id
+                    self.first_name = first_name
+                    self.username = clean_arg
+            return DummyUser(user_id, first_name)
     
     return None
 
@@ -489,6 +517,7 @@ async def free_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "block_game": "🎮 Game",
     }
     
+    user_name = getattr(target_user, 'first_name', f"User {target_user.id}")
     if already_freed:
         # Get existing exemptions
         exemptions = user_permissions[user_id_str]
@@ -503,29 +532,21 @@ async def free_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if freed_list:
             freed_text = "\n".join(freed_list)
             message_text = (
-                f"{random_emoji} [{target_user.id}] ᴡɪʟʟ ʙᴇ ᴀʟʀᴇᴀᴅʏ ꜰʀᴇᴇᴅ!\n\n"
+                f"{random_emoji} <b>{user_name}</b> (<code>{target_user.id}</code>) ɪꜱ ᴀʟʀᴇᴀᴅʏ ꜰʀᴇᴇᴅ!\n\n"
                 f"<b>📊 ᴄᴜʀʀᴇɴᴛ ᴇxᴇᴍᴘᴛɪᴏɴꜱ:</b>\n{freed_text}\n\n"
                 f"💡 ʏᴏᴜ ᴄᴀɴ ꜱᴛɪʟʟ ᴍᴀɴᴀɢᴇ ᴛʜᴇɪʀ ʙʟᴏᴄᴋɪɴɢ ᴘᴇʀᴍɪꜱꜱɪᴏɴꜱ ʙᴇʟᴏᴡ:"
             )
         else:
             message_text = (
-                f"{random_emoji} [{target_user.id}] ᴡɪʟʟ ʙᴇ ᴀʟʀᴇᴀᴅʏ ꜰʀᴇᴇᴅ!\n\n"
-                f"💡 ʏᴏᴜ ᴄᴀɴ ꜱᴛɪʟʟ ᴍᴀɴᴀɢᴇ ᴛʜᴇɪʀ ʙʟᴏᴄᴋɪɴɢ ᴘᴇʀᴍɪꜱꜱɪᴏɴꜱ ʙᴇʟᴏᴡ:"
+                f"{random_emoji} <b>{user_name}</b> (<code>{target_user.id}</code>) ʜᴀꜱ ᴀ ꜰʀᴇᴇ ʀᴇᴄᴏʀᴅ ʙᴜᴛ ɴᴏ ᴀᴄᴛɪᴠᴇ ᴇxᴇᴍᴘᴛɪᴏɴꜱ.\n\n"
+                f"💡 ꜱᴇʟᴇᴄᴛ ꜰᴇᴀᴛᴜʀᴇꜱ ᴛᴏ ᴇxᴇᴍᴘᴛ ᴛʜᴇᴍ ꜰʀᴏᴍ ʙʟᴏᴄᴋɪɴɢ:"
             )
     else:
-        # Grant all exemptions (default to False/disabled)
-        exemptions = {key: False for key in blocking_labels.keys()}
-        
-        # Store with string key for MongoDB compatibility
-        user_permissions[user_id_str] = exemptions
-        
-        # Update settings
-        update_chat_setting(chat_id, "user_permissions", user_permissions)
-        
+        # New entry - start with no exemptions
         random_emoji = get_random_premium_emoji()
         message_text = (
-            f"{random_emoji} [{target_user.id}] ᴡɪʟʟ ʙᴇ ꜰʀᴇᴇᴅ ꜰʀᴏᴍ ʙʟᴏᴄᴋɪɴɢ :\n\n"
-            f"💡 ʏᴏᴜ ᴄᴀɴ ꜱᴛɪʟʟ ᴍᴀɴᴀɢᴇ ᴛʜᴇɪʀ ʙʟᴏᴄᴋɪɴɢ ᴘᴇʀᴍɪꜱꜱɪᴏɴꜱ ʙᴇʟᴏᴡ:"
+            f"{random_emoji} ꜱᴇʟᴇᴄᴛ ʙʟᴏᴄᴋɪɴɢ ᴇxᴇᴍᴘᴛɪᴏɴꜱ ꜰᴏʀ <b>{user_name}</b> (<code>{target_user.id}</code>):\n\n"
+            f"ᴛᴏɢɢʟᴇ ꜰᴇᴀᴛᴜʀᴇꜱ ᴛᴏ ᴀʟʟᴏᴡ ᴛʜᴇᴍ ᴛᴏ ꜱᴇɴᴅ ᴄᴏɴᴛᴇɴᴛ:"
         )
     
     # Create keyboard with permission button
@@ -545,16 +566,21 @@ async def unfree_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await send_bot_response(update, context, "Only admins with 'Ban Users' and 'Change Group Info' permissions can use the /unfree command.")
         return
     
-    # Check if replying to a user
-    if not update.message.reply_to_message:
-        await send_bot_response(update, context, 
-            "Usage: Reply to a user's message with /unfree\n\n"
-            "This will remove all blocking exemptions from them.")
-        return
-    
-    target_user = update.message.reply_to_message.from_user
+    # Try to resolve target user
+    target_user = None
+    if context.args:
+        arg = context.args[0]
+        target_user = await resolve_user(context, chat_id, arg=arg, reply_to_message=update.message.reply_to_message if update.message else None)
+    elif update.message and update.message.reply_to_message:
+        target_user = await resolve_user(context, chat_id, reply_to_message=update.message.reply_to_message)
+
     if not target_user:
-        await send_bot_response(update, context, "Could not find the user.")
+        await send_bot_response(update, context, 
+            "Usage:\n"
+            "• Reply to a user's message with /unfree\n"
+            "• /unfree <user_id>\n"
+            "• /unfree @username\n\n"
+            "This will remove all blocking exemptions from them.")
         return
     
     # Get current settings
@@ -567,19 +593,100 @@ async def unfree_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         del user_permissions[user_id_str]
         update_chat_setting(chat_id, "user_permissions", user_permissions)
         await send_bot_response(update, context, 
-            f"❌ <b>{target_user.first_name}</b> is no longer exempt from blocking rules.")
+            f"❌ <b>{getattr(target_user, 'first_name', 'User')}</b> is no longer exempt from blocking rules.")
     else:
         await send_bot_response(update, context, 
-            f"ℹ️ <b>{target_user.first_name}</b> is not exempt from any blocking rules.")
+            f"ℹ️ <b>{getattr(target_user, 'first_name', 'User')}</b> is not exempt from any blocking rules.")
+
+async def list_freed_members(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Callback to show the list of freed members and their exemptions."""
+    query = update.callback_query
+    chat_id = update.effective_chat.id
+    user_id = update.effective_user.id
+    
+    # Check permissions
+    if not await can_user_configure_settings(chat_id, user_id, context):
+        await query.answer("You don't have permission to view freed members.", show_alert=True)
+        return
+    
+    await query.answer()
+    
+    settings = get_chat_settings(chat_id)
+    user_permissions = settings.get("user_permissions", {})
+    
+    if not user_permissions:
+        text = "📋 <b>ꜰʀᴇᴇᴅ ᴍᴇᴍʙᴇʀꜱ ʟɪꜱᴛ</b>\n\nɴᴏ ᴍᴇᴍʙᴇʀꜱ ᴀʀᴇ ᴄᴜʀʀᴇɴᴛʟʏ ᴇxᴇᴍᴘᴛᴇᴅ ꜰʀᴏᴍ ʙʟᴏᴄᴋɪɴɢ ʀᴜʟᴇꜱ."
+        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="set_view_blocking")]])
+        await query.edit_message_text(text, reply_markup=keyboard, parse_mode='HTML')
+        return
+
+    text = "📋 <b>ꜰʀᴇᴇᴅ ᴍᴇᴍʙᴇʀꜱ ʟɪꜱᴛ</b>\n\nꜱᴇʟᴇᴄᴛ ᴀ ᴍᴇᴍʙᴇʀ ᴛᴏ ᴍᴀɴᴀɢᴇ ᴛʜᴇɪʀ ᴇxᴇᴍᴘᴛɪᴏɴꜱ:\n\n"
+    keyboard_buttons = []
+    
+    # Define labels for permissions (same as in free_command)
+    blocking_labels = {
+        "block_stickers": "🎫",
+        "block_premium_sticker": "✨",
+        "block_link": "🔗",
+        "block_embed_link": "🔘",
+        "block_media": "🖼️",
+        "block_documents": "📄",
+        "block_audio": "🎵",
+        "block_forward": "🔄",
+        "block_channel_post": "📢",
+        "block_command": "⌨️",
+        "block_contact": "📱",
+        "block_location": "📍",
+        "block_voice": "🎤",
+        "block_video_note": "📹",
+        "block_poll": "📊",
+        "block_dice": "🎲",
+        "block_game": "🎮",
+    }
+
+    from user_manager_mongo import resolve_username
+    
+    for uid_str, perms in user_permissions.items():
+        # Get user name from cache or bot
+        try:
+            uid = int(uid_str)
+            user_name = f"User {uid}"
+            
+            # Try cache first
+            cached_id, cached_name = resolve_username(uid_str)
+            if cached_name:
+                user_name = cached_name
+            else:
+                # Try bot
+                try:
+                    chat = await context.bot.get_chat(uid)
+                    user_name = chat.first_name or chat.title or user_name
+                except:
+                    pass
+            
+            # Count active exemptions
+            active_exemptions = [blocking_labels[k] for k, v in perms.items() if v and k in blocking_labels]
+            exempt_str = " ".join(active_exemptions) if active_exemptions else "None"
+            
+            keyboard_buttons.append([InlineKeyboardButton(f"👤 {user_name} ({len(active_exemptions)})", callback_data=f"free_permission_{uid}")])
+            text += f"• <b>{user_name}</b> (<code>{uid}</code>)\n  └ ᴇxᴇᴍᴘᴛ: {exempt_str}\n\n"
+        except:
+            continue
+
+    keyboard_buttons.append([InlineKeyboardButton("🔙 Back", callback_data="set_view_blocking")])
+    keyboard = InlineKeyboardMarkup(keyboard_buttons)
+    
+    await query.edit_message_text(text, reply_markup=keyboard, parse_mode='HTML')
 
 def get_blocking_handlers():
     """Return all blocking handlers."""
     return [
         CommandHandler("free", free_command),
         CommandHandler("unfree", unfree_command),
-        CallbackQueryHandler(free_permission_callback, pattern="^free_perms_"),
-        CallbackQueryHandler(free_permission_toggle, pattern="^free_toggle_"),
-        CallbackQueryHandler(free_permission_save, pattern="^free_save_"),
+        CallbackQueryHandler(free_permission_callback, pattern=r"^free_perm"),
+        CallbackQueryHandler(free_permission_toggle, pattern=r"^free_toggle_"),
+        CallbackQueryHandler(free_permission_save, pattern=r"^free_save_"),
+        CallbackQueryHandler(list_freed_members, pattern=r"^free_list_members$"),
         MessageHandler(filters.ALL & filters.ChatType.GROUPS, handle_message_blocking),
     ]
 

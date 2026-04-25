@@ -198,7 +198,8 @@ def get_main_settings_keyboard(chat_id=None):
          InlineKeyboardButton("🎛️ Command Perms", callback_data="set_view_command_permissions")],
         [InlineKeyboardButton("🌐 Language Filter", callback_data="set_view_language_filter")],
         [InlineKeyboardButton("🚧 Blocking", callback_data="set_view_blocking"),
-         InlineKeyboardButton("👥 Manager", callback_data="set_view_manager")],
+         InlineKeyboardButton("📋 Freed Members", callback_data="free_list_members")],
+        [InlineKeyboardButton("👥 Manager", callback_data="set_view_manager")],
         [InlineKeyboardButton("❌ Close Menu", callback_data="set_close")]
     ]
     return InlineKeyboardMarkup(keyboard)
