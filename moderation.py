@@ -18,7 +18,9 @@ async def can_user_mute(chat_id, user_id, context):
     """Check if a user can mute/unmute (Admin or Muter)."""
     # Check if it's an anonymous admin
     if is_anonymous_admin(user_id):
+        logging.info(f"Anonymous admin detected, checking mute permissions for chat {chat_id}")
         has_perm, error_msg = await check_anonymous_admin_mute_permission(chat_id, context)
+        logging.info(f"Anonymous admin mute permission result: {has_perm}, error: {error_msg}")
         return has_perm
     
     if await is_user_admin(chat_id, user_id, context):
@@ -43,11 +45,15 @@ async def can_user_ban(chat_id, user_id, context):
     # Owner can always ban
     from config import OWNER_ID
     if user_id == OWNER_ID:
+        logging.info(f"Owner {user_id} can ban in chat {chat_id}")
         return True, None
     
     # Check if it's an anonymous admin
     if is_anonymous_admin(user_id):
-        return await check_anonymous_admin_ban_permission(chat_id, context)
+        logging.info(f"Anonymous admin detected, checking ban permissions for chat {chat_id}")
+        has_perm, error_msg = await check_anonymous_admin_ban_permission(chat_id, context)
+        logging.info(f"Anonymous admin ban permission result: {has_perm}, error: {error_msg}")
+        return has_perm, error_msg
     
     try:
         member = await context.bot.get_chat_member(chat_id, user_id)

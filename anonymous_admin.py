@@ -29,9 +29,6 @@ async def get_anonymous_admin_permissions(chat_id, context):
     Returns a dict with permission booleans or None if anonymous admin is not configured.
     """
     try:
-        # Get chat info to check if it has anonymous admins enabled
-        chat = await context.bot.get_chat(chat_id)
-        
         # Get all administrators in the chat
         admins = await context.bot.get_chat_administrators(chat_id)
         
@@ -39,32 +36,56 @@ async def get_anonymous_admin_permissions(chat_id, context):
         anonymous_admins = [admin for admin in admins if admin.is_anonymous]
         
         if not anonymous_admins:
+            logging.info(f"No anonymous admins found in chat {chat_id}")
             return None
         
-        # For anonymous admins, we need to check the bot's own permissions as a reference
-        # since we can't directly identify which anonymous admin is acting
-        # The safest approach is to check if ANY admin has the required permission
-        # and assume the anonymous admin might have it
+        # When multiple anonymous admins exist, we can't determine which specific one is acting.
+        # The best approach is to check if ANY anonymous admin has the required permissions.
+        # If at least one anonymous admin has the permission, we allow the action.
+        # This is a reasonable security model since all anonymous admins are trusted by the group.
         
-        # Get the first anonymous admin's permissions as reference
-        # Note: This is a limitation - we can't know WHICH anonymous admin is acting
-        anon_admin = anonymous_admins[0]
-        
-        return {
-            'can_change_info': anon_admin.can_change_info,
-            'can_delete_messages': anon_admin.can_delete_messages,
-            'can_restrict_members': anon_admin.can_restrict_members,
-            'can_invite_users': anon_admin.can_invite_users,
-            'can_pin_messages': anon_admin.can_pin_messages,
-            'can_post_stories': anon_admin.can_post_stories,
-            'can_edit_stories': anon_admin.can_edit_stories,
-            'can_delete_stories': anon_admin.can_delete_stories,
-            'can_manage_video_chats': anon_admin.can_manage_video_chats,
-            'can_promote_members': anon_admin.can_promote_members,
-            'is_anonymous': anon_admin.is_anonymous,
+        # Combine permissions from ALL anonymous admins (OR logic - if any has it, allow it)
+        combined_permissions = {
+            'can_change_info': False,
+            'can_delete_messages': False,
+            'can_restrict_members': False,
+            'can_invite_users': False,
+            'can_pin_messages': False,
+            'can_post_stories': False,
+            'can_edit_stories': False,
+            'can_delete_stories': False,
+            'can_manage_video_chats': False,
+            'can_promote_members': False,
+            'is_anonymous': True,
         }
+        
+        for anon_admin in anonymous_admins:
+            # Use OR logic - if any anonymous admin has the permission, enable it
+            if anon_admin.can_change_info:
+                combined_permissions['can_change_info'] = True
+            if anon_admin.can_delete_messages:
+                combined_permissions['can_delete_messages'] = True
+            if anon_admin.can_restrict_members:
+                combined_permissions['can_restrict_members'] = True
+            if anon_admin.can_invite_users:
+                combined_permissions['can_invite_users'] = True
+            if anon_admin.can_pin_messages:
+                combined_permissions['can_pin_messages'] = True
+            if hasattr(anon_admin, 'can_post_stories') and anon_admin.can_post_stories:
+                combined_permissions['can_post_stories'] = True
+            if hasattr(anon_admin, 'can_edit_stories') and anon_admin.can_edit_stories:
+                combined_permissions['can_edit_stories'] = True
+            if hasattr(anon_admin, 'can_delete_stories') and anon_admin.can_delete_stories:
+                combined_permissions['can_delete_stories'] = True
+            if anon_admin.can_manage_video_chats:
+                combined_permissions['can_manage_video_chats'] = True
+            if anon_admin.can_promote_members:
+                combined_permissions['can_promote_members'] = True
+        
+        logging.info(f"Found {len(anonymous_admins)} anonymous admin(s) in chat {chat_id}. Combined permissions: {combined_permissions}")
+        return combined_permissions
     except Exception as e:
-        logging.error(f"Error getting anonymous admin permissions: {e}")
+        logging.error(f"Error getting anonymous admin permissions in chat {chat_id}: {e}")
         return None
 
 
@@ -96,9 +117,12 @@ async def check_anonymous_admin_ban_permission(chat_id, context):
     Returns:
         tuple: (has_permission, error_message)
     """
-    if await anonymous_admin_has_permission(chat_id, context, 'can_restrict_members'):
+    has_perm = await anonymous_admin_has_permission(chat_id, context, 'can_restrict_members')
+    logging.info(f"Anonymous admin ban permission check for chat {chat_id}: {has_perm}")
+    
+    if has_perm:
         return True, None
-    return False, "❌ Anonymous admin doesn't have 'Ban Users' permission."
+    return False, "❌ Anonymous admin doesn't have 'Ban Users' permission. Please enable 'Ban Users' permission for anonymous admins in group settings."
 
 
 async def check_anonymous_admin_mute_permission(chat_id, context):
@@ -108,9 +132,12 @@ async def check_anonymous_admin_mute_permission(chat_id, context):
     Returns:
         tuple: (has_permission, error_message)
     """
-    if await anonymous_admin_has_permission(chat_id, context, 'can_restrict_members'):
+    has_perm = await anonymous_admin_has_permission(chat_id, context, 'can_restrict_members')
+    logging.info(f"Anonymous admin mute permission check for chat {chat_id}: {has_perm}")
+    
+    if has_perm:
         return True, None
-    return False, "❌ Anonymous admin doesn't have 'Ban Users' permission."
+    return False, "❌ Anonymous admin doesn't have 'Ban Users' permission. Please enable 'Ban Users' permission for anonymous admins in group settings."
 
 
 async def check_anonymous_admin_promote_permission(chat_id, context):
