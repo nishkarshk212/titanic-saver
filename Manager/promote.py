@@ -4,11 +4,13 @@ Ported from AnnieXMusic to python-telegram-bot
 """
 
 import asyncio
+import logging
 from datetime import datetime, timedelta
 from telegram import Update, ChatAdministratorRights
 from telegram.ext import ContextTypes, CommandHandler
 from Manager.actions import parse_time, is_admin
 from settings_manager_mongo import get_chat_settings
+from anonymous_admin import is_anonymous_admin, check_anonymous_admin_promote_permission
 
 # Privilege presets
 LIMITED_PRIVS = ChatAdministratorRights(
@@ -87,8 +89,14 @@ async def promote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not settings.get("manager_promote_enabled", True):
         return await update.message.reply_text("❌ The /promote command is currently disabled.")
     
-    if not await is_admin(chat, user.id):
-        return await update.message.reply_text("You need to be an admin to use this command.")
+    # Check if it's an anonymous admin
+    if is_anonymous_admin(user.id):
+        has_perm, error_msg = await check_anonymous_admin_promote_permission(chat.id, context)
+        if not has_perm:
+            return await update.message.reply_text(error_msg)
+    else:
+        if not await is_admin(chat, user.id):
+            return await update.message.reply_text("You need to be an admin to use this command.")
     
     user_id, name, title = get_user_and_title(update, context)
     if not user_id:
@@ -132,8 +140,14 @@ async def fullpromote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     user = update.effective_user
     
-    if not await is_admin(chat, user.id):
-        return await update.message.reply_text("You need to be an admin to use this command.")
+    # Check if it's an anonymous admin
+    if is_anonymous_admin(user.id):
+        has_perm, error_msg = await check_anonymous_admin_promote_permission(chat.id, context)
+        if not has_perm:
+            return await update.message.reply_text(error_msg)
+    else:
+        if not await is_admin(chat, user.id):
+            return await update.message.reply_text("You need to be an admin to use this command.")
     
     user_id, name, title = get_user_and_title(update, context)
     if not user_id:
@@ -182,8 +196,14 @@ async def demote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not settings.get("manager_demote_enabled", True):
         return await update.message.reply_text("❌ The /demote command is currently disabled.")
     
-    if not await is_admin(chat, user.id):
-        return await update.message.reply_text("You need to be an admin to use this command.")
+    # Check if it's an anonymous admin
+    if is_anonymous_admin(user.id):
+        has_perm, error_msg = await check_anonymous_admin_promote_permission(chat.id, context)
+        if not has_perm:
+            return await update.message.reply_text(error_msg)
+    else:
+        if not await is_admin(chat, user.id):
+            return await update.message.reply_text("You need to be an admin to use this command.")
     
     user_id, name, _ = get_user_and_title(update, context)
     if not user_id:
@@ -219,8 +239,14 @@ async def tempadmin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     user = update.effective_user
     
-    if not await is_admin(chat, user.id):
-        return await update.message.reply_text("You need to be an admin to use this command.")
+    # Check if it's an anonymous admin
+    if is_anonymous_admin(user.id):
+        has_perm, error_msg = await check_anonymous_admin_promote_permission(chat.id, context)
+        if not has_perm:
+            return await update.message.reply_text(error_msg)
+    else:
+        if not await is_admin(chat, user.id):
+            return await update.message.reply_text("You need to be an admin to use this command.")
     
     if update.message.reply_to_message:
         if len(context.args) < 1:

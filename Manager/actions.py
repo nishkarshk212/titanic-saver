@@ -4,11 +4,13 @@ Ported from AnnieXMusic to python-telegram-bot
 """
 
 import asyncio
+import logging
 from datetime import datetime, timedelta
 from telegram import Update, ChatPermissions, ChatMemberAdministrator, ChatMemberOwner, ChatMemberBanned, ChatMemberRestricted
 from telegram.ext import ContextTypes, CommandHandler
 from telegram.constants import ChatMemberStatus
 from settings_manager_mongo import get_chat_settings
+from anonymous_admin import is_anonymous_admin, check_anonymous_admin_ban_permission, check_anonymous_admin_mute_permission
 
 def parse_time(time_str):
     """Parse time string like '1h', '30m', '2d' into timedelta."""
@@ -58,8 +60,14 @@ async def ban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not settings.get("manager_ban_enabled", True):
         return await update.message.reply_text("❌ The /ban command is currently disabled.")
     
-    if not await is_admin(chat, user.id):
-        return await update.message.reply_text("You need to be an admin to use this command.")
+    # Check if it's an anonymous admin
+    if is_anonymous_admin(user.id):
+        has_perm, error_msg = await check_anonymous_admin_ban_permission(chat.id, context)
+        if not has_perm:
+            return await update.message.reply_text(error_msg)
+    else:
+        if not await is_admin(chat, user.id):
+            return await update.message.reply_text("You need to be an admin to use this command.")
     
     user_id, name, reason = get_user_from_args(update, context)
     if not user_id:
@@ -96,8 +104,14 @@ async def unban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not settings.get("manager_unban_enabled", True):
         return await update.message.reply_text("❌ The /unban command is currently disabled.")
     
-    if not await is_admin(chat, user.id):
-        return await update.message.reply_text("You need to be an admin to use this command.")
+    # Check if it's an anonymous admin
+    if is_anonymous_admin(user.id):
+        has_perm, error_msg = await check_anonymous_admin_ban_permission(chat.id, context)
+        if not has_perm:
+            return await update.message.reply_text(error_msg)
+    else:
+        if not await is_admin(chat, user.id):
+            return await update.message.reply_text("You need to be an admin to use this command.")
     
     user_id, name, reason = get_user_from_args(update, context)
     if not user_id:
@@ -131,8 +145,14 @@ async def mute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not settings.get("manager_mute_enabled", True):
         return await update.message.reply_text("❌ The /mute command is currently disabled.")
     
-    if not await is_admin(chat, user.id):
-        return await update.message.reply_text("You need to be an admin to use this command.")
+    # Check if it's an anonymous admin
+    if is_anonymous_admin(user.id):
+        has_perm, error_msg = await check_anonymous_admin_mute_permission(chat.id, context)
+        if not has_perm:
+            return await update.message.reply_text(error_msg)
+    else:
+        if not await is_admin(chat, user.id):
+            return await update.message.reply_text("You need to be an admin to use this command.")
     
     user_id, name, reason = get_user_from_args(update, context)
     if not user_id:
@@ -175,8 +195,14 @@ async def unmute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     user = update.effective_user
     
-    if not await is_admin(chat, user.id):
-        return await update.message.reply_text("You need to be an admin to use this command.")
+    # Check if it's an anonymous admin
+    if is_anonymous_admin(user.id):
+        has_perm, error_msg = await check_anonymous_admin_mute_permission(chat.id, context)
+        if not has_perm:
+            return await update.message.reply_text(error_msg)
+    else:
+        if not await is_admin(chat, user.id):
+            return await update.message.reply_text("You need to be an admin to use this command.")
     
     user_id, name, reason = get_user_from_args(update, context)
     if not user_id:
@@ -214,8 +240,14 @@ async def tmute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     user = update.effective_user
     
-    if not await is_admin(chat, user.id):
-        return await update.message.reply_text("You need to be an admin to use this command.")
+    # Check if it's an anonymous admin
+    if is_anonymous_admin(user.id):
+        has_perm, error_msg = await check_anonymous_admin_mute_permission(chat.id, context)
+        if not has_perm:
+            return await update.message.reply_text(error_msg)
+    else:
+        if not await is_admin(chat, user.id):
+            return await update.message.reply_text("You need to be an admin to use this command.")
     
     if update.message.reply_to_message:
         if len(context.args) < 1:
@@ -278,8 +310,14 @@ async def kick_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not settings.get("manager_kick_enabled", True):
         return await update.message.reply_text("❌ The /kick command is currently disabled.")
     
-    if not await is_admin(chat, user.id):
-        return await update.message.reply_text("You need to be an admin to use this command.")
+    # Check if it's an anonymous admin
+    if is_anonymous_admin(user.id):
+        has_perm, error_msg = await check_anonymous_admin_ban_permission(chat.id, context)
+        if not has_perm:
+            return await update.message.reply_text(error_msg)
+    else:
+        if not await is_admin(chat, user.id):
+            return await update.message.reply_text("You need to be an admin to use this command.")
     
     user_id, name, reason = get_user_from_args(update, context)
     if not user_id:
@@ -310,8 +348,14 @@ async def dban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     user = update.effective_user
     
-    if not await is_admin(chat, user.id):
-        return await update.message.reply_text("You need to be an admin to use this command.")
+    # Check if it's an anonymous admin
+    if is_anonymous_admin(user.id):
+        has_perm, error_msg = await check_anonymous_admin_ban_permission(chat.id, context)
+        if not has_perm:
+            return await update.message.reply_text(error_msg)
+    else:
+        if not await is_admin(chat, user.id):
+            return await update.message.reply_text("You need to be an admin to use this command.")
     
     if not update.message.reply_to_message:
         return await update.message.reply_text("Usage: Reply to a user's message with /dban [reason]")
@@ -345,8 +389,14 @@ async def sban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     user = update.effective_user
     
-    if not await is_admin(chat, user.id):
-        return await update.message.reply_text("You need to be an admin to use this command.")
+    # Check if it's an anonymous admin
+    if is_anonymous_admin(user.id):
+        has_perm, error_msg = await check_anonymous_admin_ban_permission(chat.id, context)
+        if not has_perm:
+            return await update.message.reply_text(error_msg)
+    else:
+        if not await is_admin(chat, user.id):
+            return await update.message.reply_text("You need to be an admin to use this command.")
     
     user_id, name, reason = get_user_from_args(update, context)
     if not user_id:
@@ -385,8 +435,14 @@ async def tban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     user = update.effective_user
     
-    if not await is_admin(chat, user.id):
-        return await update.message.reply_text("You need to be an admin to use this command.")
+    # Check if it's an anonymous admin
+    if is_anonymous_admin(user.id):
+        has_perm, error_msg = await check_anonymous_admin_ban_permission(chat.id, context)
+        if not has_perm:
+            return await update.message.reply_text(error_msg)
+    else:
+        if not await is_admin(chat, user.id):
+            return await update.message.reply_text("You need to be an admin to use this command.")
     
     if update.message.reply_to_message:
         if len(context.args) < 1:
