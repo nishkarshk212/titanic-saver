@@ -2,7 +2,7 @@ import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ChatPermissions, ChatAdministratorRights
 from telegram.ext import ContextTypes, CallbackQueryHandler, CommandHandler
 from telegram.error import BadRequest
-from user_manager_mongo import get_user_id, is_user_admin
+from user_manager_mongo import get_user_id, is_user_admin, can_user_reload
 from config import OWNER_ID, send_bot_response, edit_bot_response, log_to_channel
 from anonymous_admin import is_anonymous_admin, check_anonymous_admin_promote_permission, check_anonymous_admin_pin_permission, check_anonymous_admin_change_info_permission
 
@@ -504,9 +504,9 @@ async def reload_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
     
-    # Check if user is admin/owner
-    if not await is_user_admin(chat_id, user_id, context):
-        await send_bot_response(update, context, "You must be an admin to use the /reload command.")
+    # Check if user has specific reload permissions
+    if not await can_user_reload(chat_id, user_id, context):
+        await send_bot_response(update, context, "Only admins with 'Add Admins', 'Ban Users', and 'Change Group Info' permissions can use the /reload command.")
         return
 
     try:

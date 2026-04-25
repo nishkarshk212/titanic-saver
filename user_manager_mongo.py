@@ -203,3 +203,25 @@ async def can_user_configure_settings(chat_id, user_id, context):
         return False
     except:
         return False
+
+async def can_user_reload(chat_id, user_id, context):
+    """Check if a user can reload (Owner, Creator, or Admin with Change Info + Ban + Add Admin perms)."""
+    if not user_id: return False
+    
+    # Anonymous admins are allowed to reload as we can't check specific rights easily
+    ANONYMOUS_ADMIN_ID = 1087968824
+    if user_id == ANONYMOUS_ADMIN_ID:
+        return True
+        
+    if user_id == OWNER_ID:
+        return True
+    try:
+        member = await context.bot.get_chat_member(chat_id, user_id)
+        if member.status == 'creator':
+            return True
+        if member.status == 'administrator':
+            # Check for "Change Group Info", "Ban Users" (can_restrict_members), and "Add New Admins" (can_promote_members)
+            return member.can_change_info and member.can_restrict_members and member.can_promote_members
+        return False
+    except:
+        return False
