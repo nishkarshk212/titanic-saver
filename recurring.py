@@ -10,37 +10,20 @@ async def get_recurring_keyboard(settings):
     recurring_messages = settings.get("recurring_messages", [])
     keyboard = []
     
+    # "Add message" button
+    if len(recurring_messages) < 5: # Limit to 5 slots
+        keyboard.append([InlineKeyboardButton("➕ Add message", callback_data="set_recurring_add")])
+    
     for msg in recurring_messages:
         msg_id = msg['id']
-        active_status = "✅" if msg.get('active', False) else "❌"
-        msg_type = msg.get('type', 'time')
+        active_status = "✅ Active" if msg.get('active', False) else "❌ Inactive"
         
-        type_label = "🕒 Time" if msg_type == 'time' else "💬 Messages"
-        interval = msg.get('interval', 1440)
-        msg_interval = msg.get('message_interval', 100)
-        
-        if msg_type == 'time':
-            # Convert minutes to readable format
-            if interval >= 1440:
-                interval_str = f"Every {interval // 1440} days"
-            elif interval >= 60:
-                interval_str = f"Every {interval // 60} hours"
-            else:
-                interval_str = f"Every {interval} minutes"
-        else:
-            interval_str = f"Every {msg_interval} messages"
-            
-        msg_text = msg.get('text', 'Not set')
-        if msg_text and len(msg_text) > 20:
-            msg_text = msg_text[:17] + "..."
-            
-        keyboard.append([InlineKeyboardButton(f"🗯{msg_id} • Active {active_status}", callback_data=f"set_recurring_toggle_active_{msg_id}")])
+        # Row with [Slot Button] [Active/Inactive Toggle] [Delete Button]
         keyboard.append([
-            InlineKeyboardButton(f"├ Type: {type_label}", callback_data=f"set_recurring_toggle_type_{msg_id}"),
-            InlineKeyboardButton(f"└ {interval_str}", callback_data=f"set_recurring_config_interval_{msg_id}")
+            InlineKeyboardButton(f"🗯 {msg_id}", callback_data=f"set_recurring_config_text_{msg_id}"),
+            InlineKeyboardButton(f"{active_status}", callback_data=f"set_recurring_toggle_active_{msg_id}"),
+            InlineKeyboardButton("🗑", callback_data=f"set_recurring_delete_{msg_id}")
         ])
-        keyboard.append([InlineKeyboardButton(f"📝 Msg: {msg_text}", callback_data=f"set_recurring_config_text_{msg_id}")])
-        keyboard.append([InlineKeyboardButton("────────────────────", callback_data="set_none")])
         
     keyboard.append([InlineKeyboardButton("🔙 Back", callback_data="set_view_main")])
     return InlineKeyboardMarkup(keyboard)
@@ -52,27 +35,143 @@ async def recurring_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     settings = get_chat_settings(chat_id)
     recurring_messages = settings.get("recurring_messages", [])
     
-    if data == "set_view_recurring":
+    if data == "set_view_recurring" or data.startswith("set_recurring_toggle_") or data.startswith("set_recurring_delete_") or data == "set_recurring_add":
+        # Handle additions
+        if data == "set_recurring_add":
+            new_id = 1
+            if recurring_messages:
+                new_id = max(m['id'] for m in recurring_messages) + 1
+            
+            new_msg = {
+                "id": new_id,
+                "active": False,
+                "type": "time",
+                "interval": 1440,
+                "message_interval": 100,
+                "text": None,
+                "media": None,
+                "media_type": None,
+                "last_sent_at": None,
+                "current_message_count": 0
+            }
+            recurring_messages.append(new_msg)
+            update_chat_setting(chat_id, "recurring_messages", recurring_messages)
+            settings = get_chat_settings(chat_id)
+            await query.answer("New message slot added!")
+            
+        # Handle deletions
+        elif data.startswith("set_recurring_delete_"):
+            msg_id = int(data.split("_")[-1])
+            recurring_messages = [m for m in recurring_messages if m['id'] != msg_id]
+            update_chat_setting(chat_id, "recurring_messages", recurring_messages)
+            settings = get_chat_settings(chat_id)
+            await query.answer("Message slot deleted!")
+
+        # Handle toggles
+        elif data.startswith("set_recurring_toggle_active_"):
+            msg_id = int(data.split("_")[-1])
+            for msg in recurring_messages:
+                if msg['id'] == msg_id:
+                    msg['active'] = not msg.get('active', False)
+                    break
+            update_chat_setting(chat_id, "recurring_messages", recurring_messages)
+            settings = get_chat_settings(chat_id)
+            await query.answer("Status updated!")
+
+        # Build message text
+        text = "🕑 <b>Recurring messages</b>\n"
+        text += "From this menu you can set messages that will be sent repeatedly to the group every few minutes/hours or every few messages.\n\n"
+        text += f"<b>Current time:</b> {datetime.datetime.now().strftime('%d %b %Y, %H:%M')}\n\n"
+        
+        if not recurring_messages:
+            text += "<i>No recurring messages set.</i>"
+        else:
+            for msg in recurring_messages:
+                msg_id = msg['id']
+                active_icon = "✅" if msg.get('active', False) else "❌"
+                
+                # Format ID emoji (1 -> 1️⃣)
+                id_emoji = f"{msg_id}️⃣" if msg_id <= 10 else f"{msg_id}"
+                
+                text += f"🗯 {id_emoji} • <b>Active</b> {active_icon}\n"
+                
+                # Last sent time
+                last_sent = msg.get('last_sent_at')
+                if last_sent:
+                    if isinstance(last_sent, str):
+                        try:
+                            last_sent = datetime.datetime.fromisoformat(last_sent)
+                            time_str = last_sent.strftime("%H:%M")
+                        except:
+                            time_str = "N/A"
+                    else:
+                        time_str = last_sent.strftime("%H:%M")
+                else:
+                    time_str = "Never"
+                
+                text += f" ├ <i>Time: {time_str}</i>\n"
+                
+                # Interval
+                msg_type = msg.get('type', 'time')
+                if msg_type == 'time':
+                    interval = msg.get('interval', 1440)
+                    if interval >= 1440:
+                        interval_str = f"{interval // 1440} hours" if interval == 1440 else f"{interval // 1440} days"
+                        # Correction: 1440 mins is 24 hours. The screenshot says "Every 24 hours"
+                        if interval % 1440 == 0:
+                            interval_str = f"{interval // 60} hours"
+                        else:
+                            interval_str = f"{interval} minutes"
+                    elif interval >= 60:
+                        interval_str = f"{interval // 60} hours"
+                    else:
+                        interval_str = f"{interval} minutes"
+                    text += f" ├ <i>Every {interval_str}</i>\n"
+                else:
+                    interval = msg.get('message_interval', 100)
+                    text += f" ├ <i>Every {interval} messages</i>\n"
+                
+                # Message content status
+                msg_text = msg.get('text')
+                msg_media = msg.get('media')
+                if msg_text or msg_media:
+                    content_preview = msg_text[:20] + "..." if msg_text and len(msg_text) > 20 else (msg_text or "Media only")
+                    text += f" └ <i>Message: {content_preview}</i>\n"
+                else:
+                    text += f" └ <i>Message is not set.</i>\n"
+                text += "\n"
+
         await edit_bot_response(
             query, context,
-            "🕑 <b>Recurring Messages</b>\n\n"
-            "Set messages that will be sent repeatedly to the group every few minutes/hours or every few messages.\n\n"
-            f"Current time: {datetime.datetime.now().strftime('%d %b %Y, %H:%M')}",
+            text,
             reply_markup=await get_recurring_keyboard(settings),
             parse_mode='HTML'
         )
-        await query.answer()
         return
 
-    if data.startswith("set_recurring_toggle_active_"):
+    if data.startswith("set_recurring_config_text_"):
         msg_id = int(data.split("_")[-1])
-        for msg in recurring_messages:
-            if msg['id'] == msg_id:
-                msg['active'] = not msg.get('active', False)
-                break
-        update_chat_setting(chat_id, "recurring_messages", recurring_messages)
-        await query.edit_message_reply_markup(reply_markup=await get_recurring_keyboard(get_chat_settings(chat_id)))
-        await query.answer("Status updated!")
+        context.user_data['config_recurring_id'] = msg_id
+        
+        # Show sub-menu for message configuration
+        msg = next((m for m in recurring_messages if m['id'] == msg_id), None)
+        msg_type = msg.get('type', 'time')
+        type_label = "🕒 Time" if msg_type == 'time' else "💬 Messages"
+        
+        keyboard = [
+            [InlineKeyboardButton(f"Type: {type_label}", callback_data=f"set_recurring_toggle_type_{msg_id}")],
+            [InlineKeyboardButton("⚙️ Set Interval", callback_data=f"set_recurring_config_interval_{msg_id}")],
+            [InlineKeyboardButton("📝 Set Message Text/Media", callback_data=f"set_recurring_prompt_text_{msg_id}")],
+            [InlineKeyboardButton("🔙 Back to List", callback_data="set_view_recurring")]
+        ]
+        
+        await edit_bot_response(
+            query, context,
+            f"⚙️ <b>Configuring Recurring Message {msg_id}</b>\n\nChoose what you want to change:",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode='HTML'
+        )
+        await query.answer()
         return
 
     if data.startswith("set_recurring_toggle_type_"):
@@ -82,33 +181,12 @@ async def recurring_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 msg['type'] = 'messages' if msg.get('type', 'time') == 'time' else 'time'
                 break
         update_chat_setting(chat_id, "recurring_messages", recurring_messages)
-        await query.edit_message_reply_markup(reply_markup=await get_recurring_keyboard(get_chat_settings(chat_id)))
-        await query.answer("Type updated!")
+        # Refresh the config menu
+        query.data = f"set_recurring_config_text_{msg_id}"
+        await recurring_callback(update, context)
         return
 
-    if data.startswith("set_recurring_config_interval_"):
-        msg_id = int(data.split("_")[-1])
-        context.user_data['config_recurring_id'] = msg_id
-        context.user_data['config_state'] = 'awaiting_recurring_interval'
-        
-        msg = next((m for m in recurring_messages if m['id'] == msg_id), None)
-        msg_type = msg.get('type', 'time')
-        
-        if msg_type == 'time':
-            instruction = "Please enter the interval in minutes (e.g., 60 for 1 hour, 1440 for 1 day):"
-        else:
-            instruction = "Please enter the message interval (e.g., 100 for every 100 messages):"
-            
-        await edit_bot_response(
-            query, context,
-            f"⚙️ <b>Configuring Interval for Message {msg_id}</b>\n\n{instruction}",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Cancel", callback_data="set_view_recurring")]]),
-            parse_mode='HTML'
-        )
-        await query.answer()
-        return
-
-    if data.startswith("set_recurring_config_text_"):
+    if data.startswith("set_recurring_prompt_text_"):
         msg_id = int(data.split("_")[-1])
         context.user_data['config_recurring_id'] = msg_id
         context.user_data['config_state'] = 'awaiting_recurring_text'
