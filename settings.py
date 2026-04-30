@@ -708,7 +708,7 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
     
     # Quick response for all setting buttons
-    if data.startswith("set_") or data.startswith("mgmt_"):
+    if data.startswith("set_") or data.startswith("mgmt_") or data == "free_list_members":
         try:
             await query.answer()
         except:
@@ -785,21 +785,18 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer()
         return
 
-    if data == "set_view_block_content":
-        # Redirect to new blocking settings
+    if data == "set_view_blocking":
         settings = get_chat_settings(chat_id)
         try:
-            await query.edit_message_text(
+            await edit_bot_response(
+                query, context,
                 "🚧 <b>ʙʟᴏᴄᴋɪɴɢ ꜱᴇᴛᴛɪɴɢꜱ 🚧</b>\n\n"
                 "ᴄᴏɴᴛʀᴏʟ ᴡʜᴀᴛ ᴛʏᴘᴇꜱ ᴏꜰ ᴄᴏɴᴛᴇɴᴛ ᴀʀᴇ ᴀʟʟᴏᴡᴇᴅ ɪɴ ʏᴏᴜʀ ɢʀᴏᴜᴘ.\n"
                 "ᴛᴏɢɢʟᴇ ᴇᴀᴄʜ ꜱᴇᴛᴛɪɴɢ ᴛᴏ ʙʟᴏᴄᴋ ᴏʀ ᴀʟʟᴏᴡ ꜱᴘᴇᴄɪꜰɪᴄ ᴄᴏɴᴛᴇɴᴛ:",
                 reply_markup=get_blocking_settings_keyboard(settings),
                 parse_mode='HTML'
             )
-        except BadRequest as e:
-            logging.error(f"Error opening blocking settings: {e}")
-            await query.answer("Error opening settings. Please try again.", show_alert=True)
-        await query.answer()
+        except BadRequest: pass
         return
 
     if data == "set_view_msg_length":
@@ -1137,18 +1134,6 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_message(chat_id, f"✅ Done! Kicked {count} deleted accounts. ({errors} errors)")
             
         await query.answer("Members Management action completed.")
-        return
-
-    if data == "set_view_blocking":
-        settings = get_chat_settings(chat_id)
-        try:
-            await edit_bot_response(
-                query, context,
-                "🚧 Blocking Settings",
-                reply_markup=get_blocking_settings_keyboard(settings)
-            )
-        except BadRequest: pass
-        await query.answer()
         return
 
     if data == "set_view_manager":

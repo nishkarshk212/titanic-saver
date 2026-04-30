@@ -601,7 +601,7 @@ async def unfree_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def list_freed_members(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Callback to show the list of freed members and their exemptions."""
     query = update.callback_query
-    chat_id = update.effective_chat.id
+    chat_id = context.user_data.get('settings_chat_id', update.effective_chat.id)
     user_id = update.effective_user.id
     
     # Check permissions
@@ -761,7 +761,7 @@ async def free_permission_callback(update: Update, context: ContextTypes.DEFAULT
     """Show permission settings for a freed user."""
     query = update.callback_query
     admin_id = update.effective_user.id
-    chat_id = update.effective_chat.id
+    chat_id = context.user_data.get('settings_chat_id', update.effective_chat.id)
     
     # Check permissions
     if not await can_user_configure_settings(chat_id, admin_id, context):
@@ -797,7 +797,7 @@ async def free_permission_toggle(update: Update, context: ContextTypes.DEFAULT_T
     """Toggle a permission for a user and auto-save to database."""
     query = update.callback_query
     admin_id = update.effective_user.id
-    chat_id = update.effective_chat.id
+    chat_id = context.user_data.get('settings_chat_id', update.effective_chat.id)
     
     # Check permissions
     if not await can_user_configure_settings(chat_id, admin_id, context):
@@ -815,7 +815,6 @@ async def free_permission_toggle(update: Update, context: ContextTypes.DEFAULT_T
     # Join all parts after index 2 to get the full permission key
     perm_key = "_".join(parts[3:])
     
-    chat_id = update.effective_chat.id
     settings = get_chat_settings(chat_id)
     
     logging.info(f"[TOGGLE] Starting toggle for user {user_id_str}, key: {perm_key}")
@@ -870,7 +869,7 @@ async def free_permission_save(update: Update, context: ContextTypes.DEFAULT_TYP
     """Save permission changes for a user (now just closes the panel since auto-save is enabled)."""
     query = update.callback_query
     admin_id = update.effective_user.id
-    chat_id = update.effective_chat.id
+    chat_id = context.user_data.get('settings_chat_id', update.effective_chat.id)
     
     # Check permissions
     if not await can_user_configure_settings(chat_id, admin_id, context):
