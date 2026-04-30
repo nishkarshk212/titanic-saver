@@ -198,10 +198,59 @@ def get_main_settings_keyboard(chat_id=None):
          InlineKeyboardButton("🎛️ Command Perms", callback_data="set_view_command_permissions")],
         [InlineKeyboardButton("🌐 Language Filter", callback_data="set_view_language_filter"),
          InlineKeyboardButton("🕒 Recurring Msg", callback_data="set_view_recurring")],
+        [InlineKeyboardButton("🔗 Group Link", callback_data="set_view_group_link"),
+         InlineKeyboardButton("🚫 Banned Words", callback_data="set_view_banned_words")],
+        [InlineKeyboardButton("👥 Members Mgmt", callback_data="set_view_members_mgmt")],
         [InlineKeyboardButton("🚧 Blocking", callback_data="set_view_blocking"),
          InlineKeyboardButton("📋 Freed Members", callback_data="free_list_members")],
         [InlineKeyboardButton("👥 Manager", callback_data="set_view_manager")],
         [InlineKeyboardButton("❌ Close Menu", callback_data="set_close")]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+def get_group_link_keyboard(settings):
+    """Get group link settings keyboard."""
+    keyboard = [
+        [InlineKeyboardButton("✍️ Set", callback_data="set_config_group_link")],
+        [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+def get_banned_words_keyboard(settings):
+    """Get banned words settings keyboard."""
+    penalty = settings.get("banned_words_penalty", "off").lower()
+    deletion = "✅" if settings.get("banned_words_deletion", True) else "❌"
+    
+    keyboard = [
+        [
+            InlineKeyboardButton(f"{'❌ ' if penalty == 'off' else ''}Off", callback_data="set_banned_penalty_off"),
+            InlineKeyboardButton(f"{'❗ ' if penalty == 'warn' else ''}Warn", callback_data="set_banned_penalty_warn"),
+            InlineKeyboardButton(f"{'❗ ' if penalty == 'kick' else ''}Kick", callback_data="set_banned_penalty_kick")
+        ],
+        [
+            InlineKeyboardButton(f"{'🔊 ' if penalty == 'mute' else ''}Mute", callback_data="set_banned_penalty_mute"),
+            InlineKeyboardButton(f"{'🚫 ' if penalty == 'ban' else ''}Ban", callback_data="set_banned_penalty_ban")
+        ],
+        [InlineKeyboardButton(f"🗑️ Delete Messages {deletion}", callback_data="set_toggle_banned_words_deletion")],
+        [
+            InlineKeyboardButton("➕ Add", callback_data="set_config_banned_words_add"),
+            InlineKeyboardButton("➖ Remove", callback_data="set_config_banned_words_remove")
+        ],
+        [InlineKeyboardButton("🔤 List", callback_data="set_view_banned_words_list")],
+        [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+def get_members_mgmt_keyboard():
+    """Get members management keyboard."""
+    keyboard = [
+        [
+            InlineKeyboardButton("🔊 Unmute all", callback_data="mgmt_unmute_all"),
+            InlineKeyboardButton("🚫 Unban all", callback_data="mgmt_unban_all")
+        ],
+        [InlineKeyboardButton("❗ Kick muted/restricted users", callback_data="mgmt_kick_restricted")],
+        [InlineKeyboardButton("💀 Kick deleted accounts", callback_data="mgmt_kick_deleted")],
+        [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -809,6 +858,125 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer()
         return
 
+    if data == "set_view_group_link":
+        settings = get_chat_settings(chat_id)
+        link = settings.get("group_link")
+        status = "Activated" if link else "Deactivated"
+        text = (
+            "🔗 <b>Group link</b>\n"
+            "Here you can set the link of the group, which will be visible with the command /link.\n\n"
+            f"<b>Status:</b> {status}"
+        )
+        if link:
+            text += f"\n<b>Current Link:</b> {link}"
+            
+        try:
+            await edit_bot_response(query, context, text, reply_markup=get_group_link_keyboard(settings), parse_mode='HTML')
+        except BadRequest: pass
+        await query.answer()
+        return
+
+    if data == "set_view_banned_words":
+        settings = get_chat_settings(chat_id)
+        penalty = settings.get("banned_words_penalty", "off").title()
+        deletion = "Yes ✅" if settings.get("banned_words_deletion", True) else "No ❌"
+        text = (
+            "🔤 <b>Banned Words</b>\n"
+            "From this menu you can set a punishment for users who use the words you decide to ban.\n\n"
+            f"<b>Penalty:</b> {penalty}\n"
+            f"<b>Deletion:</b> {deletion}"
+        )
+        try:
+            await edit_bot_response(query, context, text, reply_markup=get_banned_words_keyboard(settings), parse_mode='HTML')
+        except BadRequest: pass
+        await query.answer()
+        return
+
+    if data == "set_view_banned_words_list":
+        settings = get_chat_settings(chat_id)
+        words = settings.get("banned_words", [])
+        if not words:
+            text = "No words have been banned yet."
+        else:
+            text = "📋 <b>Banned Words List:</b>\n\n"
+            text += ", ".join([f"<code>{w}</code>" for w in words])
+            
+        try:
+            await edit_bot_response(query, context, text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="set_view_banned_words")]]), parse_mode='HTML')
+        except BadRequest: pass
+        await query.answer()
+        return
+
+    if data == "set_view_members_mgmt":
+        text = (
+            "👥 <b>Members Management</b>\n"
+            "From this menu you can manage general actions on group members"
+        )
+        try:
+            await edit_bot_response(query, context, text, reply_markup=get_members_mgmt_keyboard(), parse_mode='HTML')
+        except BadRequest: pass
+        await query.answer()
+        return
+
+    if data.startswith("set_banned_penalty_"):
+        new_penalty = data.split("_")[-1]
+        update_chat_setting(chat_id, "banned_words_penalty", new_penalty)
+        # Refresh
+        query.data = "set_view_banned_words"
+        await settings_callback(update, context)
+        return
+
+    if data == "set_toggle_banned_words_deletion":
+        settings = get_chat_settings(chat_id)
+        current = settings.get("banned_words_deletion", True)
+        update_chat_setting(chat_id, "banned_words_deletion", not current)
+        # Refresh
+        query.data = "set_view_banned_words"
+        await settings_callback(update, context)
+        return
+
+    if data.startswith("mgmt_"):
+        action = data.split("_", 1)[1]
+        await query.answer(f"Action '{action}' in progress...")
+        
+        # Use existing mass action functions
+        from Manager.mass_actions import do_unmuteall, do_unbanall, do_kickall
+        
+        if action == "unmute_all":
+            await do_unmuteall(context.bot, chat_id)
+        elif action == "unban_all":
+            await do_unbanall(context.bot, chat_id)
+        elif action == "kick_restricted":
+            # Find users who are restricted
+            count, errors = 0, 0
+            async for member in context.bot.get_chat_members(chat_id):
+                if member.status == 'restricted':
+                    try:
+                        await context.bot.ban_chat_member(chat_id, member.user.id)
+                        await asyncio.sleep(0.1)
+                        await context.bot.unban_chat_member(chat_id, member.user.id)
+                        count += 1
+                    except:
+                        errors += 1
+            await context.bot.send_message(chat_id, f"✅ Done! Kicked {count} restricted users. ({errors} errors)")
+        elif action == "kick_deleted":
+            # Find deleted accounts
+            from Manager.zombie import scan_deleted_members
+            zombies = await scan_deleted_members(context.bot, chat_id)
+            count, errors = 0, 0
+            for user in zombies:
+                try:
+                    await context.bot.ban_chat_member(chat_id, user.id)
+                    await asyncio.sleep(0.1)
+                    await context.bot.unban_chat_member(chat_id, user.id)
+                    count += 1
+                except:
+                    errors += 1
+            await context.bot.send_message(chat_id, f"✅ Done! Kicked {count} deleted accounts. ({errors} errors)")
+            
+        await query.answer("Members Management action completed.")
+        return
+
     if data == "set_view_blocking":
         settings = get_chat_settings(chat_id)
         try:
@@ -1002,6 +1170,8 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if "welcome" in config_full: section = "welcome"
         elif "auto_delete" in config_full: section = "auto_delete"
         elif "msg_length" in config_full: section = "msg_length"
+        elif "group_link" in config_full: section = "group_link"
+        elif "banned_words" in config_full: section = "banned_words"
         else: section = "unknown"
         
         config_type = config_full.replace(f"{section}_", "")
@@ -1009,6 +1179,9 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         prompt_map = {
             "media": f"Please send the photo you want to use as the {section} media.",
+            "group_link": "Please send the link for this group (e.g., https://t.me/joinchat/...).",
+            "add": "Please send the word(s) you want to ban. You can send multiple words separated by space or new line.",
+            "remove": "Please send the word(s) you want to unban.",
             "text": (
                 f"˹{update.effective_user.first_name}˼, send now the message you want to set!\n\n"
                 "You can use HTML and:\n"
@@ -1098,9 +1271,31 @@ async def handle_setting_input(update: Update, context: ContextTypes.DEFAULT_TYP
         if update.message.text and update.message.text.isdigit():
             update_chat_setting(chat_id, setting_key, int(update.message.text))
             success = True
+    elif section == "group_link":
+        update_chat_setting(chat_id, "group_link", update.message.text)
+        success = True
+    elif section == "banned_words":
+        settings = get_chat_settings(chat_id)
+        current_words = settings.get("banned_words", [])
+        new_words = update.message.text.lower().split()
+        
+        if config_type == "add":
+            for word in new_words:
+                if word not in current_words:
+                    current_words.append(word)
+        elif config_type == "remove":
+            for word in new_words:
+                if word in current_words:
+                    current_words.remove(word)
+        
+        update_chat_setting(chat_id, "banned_words", current_words)
+        success = True
+
     if success:
         del context.user_data["waiting_for_config"]
-        await update.message.reply_text(f"✅ {section.title()} {config_type} updated successfully!", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(f"Back to {section.title()} Settings", callback_data=f"set_view_{section}")]]))
+        await update.message.reply_text(f"✅ {section.replace('_', ' ').title()} updated successfully!", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(f"Back to Settings", callback_data=f"set_view_{section}")]]))
+    else:
+        await update.message.reply_text("❌ Failed to update setting. Please try again.")
 
 def get_settings_handlers():
     return [

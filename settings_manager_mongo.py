@@ -95,6 +95,12 @@ DEFAULT_CHAT_SETTINGS = {
             "current_message_count": 0
         }
     ],
+    # Group Link settings
+    "group_link": None,
+    # Banned Words settings
+    "banned_words": [],
+    "banned_words_penalty": "off", # "off", "warn", "kick", "mute", "ban"
+    "banned_words_deletion": True,
     # Command access levels (admin, member, owner)
     "cmd_access_start": "all",
     "cmd_access_help": "all",

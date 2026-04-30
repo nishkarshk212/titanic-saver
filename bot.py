@@ -720,6 +720,62 @@ async def get_id_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode=ParseMode.HTML
     )
 
+async def get_link_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Command to show the group link."""
+    chat_id = update.effective_chat.id
+    settings = get_chat_settings(chat_id)
+    link = settings.get("group_link")
+    
+    if not link:
+        await send_bot_response(update, context, "❌ No group link has been set yet.")
+        return
+        
+    await send_bot_response(update, context, f"🔗 <b>Group Link:</b>\n{link}", parse_mode=ParseMode.HTML)
+
+async def check_banned_words(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Check for banned words in messages."""
+    if not update.effective_chat or not update.message or not update.message.text:
+        return
+        
+    chat_id = update.effective_chat.id
+    user_id = update.effective_user.id
+    
+    # Skip admins
+    if await is_user_admin(chat_id, user_id, context):
+        return
+        
+    settings = get_chat_settings(chat_id)
+    banned_words = settings.get("banned_words", [])
+    
+    if not banned_words:
+        return
+        
+    text = update.message.text.lower()
+    found_words = [word for word in banned_words if word in text]
+    
+    if found_words:
+        # Delete message if enabled
+        if settings.get("banned_words_deletion", True):
+            try:
+                await update.message.delete()
+            except: pass
+            
+        # Apply penalty
+        penalty = settings.get("banned_words_penalty", "off").lower()
+        if penalty == "off":
+            return
+            
+        from moderation import warn_command, ban_command, mute_command, kick_command
+        # Create mock context and update for moderation commands
+        if penalty == "warn":
+            await warn_command(update, context)
+        elif penalty == "ban":
+            await ban_command(update, context)
+        elif penalty == "mute":
+            await mute_command(update, context)
+        elif penalty == "kick":
+            await kick_command(update, context)
+
 def main():
     """Main function to run the bot."""
     if not BOT_TOKEN:
@@ -741,6 +797,7 @@ def main():
     # Add general handlers (Group 0)
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("id", get_id_command))
+    application.add_handler(CommandHandler("link", get_link_command))
     application.add_handler(CommandHandler("info", info_command))
     application.add_handler(CommandHandler("report", report_command))
     application.add_handler(MessageHandler(
@@ -847,6 +904,9 @@ def main():
     if application.job_queue:
         application.job_queue.run_repeating(check_recurring_messages, interval=60, first=10)
     
+    # Banned words check (Group 15)
+    application.add_handler(MessageHandler(filters.TEXT & filters.ChatType.GROUPS & ~filters.COMMAND, check_banned_words), group=15)
+
     # Add Manager handlers (Group 0) - Group management commands
     for handler in get_manager_handlers():
         application.add_handler(handler)
