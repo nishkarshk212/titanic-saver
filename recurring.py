@@ -375,6 +375,6 @@ async def count_recurring_messages(update: Update, context: ContextTypes.DEFAULT
 
 def get_recurring_handlers():
     return [
-        CallbackQueryHandler(recurring_callback, pattern="^set_(view_recurring|recurring_toggle_|recurring_config_)"),
+        CallbackQueryHandler(recurring_callback, pattern="^set_(view_recurring|recurring_)"),
         MessageHandler(filters.ALL & ~filters.COMMAND, handle_recurring_config_input)
     ]

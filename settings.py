@@ -708,7 +708,7 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer()
         return
 
-    if data == "set_view_recurring":
+    if data == "set_view_recurring" or data.startswith("set_recurring_"):
         from recurring import recurring_callback
         await recurring_callback(update, context)
         return
