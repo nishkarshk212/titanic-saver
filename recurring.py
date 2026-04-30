@@ -174,6 +174,28 @@ async def recurring_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await query.answer()
         return
 
+    if data.startswith("set_recurring_config_interval_"):
+        msg_id = int(data.split("_")[-1])
+        context.user_data['config_recurring_id'] = msg_id
+        context.user_data['config_state'] = 'awaiting_recurring_interval'
+        
+        msg = next((m for m in recurring_messages if m['id'] == msg_id), None)
+        msg_type = msg.get('type', 'time')
+        
+        if msg_type == 'time':
+            instruction = "Please enter the interval in minutes (e.g., 60 for 1 hour, 1440 for 1 day):"
+        else:
+            instruction = "Please enter the message interval (e.g., 100 for every 100 messages):"
+            
+        await edit_bot_response(
+            query, context,
+            f"⚙️ <b>Configuring Interval for Message {msg_id}</b>\n\n{instruction}",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Cancel", callback_data=f"set_recurring_config_text_{msg_id}")]]),
+            parse_mode='HTML'
+        )
+        await query.answer()
+        return
+
     if data.startswith("set_recurring_toggle_type_"):
         msg_id = int(data.split("_")[-1])
         for msg in recurring_messages:
