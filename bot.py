@@ -22,6 +22,7 @@ from translator import get_translation_handlers
 from language_filter import get_language_handlers
 from sticker_manager import get_sticker_handlers
 from blocking_handler import get_blocking_handlers
+from recurring import get_recurring_handlers, check_recurring_messages, count_recurring_messages
 from Manager import get_manager_handlers
 from config import BOT_TOKEN, LOG_CHANNEL_ID, OWNER_ID, log_to_channel, send_bot_response, send_bot_media, START_VIDEOS
 from user_manager_mongo import cache_user, increment_message_count, get_user_id, get_user_stats, is_user_admin
@@ -831,6 +832,20 @@ def main():
     # Add Blocking handlers (Group 12)
     for handler in get_blocking_handlers():
         application.add_handler(handler, group=12)
+    
+    # Add Recurring Message handlers (Group 13)
+    for handler in get_recurring_handlers():
+        if isinstance(handler, MessageHandler) and not isinstance(handler, CommandHandler):
+            application.add_handler(handler, group=13)
+        else:
+            application.add_handler(handler)
+    
+    # Message count for recurring messages (Group 14)
+    application.add_handler(MessageHandler(filters.ALL & filters.ChatType.GROUPS, count_recurring_messages), group=14)
+
+    # Add Recurring Messages background job
+    if application.job_queue:
+        application.job_queue.run_repeating(check_recurring_messages, interval=60, first=10)
     
     # Add Manager handlers (Group 0) - Group management commands
     for handler in get_manager_handlers():

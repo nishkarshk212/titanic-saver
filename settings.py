@@ -196,7 +196,8 @@ def get_main_settings_keyboard(chat_id=None):
          InlineKeyboardButton("🔄 Forward Protect", callback_data="set_view_forward_protection")],
         [InlineKeyboardButton("🔑 Cmd Access", callback_data="set_view_command_access"), 
          InlineKeyboardButton("🎛️ Command Perms", callback_data="set_view_command_permissions")],
-        [InlineKeyboardButton("🌐 Language Filter", callback_data="set_view_language_filter")],
+        [InlineKeyboardButton("🌐 Language Filter", callback_data="set_view_language_filter"),
+         InlineKeyboardButton("🕒 Recurring Msg", callback_data="set_view_recurring")],
         [InlineKeyboardButton("🚧 Blocking", callback_data="set_view_blocking"),
          InlineKeyboardButton("📋 Freed Members", callback_data="free_list_members")],
         [InlineKeyboardButton("👥 Manager", callback_data="set_view_manager")],
@@ -705,6 +706,11 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         except BadRequest: pass
         await query.answer()
+        return
+
+    if data == "set_view_recurring":
+        from recurring import recurring_callback
+        await recurring_callback(update, context)
         return
 
     if data == "set_view_command_deletion":

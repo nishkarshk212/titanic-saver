@@ -56,6 +56,45 @@ DEFAULT_CHAT_SETTINGS = {
     "manager_sg_enabled": True,
     "manager_id_enabled": True,
     "manager_info_enabled": True,
+    # Recurring messages settings
+    "recurring_messages": [
+        {
+            "id": 1,
+            "active": False,
+            "type": "time", # "time" or "messages"
+            "interval": 1440, # minutes (default 24 hours)
+            "message_interval": 100, # every 100 messages
+            "text": None,
+            "media": None,
+            "media_type": None,
+            "last_sent_at": None,
+            "current_message_count": 0
+        },
+        {
+            "id": 2,
+            "active": False,
+            "type": "time",
+            "interval": 1440,
+            "message_interval": 100,
+            "text": None,
+            "media": None,
+            "media_type": None,
+            "last_sent_at": None,
+            "current_message_count": 0
+        },
+        {
+            "id": 3,
+            "active": False,
+            "type": "time",
+            "interval": 1440,
+            "message_interval": 100,
+            "text": None,
+            "media": None,
+            "media_type": None,
+            "last_sent_at": None,
+            "current_message_count": 0
+        }
+    ],
     # Command access levels (admin, member, owner)
     "cmd_access_start": "all",
     "cmd_access_help": "all",
