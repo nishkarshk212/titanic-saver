@@ -720,9 +720,136 @@ async def get_id_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode=ParseMode.HTML
     )
 
+async def check_command_permission(update: Update, context: ContextTypes.DEFAULT_TYPE, command: str) -> bool:
+    """Check if the user has permission to use a command based on settings."""
+    if not update.effective_chat:
+        return True
+    
+    chat_id = update.effective_chat.id
+    user_id = update.effective_user.id
+    
+    # Always allow in private
+    if update.effective_chat.type == 'private':
+        return True
+        
+    settings = get_chat_settings(chat_id)
+    perms = settings.get("command_permissions", {})
+    level = perms.get(command, "all")
+    
+    if level == "all":
+        return True
+    elif level == "staff":
+        return await is_user_admin(chat_id, user_id, context)
+    elif level == "private":
+        # Handled by command implementation (redirect to private)
+        return True
+    elif level == "nobody":
+        return False
+    return True
+
+async def send_rules_message(bot, chat_id, target_chat_id, settings):
+    """Helper to send the formatted rules message."""
+    text = settings.get("rules_text", "No rules have been set for this group yet.")
+    media = settings.get("rules_media")
+    media_type = settings.get("rules_media_type")
+    buttons = settings.get("rules_buttons", [])
+    
+    reply_markup = None
+    if buttons:
+        keyboard = []
+        for btn in buttons:
+            keyboard.append([InlineKeyboardButton(btn['label'], url=btn['url'])])
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+    try:
+        if media:
+            if media_type == "photo":
+                await bot.send_photo(target_chat_id, media, caption=text, reply_markup=reply_markup, parse_mode='HTML')
+            elif media_type == "video":
+                await bot.send_video(target_chat_id, media, caption=text, reply_markup=reply_markup, parse_mode='HTML')
+        else:
+            await bot.send_message(target_chat_id, text, reply_markup=reply_markup, parse_mode='HTML')
+        return True
+    except Exception as e:
+        logging.error(f"Error sending rules: {e}")
+        return False
+
+async def rules_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Command to show group rules."""
+    if not update.effective_chat: return
+    
+    chat_id = update.effective_chat.id
+    if not await check_command_permission(update, context, "rules"):
+        return
+        
+    settings = get_chat_settings(chat_id)
+    perms = settings.get("command_permissions", {})
+    
+    if perms.get("rules") == "private":
+        # Send in private
+        success = await send_rules_message(context.bot, chat_id, update.effective_user.id, settings)
+        if success:
+            await update.message.reply_text("✅ I've sent the rules to you in private chat.")
+        else:
+            await update.message.reply_text("❌ I couldn't send you the rules. Please make sure you've started me in private.")
+    else:
+        await send_rules_message(context.bot, chat_id, chat_id, settings)
+
+async def me_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Command to show user info."""
+    user = update.effective_user
+    text = (
+        f"👤 <b>User Info</b>\n\n"
+        f"<b>Name:</b> {user.full_name}\n"
+        f"<b>ID:</b> <code>{user.id}</code>\n"
+        f"<b>Username:</b> @{user.username if user.username else 'None'}"
+    )
+    
+    if update.effective_chat.type != 'private':
+        chat_id = update.effective_chat.id
+        settings = get_chat_settings(chat_id)
+        perms = settings.get("command_permissions", {})
+        if perms.get("me") == "private":
+            try:
+                await context.bot.send_message(user.id, text, parse_mode='HTML')
+                await update.message.reply_text("✅ I've sent your info to you in private chat.")
+                return
+            except:
+                pass # Fallback to group if private fails? Or just error
+                
+    await update.message.reply_text(text, parse_mode='HTML')
+
+async def staff_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Command to show group staff."""
+    if not update.effective_chat: return
+    chat_id = update.effective_chat.id
+    
+    if not await check_command_permission(update, context, "staff"):
+        return
+        
+    admins = await context.bot.get_chat_administrators(chat_id)
+    text = "👮 <b>Group Staff:</b>\n\n"
+    for admin in admins:
+        status = "Owner" if admin.status == 'creator' else "Admin"
+        name = admin.user.full_name
+        text += f"• {name} ({status})\n"
+        
+    await update.message.reply_text(text, parse_mode='HTML')
+
+async def translate_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Placeholder for translate command."""
+    if not await check_command_permission(update, context, "translate"):
+        return
+    await update.message.reply_text("🌐 Translation feature is coming soon!")
+
 async def get_link_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Command to show the group link."""
+    if not update.effective_chat: return
     chat_id = update.effective_chat.id
+    
+    if not await check_command_permission(update, context, "link"):
+        return
+        
     settings = get_chat_settings(chat_id)
     link = settings.get("group_link")
     
@@ -798,6 +925,10 @@ def main():
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("id", get_id_command))
     application.add_handler(CommandHandler("link", get_link_command))
+    application.add_handler(CommandHandler("rules", rules_command))
+    application.add_handler(CommandHandler("staff", staff_command))
+    application.add_handler(CommandHandler("me", me_command))
+    application.add_handler(CommandHandler("translate", translate_command))
     application.add_handler(CommandHandler("info", info_command))
     application.add_handler(CommandHandler("report", report_command))
     application.add_handler(MessageHandler(

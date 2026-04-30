@@ -200,7 +200,8 @@ def get_main_settings_keyboard(chat_id=None):
          InlineKeyboardButton("🕒 Recurring Msg", callback_data="set_view_recurring")],
         [InlineKeyboardButton("🔗 Group Link", callback_data="set_view_group_link"),
          InlineKeyboardButton("🚫 Banned Words", callback_data="set_view_banned_words")],
-        [InlineKeyboardButton("👥 Members Mgmt", callback_data="set_view_members_mgmt")],
+        [InlineKeyboardButton("📜 Regulations", callback_data="set_view_regulations"),
+         InlineKeyboardButton("👥 Members Mgmt", callback_data="set_view_members_mgmt")],
         [InlineKeyboardButton("🚧 Blocking", callback_data="set_view_blocking"),
          InlineKeyboardButton("📋 Freed Members", callback_data="free_list_members")],
         [InlineKeyboardButton("👥 Manager", callback_data="set_view_manager")],
@@ -252,6 +253,67 @@ def get_members_mgmt_keyboard():
         [InlineKeyboardButton("💀 Kick deleted accounts", callback_data="mgmt_kick_deleted")],
         [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
     ]
+    return InlineKeyboardMarkup(keyboard)
+
+def get_regulations_keyboard():
+    """Get regulations main keyboard."""
+    keyboard = [
+        [InlineKeyboardButton("✍️ Customize message", callback_data="set_view_regulations_custom")],
+        [InlineKeyboardButton("🕹️ Commands Permissions", callback_data="set_view_command_permissions")],
+        [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+def get_regulations_custom_keyboard(settings):
+    """Get regulations customization keyboard."""
+    text_icon = "✅" if settings.get("rules_text") else "❌"
+    media_icon = "✅" if settings.get("rules_media") else "❌"
+    btns_icon = "✅" if settings.get("rules_buttons") else "❌"
+    
+    keyboard = [
+        [InlineKeyboardButton("📄 Text", callback_data="set_config_rules_text"),
+         InlineKeyboardButton("👀 See", callback_data="set_preview_rules_text")],
+        [InlineKeyboardButton("📸 Media", callback_data="set_config_rules_media"),
+         InlineKeyboardButton("👀 See", callback_data="set_preview_rules_media")],
+        [InlineKeyboardButton("🔡 Url Buttons", callback_data="set_config_rules_buttons"),
+         InlineKeyboardButton("👀 See", callback_data="set_preview_rules_buttons")],
+        [InlineKeyboardButton("👀 Full preview", callback_data="set_preview_rules_full")],
+        [InlineKeyboardButton("🔙 Back", callback_data="set_view_regulations")]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+def get_command_permissions_keyboard(settings):
+    """Get command permissions grid keyboard."""
+    perms = settings.get("command_permissions", {
+        "staff": "all",
+        "rules": "staff",
+        "me": "private",
+        "translate": "all",
+        "link": "all"
+    })
+    
+    # Icons: ✖️ (nobody), 👥 (all), 🤖 (private), 👮 (staff)
+    icon_map = {"nobody": "✖️", "all": "👥", "private": "🤖", "staff": "👮"}
+    
+    keyboard = []
+    commands = ["staff", "rules", "me", "translate", "link"]
+    
+    for cmd in commands:
+        current = perms.get(cmd, "all")
+        row = [InlineKeyboardButton(f"/{cmd}", callback_data="set_none")]
+        
+        for level in ["nobody", "staff", "all", "private"]:
+            icon = icon_map[level]
+            # Add highlight/indicator if active? The screenshot shows green/blue colors.
+            # We'll use the icon and maybe a checkmark if active.
+            label = f"{icon}"
+            if current == level:
+                label = f"{icon} ✅" # Simple indicator
+            
+            row.append(InlineKeyboardButton(label, callback_data=f"set_perm_{cmd}_{level}"))
+        keyboard.append(row)
+        
+    keyboard.append([InlineKeyboardButton("🔙 Back", callback_data="set_view_regulations")])
     return InlineKeyboardMarkup(keyboard)
 
 def get_welcome_settings_keyboard(settings):
@@ -645,6 +707,13 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     data = query.data
     
+    # Quick response for all setting buttons
+    if data.startswith("set_") or data.startswith("mgmt_"):
+        try:
+            await query.answer()
+        except:
+            pass
+
     if data == "set_close":
         chat_id = update.effective_chat.id
         
@@ -918,6 +987,99 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer()
         return
 
+    if data == "set_view_regulations":
+        text = (
+            "📜 <b>Group's regulations</b>\n"
+            "From this menu you can manage the group's regulations, that will be "
+            "shown with the command /rules.\n\n"
+            "<i>To edit who can use the /rules command, go to the \"Commands permissions\" section.</i>"
+        )
+        try:
+            await edit_bot_response(query, context, text, reply_markup=get_regulations_keyboard(), parse_mode='HTML')
+        except BadRequest: pass
+        await query.answer()
+        return
+
+    if data == "set_view_regulations_custom":
+        settings = get_chat_settings(chat_id)
+        text_status = "✅" if settings.get("rules_text") else "❌"
+        media_status = "✅" if settings.get("rules_media") else "❌"
+        btns_status = "✅" if settings.get("rules_buttons") else "❌"
+        
+        text = (
+            "📜 <b>Regulation</b>\n\n"
+            f"📄 Text {text_status}\n"
+            f"📸 Media {media_status}\n"
+            f"🔡 Url Buttons {btns_status}\n\n"
+            "👉 Use the buttons below to choose what you want to set"
+        )
+        try:
+            await edit_bot_response(query, context, text, reply_markup=get_regulations_custom_keyboard(settings), parse_mode='HTML')
+        except BadRequest: pass
+        await query.answer()
+        return
+
+    if data == "set_view_command_permissions":
+        settings = get_chat_settings(chat_id)
+        perms = settings.get("command_permissions", {})
+        
+        text = (
+            "🕹️ <b>Commands Permissions</b>\n"
+            "From this menu you can configure the usage permissions of the following commands.\n\n"
+            "✖️ = nobody  |  👥 = all\n"
+            "🤖 = all, in private chat\n"
+            "👮 = admins and moderators\n\n"
+        )
+        
+        icon_map = {"nobody": "✖️", "all": "👥", "private": "🤖", "staff": "👮"}
+        label_map = {"nobody": "Nobody", "all": "Everyone", "private": "Private", "staff": "Staff"}
+        
+        for cmd in ["staff", "rules", "me", "translate", "link"]:
+            lvl = perms.get(cmd, "all")
+            text += f"• /{cmd} » {icon_map.get(lvl, '👥')} {label_map.get(lvl, 'Everyone')}\n"
+            
+        try:
+            await edit_bot_response(query, context, text, reply_markup=get_command_permissions_keyboard(settings), parse_mode='HTML')
+        except BadRequest: pass
+        await query.answer()
+        return
+
+    if data.startswith("set_perm_"):
+        # set_perm_{cmd}_{level}
+        parts = data.split("_")
+        cmd = parts[2]
+        level = parts[3]
+        
+        settings = get_chat_settings(chat_id)
+        perms = settings.get("command_permissions", {})
+        perms[cmd] = level
+        update_chat_setting(chat_id, "command_permissions", perms)
+        
+        # Refresh view
+        query.data = "set_view_command_permissions"
+        await settings_callback(update, context)
+        return
+
+    if data.startswith("set_preview_rules_"):
+        settings = get_chat_settings(chat_id)
+        p_type = data.replace("set_preview_rules_", "")
+        
+        if p_type == "text":
+            val = settings.get("rules_text", "Not set")
+            await query.answer(f"Text: {val[:50]}...", show_alert=True)
+        elif p_type == "media":
+            val = settings.get("rules_media", "Not set")
+            await query.answer(f"Media ID: {val[:50]}...", show_alert=True)
+        elif p_type == "buttons":
+            val = settings.get("rules_buttons", [])
+            await query.answer(f"Buttons: {len(val)} set", show_alert=True)
+        elif p_type == "full":
+            # Actually send the rules message as a test
+            from bot import send_rules_message
+            await send_rules_message(context.bot, chat_id, chat_id, settings)
+            await query.answer("Full preview sent to the chat!")
+        return
+
     if data.startswith("set_banned_penalty_"):
         new_penalty = data.split("_")[-1]
         update_chat_setting(chat_id, "banned_words_penalty", new_penalty)
@@ -1172,6 +1334,7 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif "msg_length" in config_full: section = "msg_length"
         elif "group_link" in config_full: section = "group_link"
         elif "banned_words" in config_full: section = "banned_words"
+        elif "rules" in config_full: section = "rules"
         else: section = "unknown"
         
         config_type = config_full.replace(f"{section}_", "")
@@ -1291,9 +1454,32 @@ async def handle_setting_input(update: Update, context: ContextTypes.DEFAULT_TYP
         update_chat_setting(chat_id, "banned_words", current_words)
         success = True
 
+    elif section == "rules":
+        if config_type == "text":
+            update_chat_setting(chat_id, "rules_text", update.message.text)
+        elif config_type == "media":
+            if update.message.photo:
+                update_chat_setting(chat_id, "rules_media", update.message.photo[-1].file_id)
+                update_chat_setting(chat_id, "rules_media_type", "photo")
+            elif update.message.video:
+                update_chat_setting(chat_id, "rules_media", update.message.video.file_id)
+                update_chat_setting(chat_id, "rules_media_type", "video")
+        elif config_type == "buttons":
+            # Expected format: Label1 | url1, Label2 | url2
+            lines = update.message.text.split("\n")
+            btns = []
+            for line in lines:
+                if "|" in line:
+                    label, url = line.split("|", 1)
+                    btns.append({"label": label.strip(), "url": url.strip()})
+            update_chat_setting(chat_id, "rules_buttons", btns)
+        success = True
+    
     if success:
         del context.user_data["waiting_for_config"]
-        await update.message.reply_text(f"✅ {section.replace('_', ' ').title()} updated successfully!", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(f"Back to Settings", callback_data=f"set_view_{section}")]]))
+        view_map = {"rules": "regulations_custom"}
+        target_view = view_map.get(section, section)
+        await update.message.reply_text(f"✅ {section.replace('_', ' ').title()} updated successfully!", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(f"Back to Settings", callback_data=f"set_view_{target_view}")]]))
     else:
         await update.message.reply_text("❌ Failed to update setting. Please try again.")
 

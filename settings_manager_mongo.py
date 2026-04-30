@@ -101,7 +101,20 @@ DEFAULT_CHAT_SETTINGS = {
     "banned_words": [],
     "banned_words_penalty": "off", # "off", "warn", "kick", "mute", "ban"
     "banned_words_deletion": True,
-    # Command access levels (admin, member, owner)
+    # Rules/Regulations settings
+    "rules_text": None,
+    "rules_media": None,
+    "rules_media_type": None,
+    "rules_buttons": [],
+    # Command access levels (nobody, staff, all, private)
+    "command_permissions": {
+        "staff": "all",
+        "rules": "staff",
+        "me": "private",
+        "translate": "all",
+        "link": "all"
+    },
+    # Command access levels (admin, member, owner) - OLD STYLE (kept for compat)
     "cmd_access_start": "all",
     "cmd_access_help": "all",
     "cmd_access_id": "all",
