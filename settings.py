@@ -1223,6 +1223,8 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await query.edit_message_reply_markup(reply_markup=get_language_filter_settings_keyboard(new_settings))
             elif "command_access" in key: 
                 await query.edit_message_reply_markup(reply_markup=get_command_access_keyboard(new_settings))
+            elif "banned_words" in key:
+                await query.edit_message_reply_markup(reply_markup=get_banned_words_keyboard(new_settings))
             elif key.startswith("block_") or key == "blocking_enabled":
                 await query.edit_message_reply_markup(reply_markup=get_blocking_settings_keyboard(new_settings))
             elif key.startswith("manager_"):
