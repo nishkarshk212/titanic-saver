@@ -221,6 +221,8 @@ def get_banned_words_keyboard(settings):
     """Get banned words settings keyboard."""
     penalty = settings.get("banned_words_penalty", "off").lower()
     deletion = "✅" if settings.get("banned_words_deletion", True) else "❌"
+    target = settings.get("banned_words_target", "members").title()
+    warn_delete_time = settings.get("banned_words_warning_delete_time", 60)
     
     keyboard = [
         [
@@ -232,7 +234,13 @@ def get_banned_words_keyboard(settings):
             InlineKeyboardButton(f"{'🔊 ' if penalty == 'mute' else ''}Mute", callback_data="set_banned_penalty_mute"),
             InlineKeyboardButton(f"{'🚫 ' if penalty == 'ban' else ''}Ban", callback_data="set_banned_penalty_ban")
         ],
+        [InlineKeyboardButton(f"🎯 Target: {target}", callback_data="set_toggle_banned_words_target")],
         [InlineKeyboardButton(f"🗑️ Delete Messages {deletion}", callback_data="set_toggle_banned_words_deletion")],
+        [
+            InlineKeyboardButton("-10s", callback_data="set_banned_warn_time_sub_10"),
+            InlineKeyboardButton(f"🕒 Warn Delete: {warn_delete_time}s", callback_data="set_none"),
+            InlineKeyboardButton("+10s", callback_data="set_banned_warn_time_add_10")
+        ],
         [
             InlineKeyboardButton("➕ Add", callback_data="set_config_banned_words_add"),
             InlineKeyboardButton("➖ Remove", callback_data="set_config_banned_words_remove")
@@ -1166,6 +1174,11 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             current = settings.get("command_access", "all")
             new_val = "admins" if current == "all" else "all"
             update_chat_setting(chat_id, "command_access", new_val)
+        elif key == "banned_words_target":
+            # Toggle: members -> everyone -> members
+            current = settings.get("banned_words_target", "members")
+            new_val = "everyone" if current == "members" else "members"
+            update_chat_setting(chat_id, "banned_words_target", new_val)
         else:
             # Welcome and Clean settings enabled by default, others disabled by default
             default_val = True if "welcome_" in key or "media_enabled" in key or "button_enabled" in key or "clean_" in key else False
@@ -1296,6 +1309,21 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_reply_markup(reply_markup=get_welcome_settings_keyboard(new_settings))
         except BadRequest: pass
         await query.answer(f"Welcome deletion time set to {new_time}s")
+        return
+
+    # Handle Banned Words Warning Time adjustment buttons
+    if data.startswith("set_banned_warn_time_"):
+        action, amount = data.replace("set_banned_warn_time_", "").split("_")
+        amount = int(amount)
+        settings = get_chat_settings(chat_id)
+        current_time = settings.get("banned_words_warning_delete_time", 60)
+        new_time = current_time + amount if action == "add" else max(0, current_time - amount)
+        update_chat_setting(chat_id, "banned_words_warning_delete_time", new_time)
+        new_settings = get_chat_settings(chat_id)
+        try:
+            await query.edit_message_reply_markup(reply_markup=get_banned_words_keyboard(new_settings))
+        except BadRequest: pass
+        await query.answer(f"Warning deletion time set to {new_time}s")
         return
 
     # Handle Goodbye Time adjustment buttons
