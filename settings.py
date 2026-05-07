@@ -320,6 +320,7 @@ def get_welcome_settings_keyboard(settings):
     welcome_status = "✅" if settings.get("welcome_enabled", True) else "❌"
     rejoin_status = "✅" if settings.get("welcome_rejoin_enabled", True) else "❌"
     clean_status = "✅" if settings.get("welcome_clean_enabled", True) else "❌"
+    delete_enabled_status = "✅" if settings.get("welcome_delete_enabled", True) else "❌"
     media_status = "✅" if settings.get("welcome_media_enabled", True) else "❌"
     button_status = "✅" if settings.get("welcome_button_enabled", True) else "❌"
     delete_time = settings.get("welcome_delete_time", 60)
@@ -329,6 +330,7 @@ def get_welcome_settings_keyboard(settings):
         [InlineKeyboardButton(f"Welcome: {welcome_status}", callback_data="set_toggle_welcome_enabled")],
         [InlineKeyboardButton(f"Welcome on Re-join: {rejoin_status}", callback_data="set_toggle_welcome_rejoin_enabled")],
         [InlineKeyboardButton(f"Auto-Delete Previous: {clean_status}", callback_data="set_toggle_welcome_clean_enabled")],
+        [InlineKeyboardButton(f"Timed Deletion: {delete_enabled_status}", callback_data="set_toggle_welcome_delete_enabled")],
         [
             InlineKeyboardButton(f"Media: {media_status}", callback_data="set_toggle_welcome_media_enabled"),
             InlineKeyboardButton("🖼️ Set Media", callback_data="set_config_welcome_media")

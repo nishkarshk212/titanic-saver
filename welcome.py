@@ -232,8 +232,8 @@ async def send_welcome(chat, user, context: ContextTypes.DEFAULT_TYPE):
     if msg:
         update_chat_setting(chat_id, "last_welcome_id", msg.message_id)
     
-    # Schedule deletion if msg sent and time > 0
-    if msg and welcome_delete_time > 0 and context.job_queue:
+    # Schedule deletion if msg sent, enabled, and time > 0
+    if msg and settings.get("welcome_delete_enabled", True) and welcome_delete_time > 0 and context.job_queue:
         from config import delete_message_job
         try:
             context.job_queue.run_once(
