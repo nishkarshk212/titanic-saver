@@ -13,19 +13,22 @@ def format_welcome_message(text, user, chat):
     now = datetime.datetime.now()
     
     # Placeholders dictionary
+    # Use HTML for mentions to preserve formatting if the text is HTML
+    mention_html = f'<a href="tg://user?id={user.id}">{user.first_name}</a>'
+    
     placeholders = {
         "{ID}": str(user.id),
-        "{NAME}": user.first_name or "",
-        "{SURNAME}": user.last_name or "",
-        "{NAMESURNAME}": f"{user.first_name or ''} {user.last_name or ''}".strip(),
+        "{NAME}": (user.first_name or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"),
+        "{SURNAME}": (user.last_name or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"),
+        "{NAMESURNAME}": f"{(user.first_name or '').replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')} {(user.last_name or '').replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')}".strip(),
         "{LANG}": user.language_code or "Unknown",
         "{DATE}": now.strftime("%Y-%m-%d"),
         "{TIME}": now.strftime("%H:%M:%S"),
         "{WEEKDAY}": now.strftime("%A"),
-        "{MENTION}": f'<a href="tg://user?id={user.id}">{user.first_name}</a>',
+        "{MENTION}": mention_html,
         "{USERNAME}": f"@{user.username}" if user.username else "No Username",
-        "{GROUPNAME}": chat.title or "this group",
-        "{RULES}": "/rules" # Placeholder for rules, can be customized
+        "{GROUPNAME}": (chat.title or "this group").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"),
+        "{RULES}": "/rules" 
     }
     
     formatted_text = text
@@ -48,14 +51,30 @@ async def set_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("Admin only command.")
             return
 
-    text = update.message.text.split(" ", 1)
-    if len(text) < 2:
-        await update.message.reply_text("Usage: /setwelcome <welcome message text>")
-        return
+    # Check if this is a reply to a message
+    if update.message.reply_to_message:
+        reply = update.message.reply_to_message
+        
+        # We MUST use text_html to capture premium emojis as <tg-emoji> tags
+        if reply.text_html:
+            welcome_text = reply.text_html
+        elif reply.caption_html:
+            welcome_text = reply.caption_html
+        else:
+            await update.message.reply_text("❌ The replied message doesn't have any text to set as welcome.")
+            return
+            
+    else:
+        # Fallback to the text after the command
+        text = update.message.text_html.split(" ", 1)
+        if len(text) < 2:
+            await update.message.reply_text("Usage: /setwelcome <text> OR reply to a message with /setwelcome")
+            return
+        welcome_text = text[1]
 
-    welcome_text = text[1]
+    # Save to database
     update_chat_setting(chat_id, "welcome_text", welcome_text)
-    await update.message.reply_text("Welcome message text updated!")
+    await update.message.reply_text("✅ Welcome message updated! Premium Emojis and Quote blocks are now fully supported via HTML tags.")
 
 async def set_welcome_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Set the welcome message photo."""
@@ -146,8 +165,17 @@ async def send_welcome(chat, user, context: ContextTypes.DEFAULT_TYPE):
     cache_user(user.id, user.username, user.first_name)
     
     # Format the welcome message
-    personal_welcome = format_welcome_message(welcome_text_raw, user, chat)
+    welcome_text_html = settings.get('welcome_text', "Welcome {NAME} to the group!")
+    personal_welcome = format_welcome_message(welcome_text_html, user, chat)
     
+    # Try to delete the previous welcome message
+    last_welcome_id = settings.get('last_welcome_id')
+    if last_welcome_id:
+        try:
+            await context.bot.delete_message(chat_id=chat_id, message_id=last_welcome_id)
+        except Exception:
+            pass # Message might be already deleted or too old
+
     msg = None
     if media_enabled and welcome_media:
         try:
@@ -198,6 +226,10 @@ async def send_welcome(chat, user, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=reply_markup,
             parse_mode=ParseMode.HTML
         )
+
+    # Save the new welcome message ID to delete it later
+    if msg:
+        update_chat_setting(chat_id, "last_welcome_id", msg.message_id)
     
     # Schedule deletion if msg sent and time > 0
     if msg and welcome_delete_time > 0 and context.job_queue:
@@ -262,8 +294,6 @@ def get_welcome_handlers():
         CommandHandler("setwelcome", set_welcome),
         CommandHandler("setphoto", set_welcome_photo),
         CommandHandler("setbutton", set_welcome_button),
-        # Handle service messages (legacy fallback)
-        MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, on_new_member),
         # Handle status changes (detects joins and re-joins reliably)
         ChatMemberHandler(on_chat_member_update, ChatMemberHandler.CHAT_MEMBER)
     ]

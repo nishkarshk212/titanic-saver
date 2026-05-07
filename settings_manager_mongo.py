@@ -14,6 +14,7 @@ DEFAULT_CHAT_SETTINGS = {
     "welcome_buttons": [],
     "welcome_button_text": "Join Channel",
     "welcome_button_url": None,
+    "last_welcome_id": None,
     "clean_service_enabled": True,
     "clean_join": True,
     "clean_left": True,

@@ -797,6 +797,11 @@ async def rules_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def me_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Command to show user info."""
+    if not update.effective_chat: return
+    
+    if not await check_command_permission(update, context, "me"):
+        return
+        
     user = update.effective_user
     text = (
         f"👤 <b>User Info</b>\n\n"
@@ -806,16 +811,13 @@ async def me_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     
     if update.effective_chat.type != 'private':
-        chat_id = update.effective_chat.id
-        settings = get_chat_settings(chat_id)
-        perms = settings.get("command_permissions", {})
-        if perms.get("me") == "private":
-            try:
-                await context.bot.send_message(user.id, text, parse_mode='HTML')
-                await update.message.reply_text("✅ I've sent your info to you in private chat.")
-                return
-            except:
-                pass # Fallback to group if private fails? Or just error
+        try:
+            await context.bot.send_message(user.id, text, parse_mode='HTML')
+            await update.message.reply_text("✅ I've sent your info to you in private chat.")
+            return
+        except Exception:
+            await update.message.reply_text("❌ Please start me in private chat first so I can send you your info.")
+            return
                 
     await update.message.reply_text(text, parse_mode='HTML')
 
@@ -857,7 +859,67 @@ async def get_link_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await send_bot_response(update, context, "❌ No group link has been set yet.")
         return
         
-    await send_bot_response(update, context, f"🔗 <b>Group Link:</b>\n{link}", parse_mode=ParseMode.HTML)
+    # Send directly without using send_bot_response to avoid small caps formatting
+    from telegram.constants import ParseMode
+    await update.message.reply_text(f"🔗 <b>Group Link:</b>\n{link}", parse_mode=ParseMode.HTML)
+
+async def adminlist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Command to list all admins in the group."""
+    if not update.effective_chat: return
+    chat_id = update.effective_chat.id
+    
+    if not await check_command_permission(update, context, "adminlist"):
+        return
+        
+    try:
+        admins = await context.bot.get_chat_administrators(chat_id)
+        
+        creators = []
+        administrators = []
+        bots = []
+        
+        for admin in admins:
+            user = admin.user
+            status = admin.status
+            custom_title = admin.custom_title or ""
+            
+            name = user.first_name
+            if user.last_name:
+                name += f" {user.last_name}"
+            
+            # Escape HTML characters in name
+            name = name.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            
+            mention = f"<a href='tg://user?id={user.id}'>{name}</a>"
+            if user.username:
+                mention = f"<a href='https://t.me/{user.username}'>{name}</a>"
+                
+            title_str = f" [<i>{custom_title}</i>]" if custom_title else ""
+            line = f"• {mention}{title_str}"
+            
+            if user.is_bot:
+                bots.append(line)
+            elif status == "creator":
+                creators.append(line)
+            else:
+                administrators.append(line)
+        
+        text = f"🛡️ <b>Admins for {update.effective_chat.title}:</b>\n\n"
+        
+        if creators:
+            text += "👤 <b>Creator:</b>\n" + "\n".join(creators) + "\n\n"
+            
+        if administrators:
+            text += f"👮 <b>Administrators ({len(administrators)}):</b>\n" + "\n".join(administrators) + "\n\n"
+            
+        if bots:
+            text += f"🤖 <b>Bots ({len(bots)}):</b>\n" + "\n".join(bots) + "\n"
+            
+        await update.message.reply_text(text, parse_mode='HTML', disable_web_page_preview=True)
+        
+    except Exception as e:
+        logging.error(f"Error in adminlist command: {e}")
+        await send_bot_response(update, context, "❌ Failed to retrieve admin list.")
 
 async def check_banned_words(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Check for banned words in messages."""
@@ -925,6 +987,7 @@ def main():
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("id", get_id_command))
     application.add_handler(CommandHandler("link", get_link_command))
+    application.add_handler(CommandHandler("adminlist", adminlist_command))
     application.add_handler(CommandHandler("rules", rules_command))
     application.add_handler(CommandHandler("staff", staff_command))
     application.add_handler(CommandHandler("me", me_command))
@@ -1097,6 +1160,28 @@ def main():
     async def post_init(application):
         """Called after bot initialization."""
         import asyncio
+        from telegram import BotCommand
+        
+        # Set bot commands for suggestions
+        commands = [
+            BotCommand("start", "Start the bot"),
+            BotCommand("id", "Get chat/user ID"),
+            BotCommand("link", "Get group link"),
+            BotCommand("adminlist", "List group admins"),
+            BotCommand("rules", "View group rules"),
+            BotCommand("staff", "Show group staff"),
+            BotCommand("me", "Show your info"),
+            BotCommand("info", "Show chat info"),
+            BotCommand("report", "Report a message to admins"),
+            BotCommand("settings", "Bot settings (Admins only)"),
+            BotCommand("free", "Exempt a user (Admins only)"),
+        ]
+        try:
+            await application.bot.set_my_commands(commands)
+            print("✅ Bot commands registered for suggestions")
+        except Exception as e:
+            print(f"❌ Failed to register commands: {e}")
+
         # Wait 5 seconds for bot to fully initialize
         await asyncio.sleep(5)
         await startup_notification(application.bot)
