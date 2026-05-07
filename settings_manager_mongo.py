@@ -105,7 +105,7 @@ DEFAULT_CHAT_SETTINGS = {
     "banned_words_penalty": "off", # "off", "warn", "kick", "mute", "ban"
     "banned_words_deletion": True,
     "banned_words_target": "members", # "members" or "everyone"
-    "banned_words_warning_delete_time": 60,
+    "banned_words_warning_delete_time": 30,
     # Rules/Regulations settings
     "rules_text": None,
     "rules_media": None,

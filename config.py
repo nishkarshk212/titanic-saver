@@ -56,7 +56,7 @@ async def delete_admin_command(update, context):
                     pass
 
 async def send_bot_response(update, context, text, **kwargs):
-    """Sends a bot response formatted with small caps and schedules deletion in 2 mins."""
+    """Sends a bot response formatted with small caps and schedules deletion in 30s."""
     # Convert text to small caps
     formatted_text = to_small_caps(text)
     
@@ -74,17 +74,17 @@ async def send_bot_response(update, context, text, **kwargs):
     # Handle command deletion if enabled for admins (after sending response)
     await delete_admin_command(update, context)
     
-    # Schedule deletion in 2 minutes (120 seconds)
+    # Schedule deletion in 30 seconds
     if context.job_queue:
         context.job_queue.run_once(
             delete_message_job,
-            120,
+            30,
             data={"chat_id": msg.chat_id, "message_id": msg.message_id}
         )
     return msg
 
 async def send_bot_media(update, context, video=None, photo=None, caption="", **kwargs):
-    """Sends a bot media response with formatted caption and auto-deletion."""
+    """Sends a bot media response with formatted caption and auto-deletion in 30s."""
     formatted_caption = to_small_caps(caption)
     
     # Send media - Try replying first, fallback to normal media if original is gone
@@ -110,7 +110,7 @@ async def send_bot_media(update, context, video=None, photo=None, caption="", **
     if context.job_queue:
         context.job_queue.run_once(
             delete_message_job,
-            120,
+            30,
             data={"chat_id": msg.chat_id, "message_id": msg.message_id}
         )
     return msg

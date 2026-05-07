@@ -958,7 +958,7 @@ async def check_banned_words(update: Update, context: ContextTypes.DEFAULT_TYPE)
         from moderation import warn_command, ban_command, mute_command, kick_command
         
         # We need a custom way to send response for banned words so it can be deleted
-        warn_delete_time = settings.get("banned_words_warning_delete_time", 60)
+        warn_delete_time = settings.get("banned_words_warning_delete_time", 30)
         
         async def send_temp_warning(text):
             msg = await context.bot.send_message(chat_id, text, parse_mode=ParseMode.HTML)

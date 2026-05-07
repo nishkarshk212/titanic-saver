@@ -222,7 +222,7 @@ def get_banned_words_keyboard(settings):
     penalty = settings.get("banned_words_penalty", "off").lower()
     deletion = "✅" if settings.get("banned_words_deletion", True) else "❌"
     target = settings.get("banned_words_target", "members").title()
-    warn_delete_time = settings.get("banned_words_warning_delete_time", 60)
+    warn_delete_time = settings.get("banned_words_warning_delete_time", 30)
     
     keyboard = [
         [

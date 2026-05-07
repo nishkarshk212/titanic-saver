@@ -33,9 +33,10 @@ async def kick_if_bot(update: Update, context: ContextTypes.DEFAULT_TYPE, user, 
         # Check bot permissions
         bot_member = await context.bot.get_chat_member(chat_id, context.bot.id)
         if not (bot_member.status == 'creator' or (bot_member.status == 'administrator' and bot_member.can_restrict_members)):
-            await context.bot.send_message(
-                chat_id=chat_id,
-                text="⚠️ <b>Bot Protection Alert:</b> A bot was added, but I don't have the 'Ban Users' permission to kick it. Please promote me to administrator with all rights."
+            await send_bot_response(
+                update, context,
+                "⚠️ <b>Bot Protection Alert:</b> A bot was added, but I don't have the 'Ban Users' permission to kick it. Please promote me to administrator with all rights.",
+                parse_mode=ParseMode.HTML
             )
             return
 
@@ -44,9 +45,9 @@ async def kick_if_bot(update: Update, context: ContextTypes.DEFAULT_TYPE, user, 
         await context.bot.unban_chat_member(chat_id, user.id)
         
         # Notify the group
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text=f"🚫 <b>Bot Protection:</b> Kicked added bot {user.first_name} (@{user.username}). Adding bots is restricted in this group.",
+        await send_bot_response(
+            update, context,
+            f"🚫 <b>Bot Protection:</b> Kicked added bot {user.first_name} (@{user.username}). Adding bots is restricted in this group.",
             parse_mode=ParseMode.HTML
         )
         logging.info(f"Bot Protection: Kicked bot {user.id} in chat {chat_id}")
