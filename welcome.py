@@ -169,12 +169,13 @@ async def send_welcome(chat, user, context: ContextTypes.DEFAULT_TYPE):
     personal_welcome = format_welcome_message(welcome_text_html, user, chat)
     
     # Try to delete the previous welcome message
-    last_welcome_id = settings.get('last_welcome_id')
-    if last_welcome_id:
-        try:
-            await context.bot.delete_message(chat_id=chat_id, message_id=last_welcome_id)
-        except Exception:
-            pass # Message might be already deleted or too old
+    if settings.get("welcome_clean_enabled", True):
+        last_welcome_id = settings.get('last_welcome_id')
+        if last_welcome_id:
+            try:
+                await context.bot.delete_message(chat_id=chat_id, message_id=last_welcome_id)
+            except Exception:
+                pass # Message might be already deleted or too old
 
     msg = None
     if media_enabled and welcome_media:

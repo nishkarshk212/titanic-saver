@@ -11,6 +11,7 @@ DEFAULT_CHAT_SETTINGS = {
     "welcome_media": None,
     "welcome_media_type": "photo",
     "welcome_delete_time": 60,
+    "welcome_clean_enabled": True,
     "welcome_buttons": [],
     "welcome_button_text": "Join Channel",
     "welcome_button_url": None,

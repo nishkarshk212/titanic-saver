@@ -319,6 +319,7 @@ def get_command_permissions_keyboard(settings):
 def get_welcome_settings_keyboard(settings):
     welcome_status = "✅" if settings.get("welcome_enabled", True) else "❌"
     rejoin_status = "✅" if settings.get("welcome_rejoin_enabled", True) else "❌"
+    clean_status = "✅" if settings.get("welcome_clean_enabled", True) else "❌"
     media_status = "✅" if settings.get("welcome_media_enabled", True) else "❌"
     button_status = "✅" if settings.get("welcome_button_enabled", True) else "❌"
     delete_time = settings.get("welcome_delete_time", 60)
@@ -327,6 +328,7 @@ def get_welcome_settings_keyboard(settings):
     keyboard = [
         [InlineKeyboardButton(f"Welcome: {welcome_status}", callback_data="set_toggle_welcome_enabled")],
         [InlineKeyboardButton(f"Welcome on Re-join: {rejoin_status}", callback_data="set_toggle_welcome_rejoin_enabled")],
+        [InlineKeyboardButton(f"Auto-Delete Previous: {clean_status}", callback_data="set_toggle_welcome_clean_enabled")],
         [
             InlineKeyboardButton(f"Media: {media_status}", callback_data="set_toggle_welcome_media_enabled"),
             InlineKeyboardButton("🖼️ Set Media", callback_data="set_config_welcome_media")
@@ -1164,7 +1166,7 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             update_chat_setting(chat_id, "command_access", new_val)
         else:
             # Welcome and Clean settings enabled by default, others disabled by default
-            default_val = True if "welcome_enabled" in key or "media_enabled" in key or "button_enabled" in key or "clean_" in key else False
+            default_val = True if "welcome_" in key or "media_enabled" in key or "button_enabled" in key or "clean_" in key else False
             new_val = not settings.get(key, default_val)
             update_chat_setting(chat_id, key, new_val)
         
