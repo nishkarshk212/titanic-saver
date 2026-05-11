@@ -6,7 +6,8 @@ Ported from AnnieXMusic to python-telegram-bot
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CommandHandler
 from datetime import datetime
-from user_manager_mongo import get_chat_settings, get_user_id
+from settings_manager_mongo import get_chat_settings
+from user_manager_mongo import get_user_id
 
 async def whois_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Get user information."""
