@@ -1,7 +1,8 @@
 import logging
 import datetime
+import asyncio
 from database import get_collection, COLLECTIONS
-from config import OWNER_ID
+from config import OWNER_ID, delete_message_job
 from telegram import Update
 from telegram.ext import ContextTypes, CommandHandler
 
@@ -261,14 +262,13 @@ async def cache_user_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
                             parse_mode='HTML'
                         )
                         
-                        # Auto delete name change notification after 15 seconds
-                        async def auto_delete_name_change(chat_id, message_id):
-                            await asyncio.sleep(15)
-                            try:
-                                await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
-                            except: pass
-                        
-                        asyncio.create_task(auto_delete_name_change(chat.id, sent_msg.message_id))
+                        # Auto delete name change notification after 15 seconds using job queue
+                        if context.job_queue:
+                            context.job_queue.run_once(
+                                delete_message_job,
+                                15,
+                                data={"chat_id": chat.id, "message_id": sent_msg.message_id}
+                            )
                     except Exception as e:
                         logging.error(f"Error sending name change message: {e}")
                 
