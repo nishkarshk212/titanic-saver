@@ -8,6 +8,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CommandHandler
 from telegram.constants import ChatMemberStatus
 from settings_manager_mongo import get_chat_settings
+from config import delete_message_job
 
 async def is_group_admin(chat, user_id):
     """Check if user is admin with required permissions."""
@@ -151,12 +152,19 @@ async def set_title(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         await context.bot.set_chat_title(chat.id, title)
         msg = await update.message.reply_text(f"**Group name changed to:** {title}\nBy {user.mention_html()}", parse_mode='HTML')
-        await asyncio.sleep(15)
-        try:
-            await msg.delete()
-            await update.message.delete()
-        except:
-            pass
+        
+        # Schedule deletion for both messages in 15 seconds
+        if context.job_queue:
+            context.job_queue.run_once(
+                delete_message_job,
+                15,
+                data={"chat_id": chat.id, "message_id": msg.message_id}
+            )
+            context.job_queue.run_once(
+                delete_message_job,
+                15,
+                data={"chat_id": chat.id, "message_id": update.message.message_id}
+            )
     except Exception as e:
         await update.message.reply_text(f"**Failed to set title:**\n`{str(e)}`", parse_mode='HTML')
 
