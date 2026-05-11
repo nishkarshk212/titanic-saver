@@ -116,7 +116,6 @@ async def start_voice_chat_monitor(application: Application):
                         f"ωєℓ¢σмє тσ {group_name}'s νσι¢є ¢нαт\n"
                         f"</blockquote>\n"
                         f"<blockquote>\n"
-                        f"ηαмє : {mention}\n"
                         f"ι∂ : <code>{user_id}</code>\n"
                         f"</blockquote>"
                     )
@@ -130,12 +129,21 @@ async def start_voice_chat_monitor(application: Application):
                         [InlineKeyboardButton(to_small_caps("+ ᴀᴅᴅ ᴍᴇ ɪɴ ɢʀᴏᴜᴘ +"), url=add_url)]
                     ])
                     
-                    await ptb_application.bot.send_message(
+                    sent_message = await ptb_application.bot.send_message(
                         chat_id=chat_id,
                         text=welcome_text,
                         reply_markup=keyboard,
                         parse_mode=ParseMode.HTML
                     )
+                    
+                    # Auto delete after 1 minute
+                    async def auto_delete_notification(chat_id, message_id):
+                        await asyncio.sleep(60)
+                        try:
+                            await ptb_application.bot.delete_message(chat_id=chat_id, message_id=message_id)
+                        except: pass
+                    
+                    asyncio.create_task(auto_delete_notification(chat_id, sent_message.message_id))
                     
                 except Exception as e:
                     logger.error(f"❌ Error sending VC notification: {e}")
