@@ -32,7 +32,7 @@ def get_help_keyboard():
             InlineKeyboardButton("⚙️ Settings", callback_data="help_settings")
         ],
         [
-            InlineKeyboardButton("👋 Welcome/Goodbye", callback_data="help_welcome"),
+            InlineKeyboardButton("👋 Welcome", callback_data="help_welcome"),
             InlineKeyboardButton("🧹 Clean Service", callback_data="help_clean")
         ],
         [
@@ -41,10 +41,14 @@ def get_help_keyboard():
         ],
         [
             InlineKeyboardButton("🚫 Block Content", callback_data="help_block"),
-            InlineKeyboardButton("📌 Pinned Messages", callback_data="help_pinned")
+            InlineKeyboardButton("📌 Pinned", callback_data="help_pinned")
         ],
         [
-            InlineKeyboardButton("🤖 Bot Protection", callback_data="help_bot_prot"),
+            InlineKeyboardButton("🤖 Bot Protect", callback_data="help_bot_prot"),
+            InlineKeyboardButton("🧠 AI Chat", callback_data="help_ai")
+        ],
+        [
+            InlineKeyboardButton("🌐 Translator", callback_data="help_tr"),
             InlineKeyboardButton("❌ Close", callback_data="help_close")
         ]
     ]
@@ -143,6 +147,23 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "• If enabled, any bot added to the group will be automatically kicked.\n"
             "• Enable/Disable in /config > Bot Protection.\n\n"
             "<i>Note: This bot itself is exempt.</i>"
+        )
+    elif data == "help_ai":
+        help_text = (
+            "🧠 <b>AI Assistant (ChatGPT)</b>\n\n"
+            "• /ai &lt;message&gt; - Chat with the AI assistant\n"
+            "• /gpt &lt;message&gt; - Alternative AI command\n"
+            "• /clearchat - Clear your conversation history\n\n"
+            "<i>Note: In private chat, the bot replies to every message automatically!</i>"
+        )
+    elif data == "help_tr":
+        help_text = (
+            "🌐 <b>Language Translator</b>\n\n"
+            "• /tr &lt;lang&gt; &lt;text&gt; - Translate text to target language\n"
+            "• /tr &lt;lang&gt; (reply) - Translate replied message to target language\n"
+            "• /tl &lt;text&gt; - Open translation menu for text\n"
+            "• /langs - View list of supported language codes\n\n"
+            "Example: <code>/tr hi Hello</code> translates 'Hello' to Hindi."
         )
 
     keyboard = [[InlineKeyboardButton("🔙 Back", callback_data="help_main")]]

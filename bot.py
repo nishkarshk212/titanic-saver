@@ -63,9 +63,6 @@ async def start(update, context):
         [
             InlineKeyboardButton(to_small_caps("「 Support 」"), url="https://t.me/jayden_clan"),
             InlineKeyboardButton(to_small_caps("「 Updates 」"), url="https://t.me/Tele_212_bots")
-        ],
-        [
-            InlineKeyboardButton(to_small_caps("「 Source 」"), url="https://github.com/nishkarshk212/titanic-saver")
         ]
     ])
     
