@@ -173,17 +173,30 @@ async def vc_join_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except: pass
 
         if is_active:
-            # Direct deep link to join voice chat immediately
+            # Use a more universally accepted https://t.me/ link for the answer URL
             chat = await context.bot.get_chat(chat_id)
             if chat.username:
                 join_link = f"https://t.me/{chat.username}?videochat"
             else:
-                clean_peer_id = str(chat_id).replace("-100", "")
-                join_link = f"tg://video_chat?peer={clean_peer_id}"
+                # Format for private groups: https://t.me/c/ID_WITHOUT_100/1?videochat
+                clean_id = str(chat_id).replace("-100", "")
+                join_link = f"https://t.me/c/{clean_id}/1?videochat"
             
-            await query.answer(url=join_link)
+            try:
+                # Try answering with the URL (works for many clients)
+                await query.answer(url=join_link)
+            except Exception as e:
+                # Fallback: Edit the button to a direct URL button if answer(url=) fails
+                logger.warning(f"Failed to answer with URL: {e}. Falling back to button edit.")
+                await query.answer("Click the new button below to join!", show_alert=True)
+                await query.edit_message_reply_markup(
+                    reply_markup=InlineKeyboardMarkup([
+                        [InlineKeyboardButton("✅ ᴄʟɪᴄᴋ ᴛᴏ ᴊᴏɪɴ", url=join_link)],
+                        [InlineKeyboardButton(to_small_caps("+ ᴀᴅᴅ ᴍᴇ ɪɴ ɢʀᴏᴜᴘ +"), url=f"https://t.me/{(await context.bot.get_me()).username}?startgroup=true")]
+                    ])
+                )
         else:
-            await query.answer("Error checking voice chat status.", show_alert=True)
+            await query.answer("ησ α¢тινє νσι¢є ¢нαт", show_alert=True)
             
     except Exception as e:
         logger.error(f"Error in vc_join_callback: {e}")
