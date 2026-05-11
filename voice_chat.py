@@ -186,7 +186,7 @@ async def vc_join_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # Answer with URL to open it immediately
             await query.answer(url=join_link)
         else:
-            await query.answer("ησ α¢тινє νσι¢є ¢нαт", show_alert=True)
+            await query.answer("Error checking voice chat status.", show_alert=True)
             
     except Exception as e:
         logger.error(f"Error in vc_join_callback: {e}")
