@@ -25,6 +25,7 @@ from blocking_handler import get_blocking_handlers
 from recurring import get_recurring_handlers, check_recurring_messages, count_recurring_messages
 from Manager import get_manager_handlers
 from config import BOT_TOKEN, LOG_CHANNEL_ID, OWNER_ID, log_to_channel, send_bot_response, send_bot_media, START_IMG, to_small_caps
+from voice_chat import start_voice_chat_monitor, stop_voice_chat_monitor
 from user_manager_mongo import cache_user, increment_message_count, get_user_id, get_user_stats, is_user_admin
 from settings_manager_mongo import get_chat_settings
 
@@ -1241,8 +1242,16 @@ def main():
         # Wait 5 seconds for bot to fully initialize
         await asyncio.sleep(5)
         await startup_notification(application.bot)
+        
+        # Start voice chat monitor (Telethon)
+        asyncio.create_task(start_voice_chat_monitor(application))
+    
+    async def post_stop(application):
+        """Called after bot stops."""
+        await stop_voice_chat_monitor()
     
     application.post_init = post_init
+    application.post_stop = post_stop
     
     print("Bot is starting...")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
