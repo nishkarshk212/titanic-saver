@@ -123,9 +123,16 @@ async def start_voice_chat_monitor(application: Application):
                     bot_info = await ptb_application.bot.get_me()
                     add_url = f"https://t.me/{bot_info.username}?startgroup=true"
                     
-                    # Button uses callback to check active status
+                    # Construct join link directly for the button
+                    if hasattr(chat_entity, 'username') and chat_entity.username:
+                        join_link = f"https://t.me/{chat_entity.username}?videochat"
+                    else:
+                        clean_id = str(chat_id).replace("-100", "")
+                        join_link = f"https://t.me/c/{clean_id}/1?videochat"
+                    
+                    # Button uses direct URL for faster joining
                     keyboard = InlineKeyboardMarkup([
-                        [InlineKeyboardButton("ᴊᴏɪɴ ᴠᴏɪᴄᴇ ᴄʜᴀᴛ", callback_data=f"join_vc_{chat_id}")],
+                        [InlineKeyboardButton("ᴊᴏɪɴ ᴠᴏɪᴄᴇ ¢нαт", url=join_link)],
                         [InlineKeyboardButton(to_small_caps("+ ᴀᴅᴅ ᴍᴇ ɪɴ ɢʀᴏᴜᴘ +"), url=add_url)]
                     ])
                     
