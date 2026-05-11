@@ -132,11 +132,24 @@ async def start_voice_chat_monitor(application: Application):
                     add_url = f"https://t.me/{bot_info.username}?startgroup=true"
                     
                     # Construct join link directly for the button
-                    if hasattr(chat_entity, 'username') and chat_entity.username:
-                        join_link = f"https://t.me/{chat_entity.username}?videochat"
-                    else:
-                        clean_id = str(chat_id).replace("-100", "")
-                        join_link = f"https://t.me/c/{clean_id}/1?videochat"
+                    try:
+                        # Get full chat info from bot to be sure about the username
+                        chat_info = await ptb_application.bot.get_chat(chat_id)
+                        if chat_info.username:
+                            join_link = f"https://t.me/{chat_info.username}?videochat"
+                        else:
+                            clean_id = str(chat_id).replace("-100", "")
+                            join_link = f"https://t.me/c/{clean_id}?videochat"
+                    except Exception as e:
+                        logger.warning(f"Failed to get chat info for join link: {e}")
+                        # Fallback to chat_entity if bot call fails
+                        if hasattr(chat_entity, 'username') and chat_entity.username:
+                            join_link = f"https://t.me/{chat_entity.username}?videochat"
+                        else:
+                            clean_id = str(chat_id).replace("-100", "")
+                            join_link = f"https://t.me/c/{clean_id}?videochat"
+                    
+                    logger.info(f"Generated VC join link for {chat_id}: {join_link}")
                     
                     # Button uses direct URL for faster joining
                     keyboard = InlineKeyboardMarkup([
