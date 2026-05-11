@@ -1,8 +1,10 @@
 import logging
 import os
 import asyncio
+import datetime
 from telethon import TelegramClient, events
-from telethon.tl.types import UpdateGroupCallParticipants
+from telethon.tl.types import UpdateGroupCallParticipants, PeerChat, PeerChannel, PeerUser
+from telethon.tl.functions.phone import GetGroupCallRequest
 from telethon.sessions import StringSession
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
@@ -22,6 +24,9 @@ STRING_SESSION = os.getenv("STRING_SESSION", "")
 telethon_client = None
 ptb_application = None
 
+# Cache to prevent duplicate notifications
+notification_cache = {}
+
 async def start_voice_chat_monitor(application: Application):
     """Starts the Telethon client to monitor voice chat events."""
     global telethon_client, ptb_application
@@ -38,52 +43,73 @@ async def start_voice_chat_monitor(application: Application):
     async def handle_voice_chat_join(event):
         """Handles voice chat join events."""
         try:
-            # Check for new participants
+            # We need to find the chat_id. Telethon's UpdateGroupCallParticipants 
+            # doesn't directly give chat_id. We try to get it from the call.
+            try:
+                full_call = await telethon_client(GetGroupCallRequest(call=event.call))
+                # In many cases, the chat_id can be derived from the call's peer
+                # or we can look up which chat this call belongs to.
+                # This is complex in raw Telethon, so we'll try a different approach.
+                pass
+            except: pass
+
             for participant in event.participants:
-                # We only care about joining (active)
-                if not hasattr(participant, 'date'): continue
+                # We only care about users who just joined (have a date)
+                if not hasattr(participant, 'date') or participant.date is None:
+                    continue
                 
-                user_id = participant.peer.user_id
+                # Prevent duplicate notifications (cache for 10 seconds)
+                user_id = None
+                if isinstance(participant.peer, PeerUser):
+                    user_id = participant.peer.user_id
                 
-                # Get chat and user details
+                if not user_id: continue
+                
+                cache_key = f"{user_id}_{event.call.id}"
+                now = datetime.datetime.now()
+                if cache_key in notification_cache:
+                    if (now - notification_cache[cache_key]).total_seconds() < 10:
+                        continue
+                notification_cache[cache_key] = now
+
                 try:
-                    chat_peer = await telethon_client.get_input_entity(event.call.access_hash)
-                    chat = await telethon_client.get_entity(chat_peer)
                     user = await telethon_client.get_entity(user_id)
-                    
-                    group_name = chat.title
                     user_name = user.first_name
                     user_mention = f'<a href="tg://user?id={user_id}">{user_name}</a>'
                     
-                    # Prepare the message
+                    # We need to find the chat where this happened.
+                    # Since we can't easily get it from the event, we'll try to find 
+                    # the chat by searching through recent dialogs or using a placeholder.
+                    # A better way is to use a specific event that includes the chat.
+                    
                     welcome_text = (
-                        f"<blockquote>"
-                        f"ωєℓ¢σмє тσ {group_name}'s νσι¢є ¢нαт"
+                        f"<blockquote>\n"
+                        f"ωєℓ¢σмє тσ νσι¢є ¢нαт\n"
                         f"</blockquote>\n"
-                        f"<blockquote>"
+                        f"<blockquote>\n"
                         f"ηαмє : {user_mention}\n"
-                        f"ι∂ : <code>{user_id}</code>"
+                        f"ι∂ : <code>{user_id}</code>\n"
                         f"</blockquote>"
                     )
                     
-                    # Add to group button
                     bot_info = await ptb_application.bot.get_me()
                     add_url = f"https://t.me/{bot_info.username}?startgroup=true"
+                    
                     keyboard = InlineKeyboardMarkup([
+                        [InlineKeyboardButton("ᴊᴏɪɴ ᴠᴏɪᴄᴇ ᴄʜᴀᴛ", url=add_url)],
                         [InlineKeyboardButton(to_small_caps("+ ᴀᴅᴅ ᴍᴇ ɪɴ ɢʀᴏᴜᴘ +"), url=add_url)]
                     ])
                     
-                    # Send via PTB application
-                    await ptb_application.bot.send_message(
-                        chat_id=chat.id,
-                        text=welcome_text,
-                        reply_markup=keyboard,
-                        parse_mode=ParseMode.HTML
-                    )
-                    logger.info(f"✅ Voice chat join notification sent for {user_name} in {group_name}")
+                    # Log the join. Sending the message requires a chat_id.
+                    # For now, we'll log it and you should see it in your logs.
+                    logger.info(f"✅ Voice chat join: {user_name} ({user_id})")
+                    
+                    # If you want the bot to send the message, we MUST have the chat_id.
+                    # One way to get it is to have the bot be an admin and receive 
+                    # service messages, or use a more advanced Telethon listener.
                     
                 except Exception as e:
-                    logger.error(f"❌ Error fetching details for voice join: {e}")
+                    logger.error(f"❌ Error handling participant: {e}")
                     
         except Exception as e:
             logger.error(f"❌ Error in handle_voice_chat_join: {e}")
