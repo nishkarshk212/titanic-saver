@@ -53,18 +53,34 @@ async def start(update, context):
     bot_username = bot_info.username
     add_to_group_url = f"https://t.me/{bot_username}?startgroup=true"
     
+    # Format bot name and mention
+    header_name = to_small_caps(bot_name)
+    bot_mention = f"<a href='https://t.me/{bot_username}'>{header_name}</a>"
+    
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("➕ Add to Group", url=add_to_group_url)]
+        [InlineKeyboardButton(to_small_caps("➕ Add Me In Your Group ➕"), url=add_to_group_url)],
+        [InlineKeyboardButton(to_small_caps("「 Help And Commands 」"), callback_data="help_main")],
+        [
+            InlineKeyboardButton(to_small_caps("「 Support 」"), url="https://t.me/Nishkarsh_Support"),
+            InlineKeyboardButton(to_small_caps("「 Updates 」"), url="https://t.me/Nishkarsh_Updates")
+        ],
+        [
+            InlineKeyboardButton(to_small_caps("「 Owner 」"), url=f"tg://user?id={OWNER_ID}"),
+            InlineKeyboardButton(to_small_caps("「 Source 」"), url="https://github.com/nishkarshk212/titanic-saver")
+        ]
     ])
     
     photo_url = random.choice(START_IMG)
     
     user_mention = update.effective_user.mention_html()
     start_message = (
+        f"── 「 {bot_mention} 」 ──\n\n"
         f"<blockquote>"
-        f" ── @{bot_username} ── \n\n"
-        f" 🔥 𝐇єу 𝐓нєяє •🎙 {user_mention}! 🌙✨ ᴅɪᴛᴄʜ ᴛʜᴇ ᴛʜʀᴇᴀᴅs, ʟᴇᴛ's ᴠɪʙᴇ ᴛᴏ ᴛʜᴇ ʀʜʏᴛʜᴍ. \n"
-        f" ✨ ᴊᴏɪɴ ᴍᴇ ᴏɴ ᴛᴇʟᴇɢʀᴀᴍ's ᴄᴜᴛɪᴇsᴛ  ʙᴏᴛ.🎶"
+        f"<tg-emoji emoji_id='6086714986309097798'>💜</tg-emoji> 𝐇єу 𝐓нєяє • <tg-emoji emoji_id='6089165857856952184'>🎙</tg-emoji> {user_mention} ! <tg-emoji emoji_id='6269085886177087845'>🎶</tg-emoji>"
+        f"</blockquote>\n"
+        f"<blockquote>"
+        f"» ᴅɪᴛᴄʜ ᴛʜᴇ ᴛʜʀᴇᴀᴅs, ʟᴇᴛ's ᴠɪʙᴇ ᴛᴏ ᴛʜᴇ ʀʜʏᴛʜᴍ.\n"
+        f"◎ ᴊᴏɪɴ ᴍᴇ ᴏɴ ᴛᴇʟᴇɢʀᴀᴍ's ᴄᴜᴛɪᴇsᴛ ᴍᴜsɪᴄ ʙᴏᴛ. <tg-emoji emoji_id='6269085886177087845'>🎶</tg-emoji>"
         f"</blockquote>"
     )
     
