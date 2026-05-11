@@ -3,6 +3,7 @@ Manager Group Handler - Pin, Unpin, Set Photo, Title, Description
 Ported from AnnieXMusic to python-telegram-bot
 """
 
+import asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CommandHandler
 from telegram.constants import ChatMemberStatus
@@ -149,7 +150,13 @@ async def set_title(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     try:
         await context.bot.set_chat_title(chat.id, title)
-        await update.message.reply_text(f"**Group name changed to:** {title}\nBy {user.mention_html()}", parse_mode='HTML')
+        msg = await update.message.reply_text(f"**Group name changed to:** {title}\nBy {user.mention_html()}", parse_mode='HTML')
+        await asyncio.sleep(15)
+        try:
+            await msg.delete()
+            await update.message.delete()
+        except:
+            pass
     except Exception as e:
         await update.message.reply_text(f"**Failed to set title:**\n`{str(e)}`", parse_mode='HTML')
 

@@ -141,7 +141,9 @@ DEFAULT_CHAT_SETTINGS = {
     "cmd_access_staff": "all",
     "cmd_access_bots": "all",
     "cmd_access_zombies": "admin",
-    "cmd_access_mass_actions": "admin"
+    "cmd_access_mass_actions": "admin",
+    # User permissions for blocking exemptions
+    "user_permissions": {}
 }
 
 def get_chat_settings(chat_id):

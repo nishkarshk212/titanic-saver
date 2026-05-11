@@ -4,7 +4,7 @@ Sticker Manager - Handle sticker commands and usage in bot messages
 import logging
 from telegram import Update
 from telegram.ext import ContextTypes
-from pymongo import MongoClient
+from database import get_collection, COLLECTIONS
 import os
 from dotenv import load_dotenv
 
@@ -16,13 +16,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# MongoDB connection
-MONGO_URI = os.getenv('MONGODB_URI')
-client = MongoClient(MONGO_URI)
-db = client['GROUPHELP']
-stickers_collection = db['premium_stickers']
-emojis_collection = db['premium_emojis']
-settings_collection = db['bot_settings']
+# MongoDB collections
+stickers_collection = get_collection('premium_stickers')
+emojis_collection = get_collection('premium_emojis')
+settings_collection = get_collection('bot_settings')
 
 # Owner ID - who can save stickers
 OWNER_ID = int(os.getenv('OWNER_ID', 0))

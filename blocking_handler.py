@@ -553,7 +553,7 @@ async def free_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Create keyboard with permission button
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🛡 Permissions", callback_data=f"free_perms_{target_user.id}")]
+        [InlineKeyboardButton("🛡 Permissions", callback_data=f"free_perms_{chat_id}_{target_user.id}")]
     ])
     
     await send_bot_response(update, context, message_text, reply_markup=keyboard, parse_mode="HTML")
@@ -707,13 +707,13 @@ async def handle_message_blocking(update: Update, context: ContextTypes.DEFAULT_
     # Handle clean service
     await handle_clean_service(update, context)
 
-def get_user_permission_keyboard(user_id, settings):
+def get_user_permission_keyboard(chat_id, user_id, settings):
     """Get keyboard for user permission settings."""
     # Convert to string for MongoDB compatibility
     user_id_str = str(user_id)
     user_perms = settings.get("user_permissions", {}).get(user_id_str, {})
     
-    logging.info(f"[KEYBOARD] Building keyboard for user {user_id_str}, perms: {user_perms}")
+    logging.info(f"[KEYBOARD] Building keyboard for chat {chat_id}, user {user_id_str}, perms: {user_perms}")
     
     # Blocking options in grid format - shortened for mobile
     # True = FREED/ALLOWED ✅, False = BLOCKED ❌
@@ -744,20 +744,18 @@ def get_user_permission_keyboard(user_id, settings):
         # True = FREED/ALLOWED ✅, False = BLOCKED ❌
         value1 = user_perms.get(key1, False)
         status1 = "✅" if value1 else "❌"
-        logging.info(f"[KEYBOARD] {key1}: value={value1}, status={status1}")
-        row.append(InlineKeyboardButton(f"{label1} {status1}", callback_data=f"free_toggle_{user_id}_{key1}"))
+        row.append(InlineKeyboardButton(f"{label1} {status1}", callback_data=f"free_toggle_{chat_id}_{user_id}_{key1}"))
         
         if i + 1 < len(blocking_options):
             key2, label2 = blocking_options[i + 1]
             value2 = user_perms.get(key2, False)
             status2 = "✅" if value2 else "❌"
-            logging.info(f"[KEYBOARD] {key2}: value={value2}, status={status2}")
-            row.append(InlineKeyboardButton(f"{label2} {status2}", callback_data=f"free_toggle_{user_id}_{key2}"))
+            row.append(InlineKeyboardButton(f"{label2} {status2}", callback_data=f"free_toggle_{chat_id}_{user_id}_{key2}"))
         
         keyboard.append(row)
     
     # Add save and back buttons
-    keyboard.append([InlineKeyboardButton("💾 Save", callback_data=f"free_save_{user_id}")])
+    keyboard.append([InlineKeyboardButton("💾 Save", callback_data=f"free_save_{chat_id}_{user_id}")])
     
     return InlineKeyboardMarkup(keyboard)
 
@@ -765,7 +763,11 @@ async def free_permission_callback(update: Update, context: ContextTypes.DEFAULT
     """Show permission settings for a freed user."""
     query = update.callback_query
     admin_id = update.effective_user.id
-    chat_id = context.user_data.get('settings_chat_id', update.effective_chat.id)
+    
+    # Callback data format: free_perms_{chat_id}_{user_id}
+    parts = query.data.split("_")
+    chat_id = int(parts[2])
+    target_user_id = int(parts[3])
     
     # Check permissions
     can_ban, _ = await can_user_ban(chat_id, admin_id, context)
@@ -774,8 +776,6 @@ async def free_permission_callback(update: Update, context: ContextTypes.DEFAULT
         return
 
     await query.answer()
-    
-    target_user_id = int(query.data.split("_")[-1])
     
     settings = get_chat_settings(chat_id)
     
@@ -787,11 +787,11 @@ async def free_permission_callback(update: Update, context: ContextTypes.DEFAULT
     
     message_text = (
         f"🛡 <b>ʙʟᴏᴄᴋɪɴɢ ꜱᴇᴛᴛɪɴɢꜱ 🛡</b>\n\n"
-        f"[{target_user_id}] ᴡɪʟʟ ʙᴇ ᴇxᴇᴍᴘᴛᴇᴅ ꜰʀᴏᴍ:\n\n"
+        f"<b>{user_name}</b> (<code>{target_user_id}</code>) ᴡɪʟʟ ʙᴇ ᴇxᴇᴍᴘᴛᴇᴅ ꜰʀᴏᴍ:\n\n"
         f"ᴛᴏɢɢʟᴇ ꜰᴇᴀᴛᴜʀᴇꜱ ᴛᴏ ʙʟᴏᴄᴋ ᴄᴏɴᴛᴇɴᴛ:"
     )
     
-    keyboard = get_user_permission_keyboard(target_user_id, settings)
+    keyboard = get_user_permission_keyboard(chat_id, target_user_id, settings)
     
     try:
         await query.edit_message_text(message_text, reply_markup=keyboard, parse_mode='HTML')
@@ -802,7 +802,14 @@ async def free_permission_toggle(update: Update, context: ContextTypes.DEFAULT_T
     """Toggle a permission for a user and auto-save to database."""
     query = update.callback_query
     admin_id = update.effective_user.id
-    chat_id = context.user_data.get('settings_chat_id', update.effective_chat.id)
+    
+    # Callback data format: free_toggle_{chat_id}_{user_id}_{perm_key}
+    parts = query.data.split("_")
+    chat_id = int(parts[2])
+    user_id = int(parts[3])
+    user_id_str = str(user_id)
+    # Join all parts after index 3 to get the full permission key
+    perm_key = "_".join(parts[4:])
     
     # Check permissions
     can_ban, _ = await can_user_ban(chat_id, admin_id, context)
@@ -812,24 +819,12 @@ async def free_permission_toggle(update: Update, context: ContextTypes.DEFAULT_T
 
     await query.answer()
     
-    # Parse user_id and permission key
-    # Callback data format: free_toggle_{user_id}_{perm_key}
-    # perm_key can contain underscores (e.g., block_stickers), so we need to handle that
-    parts = query.data.split("_")
-    user_id = int(parts[2])
-    user_id_str = str(user_id)
-    # Join all parts after index 2 to get the full permission key
-    perm_key = "_".join(parts[3:])
-    
     settings = get_chat_settings(chat_id)
     
-    logging.info(f"[TOGGLE] Starting toggle for user {user_id_str}, key: {perm_key}")
-    logging.info(f"[TOGGLE] Callback data: {query.data}")
-    logging.info(f"[TOGGLE] Split parts: {parts}")
+    logging.info(f"[TOGGLE] Starting toggle for chat {chat_id}, user {user_id_str}, key: {perm_key}")
     
     # Get current permissions from database
     user_permissions = settings.get("user_permissions", {})
-    logging.info(f"[TOGGLE] DB permissions: {user_permissions.get(user_id_str, {})}")
     
     # Initialize user permissions if not exists
     if user_id_str not in user_permissions:
@@ -841,54 +836,42 @@ async def free_permission_toggle(update: Update, context: ContextTypes.DEFAULT_T
     user_permissions[user_id_str][perm_key] = new_value
     
     logging.info(f"[TOGGLE] {perm_key} changed from {current_value} to {new_value}")
-    logging.info(f"[TOGGLE] Updated user perms: {user_permissions[user_id_str]}")
     
     # AUTO-SAVE to database immediately
     update_chat_setting(chat_id, "user_permissions", user_permissions)
-    logging.info(f"[TOGGLE] Auto-saved to database for user {user_id_str}")
+    logging.info(f"[TOGGLE] Auto-saved to database for user {user_id_str} in chat {chat_id}")
     
     # Refresh the keyboard with updated permissions
-    # Create a deep copy of settings to avoid modifying the original
     import copy
     temp_settings = copy.deepcopy(settings)
-    
-    # Ensure user_permissions exists and has the updated values
     if 'user_permissions' not in temp_settings:
         temp_settings['user_permissions'] = {}
-    
-    # Update the specific user's permissions
     temp_settings['user_permissions'][user_id_str] = user_permissions[user_id_str]
     
-    logging.info(f"[TOGGLE] Refreshing keyboard with permissions: {temp_settings['user_permissions'][user_id_str]}")
-    
-    keyboard = get_user_permission_keyboard(user_id, temp_settings)
+    keyboard = get_user_permission_keyboard(chat_id, user_id, temp_settings)
     
     try:
         await query.edit_message_reply_markup(reply_markup=keyboard)
-        logging.info(f"[TOGGLE] Keyboard updated successfully")
     except Exception as e:
         if "not modified" not in str(e).lower():
             logging.error(f"[TOGGLE] Error updating keyboard: {e}")
-        pass
 
 async def free_permission_save(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Save permission changes for a user (now just closes the panel since auto-save is enabled)."""
     query = update.callback_query
     admin_id = update.effective_user.id
-    chat_id = context.user_data.get('settings_chat_id', update.effective_chat.id)
+    
+    # Callback data format: free_save_{chat_id}_{user_id}
+    parts = query.data.split("_")
+    chat_id = int(parts[2])
+    user_id = int(parts[3])
+    user_id_str = str(user_id)
     
     # Check permissions
     can_ban, _ = await can_user_ban(chat_id, admin_id, context)
     if not can_ban:
         await query.answer("You don't have permission to manage exemptions.", show_alert=True)
         return
-    
-    user_id = int(query.data.split("_")[-1])
-    user_id_str = str(user_id)
-    
-    # Clean up any temporary data (if exists from old sessions)
-    if f'free_perms_{chat_id}_{user_id_str}' in context.user_data:
-        del context.user_data[f'free_perms_{chat_id}_{user_id_str}']
     
     await query.answer("Settings saved!")
     
