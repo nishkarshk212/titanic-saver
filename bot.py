@@ -24,7 +24,7 @@ from sticker_manager import get_sticker_handlers
 from blocking_handler import get_blocking_handlers
 from recurring import get_recurring_handlers, check_recurring_messages, count_recurring_messages
 from Manager import get_manager_handlers
-from config import BOT_TOKEN, LOG_CHANNEL_ID, OWNER_ID, log_to_channel, send_bot_response, send_bot_media, START_VIDEOS
+from config import BOT_TOKEN, LOG_CHANNEL_ID, OWNER_ID, log_to_channel, send_bot_response, send_bot_media, START_IMG
 from user_manager_mongo import cache_user, increment_message_count, get_user_id, get_user_stats, is_user_admin
 from settings_manager_mongo import get_chat_settings
 
@@ -57,20 +57,20 @@ async def start(update, context):
         [InlineKeyboardButton("➕ Add to Group", url=add_to_group_url)]
     ])
     
-    video_url = random.choice(START_VIDEOS)
+    photo_url = random.choice(START_IMG)
     
     user_mention = update.effective_user.mention_html()
     start_message = (
         f"<blockquote>"
         f" ── @{bot_username} ── \n\n"
-        f" <tg-emoji emoji_id='6086714986309097798'>🔥</tg-emoji> 𝐇єу 𝐓нєяє •<tg-emoji emoji_id='6089165857856952184'>🎙</tg-emoji> {user_mention}! <tg-emoji emoji_id='6113685078825505075'>🌙</tg-emoji>✨ ᴅɪᴛᴄʜ ᴛʜᴇ ᴛʜʀᴇᴀᴅs, ʟᴇᴛ's ᴠɪʙᴇ ᴛᴏ ᴛʜᴇ ʀʜʏᴛʜᴍ. \n"
-        f" ✨ ᴊᴏɪɴ ᴍᴇ ᴏɴ ᴛᴇʟᴇɢʀᴀᴍ's ᴄᴜᴛɪᴇsᴛ  ʙᴏᴛ.<tg-emoji emoji_id='6269085886177087845'>🎶</tg-emoji>"
+        f" 🔥 𝐇єу 𝐓нєяє •🎙 {user_mention}! 🌙✨ ᴅɪᴛᴄʜ ᴛʜᴇ ᴛʜʀᴇᴀᴅs, ʟᴇᴛ's ᴠɪʙᴇ ᴛᴏ ᴛʜᴇ ʀʜʏᴛʜᴍ. \n"
+        f" ✨ ᴊᴏɪɴ ᴍᴇ ᴏɴ ᴛᴇʟᴇɢʀᴀᴍ's ᴄᴜᴛɪᴇsᴛ  ʙᴏᴛ.🎶"
         f"</blockquote>"
     )
     
     await send_bot_media(
         update, context,
-        video=video_url,
+        photo=photo_url,
         caption=start_message,
         reply_markup=keyboard,
         parse_mode=ParseMode.HTML

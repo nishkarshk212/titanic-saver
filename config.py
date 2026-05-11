@@ -11,12 +11,7 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 LOG_CHANNEL_ID = os.getenv("LOG_CHANNEL_ID")
 OWNER_ID = int(os.getenv("OWNER_ID", 0))
 
-START_VIDEOS = [
-    "https://files.catbox.moe/4ij8ag.mp4",
-    "https://files.catbox.moe/z68nj0.mp4",
-    "https://files.catbox.moe/nl65r9.mp4",
-    "https://files.catbox.moe/3v4bft.mp4"
-]
+START_IMG = os.getenv("START_IMG", "https://i.ibb.co/dwSr1BCH/071045e1b930a364060e7f853a6394b8.jpg https://i.ibb.co/QjxJJq4z/a543640d2cae1726345278d761180958.jpg https://i.ibb.co/VcFwYZj0/c94b8f6d7917e218e2494ef8dda9873c.jpg").split()
 
 async def log_to_channel(context, message):
     """Logs a message to the specified log channel."""
