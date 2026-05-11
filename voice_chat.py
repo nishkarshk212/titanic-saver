@@ -153,7 +153,7 @@ async def start_voice_chat_monitor(application: Application):
                     
                     # Button uses direct URL for faster joining
                     keyboard = InlineKeyboardMarkup([
-                        [InlineKeyboardButton("ᴊᴏɪɴ ᴠᴏɪᴄᴇ ¢нαт", url=join_link)],
+                        [InlineKeyboardButton("ᴊᴏɪɴ ᴠᴏɪᴄᴇ ᴄʜᴀᴛ", url=join_link)],
                         [InlineKeyboardButton(to_small_caps("+ ᴀᴅᴅ ᴍᴇ ɪɴ ɢʀᴏᴜᴘ +"), url=add_url)]
                     ])
                     
@@ -184,51 +184,58 @@ async def start_voice_chat_monitor(application: Application):
     logger.info("✅ Telethon client started successfully!")
 
 async def vc_join_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handles the 'Join Voice Chat' button click."""
+    """Handles the 'Join Voice Chat' button click for old messages."""
     query = update.callback_query
-    chat_id = int(query.data.split("_")[2])
     
     try:
-        # Check if call is active using Telethon
-        is_active = False
-        try:
-            # Resolve entity (handle -100 prefix for Telethon)
-            tele_chat_id = int(str(chat_id).replace('-100', ''))
-            full = await telethon_client(GetFullChannelRequest(channel=tele_chat_id))
-            if hasattr(full, 'full_chat') and hasattr(full.full_chat, 'call'):
-                if full.full_chat.call:
-                    is_active = True
-        except: pass
+        # Answer immediately to stop the spinning icon on the button
+        await query.answer("Checking voice chat status...")
+        
+        data_parts = query.data.split("_")
+        if len(data_parts) < 3:
+            return
+            
+        chat_id = int(data_parts[2])
+        
+        # Construct the join link
+        chat = await context.bot.get_chat(chat_id)
+        if chat.username:
+            join_link = f"https://t.me/{chat.username}?videochat"
+        else:
+            clean_id = str(chat_id).replace("-100", "")
+            join_link = f"https://t.me/c/{clean_id}/1?videochat"
+
+        # Check if call is active using Telethon (if available)
+        is_active = True # Default to True to allow users to try joining
+        if telethon_client and telethon_client.is_connected():
+            try:
+                tele_chat_id = int(str(chat_id).replace('-100', ''))
+                full = await telethon_client(GetFullChannelRequest(channel=tele_chat_id))
+                if hasattr(full, 'full_chat') and hasattr(full.full_chat, 'call'):
+                    if not full.full_chat.call:
+                        is_active = False
+            except Exception as te:
+                logger.warning(f"Telethon check failed in callback: {te}")
 
         if is_active:
-            # Use a more universally accepted https://t.me/ link for the answer URL
-            chat = await context.bot.get_chat(chat_id)
-            if chat.username:
-                join_link = f"https://t.me/{chat.username}?videochat"
-            else:
-                # Format for private groups: https://t.me/c/ID_WITHOUT_100/1?videochat
-                clean_id = str(chat_id).replace("-100", "")
-                join_link = f"https://t.me/c/{clean_id}/1?videochat"
-            
-            try:
-                # Try answering with the URL (works for many clients)
-                await query.answer(url=join_link)
-            except Exception as e:
-                # Fallback: Edit the button to a direct URL button if answer(url=) fails
-                logger.warning(f"Failed to answer with URL: {e}. Falling back to button edit.")
-                await query.answer("Click the new button below to join!", show_alert=True)
-                await query.edit_message_reply_markup(
-                    reply_markup=InlineKeyboardMarkup([
-                        [InlineKeyboardButton("✅ ᴄʟɪᴄᴋ ᴛᴏ ᴊᴏɪɴ", url=join_link)],
-                        [InlineKeyboardButton(to_small_caps("+ ᴀᴅᴅ ᴍᴇ ɪɴ ɢʀᴏᴜᴘ +"), url=f"https://t.me/{(await context.bot.get_me()).username}?startgroup=true")]
-                    ])
-                )
+            # Edit the message to provide the direct join button since answer(url=) is unreliable
+            await query.edit_message_reply_markup(
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("✅ ᴄʟɪᴄᴋ ᴛᴏ ᴊᴏɪɴ", url=join_link)],
+                    [InlineKeyboardButton(to_small_caps("+ ᴀᴅᴅ ᴍᴇ ɪɴ ɢʀᴏᴜᴘ +"), url=f"https://t.me/{(await context.bot.get_me()).username}?startgroup=true")]
+                ])
+            )
         else:
-            await query.answer("ησ α¢тινє νσι¢є ¢нαт", show_alert=True)
+            await query.edit_message_text(
+                text=f"{query.message.text}\n\n❌ **ɴᴏ ᴀᴄᴛɪᴠᴇ ᴠᴏɪᴄᴇ ᴄʜᴀᴛ ғᴏᴜɴᴅ.**",
+                parse_mode=ParseMode.HTML
+            )
             
     except Exception as e:
         logger.error(f"Error in vc_join_callback: {e}")
-        await query.answer("Error checking voice chat status.", show_alert=True)
+        try:
+            await query.answer("Error checking voice chat status.", show_alert=True)
+        except: pass
 
 async def stop_voice_chat_monitor():
     """Stops the Telethon client."""
