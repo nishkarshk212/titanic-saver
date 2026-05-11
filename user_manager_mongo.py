@@ -3,7 +3,7 @@ import datetime
 from database import get_collection, COLLECTIONS
 from config import OWNER_ID
 from telegram import Update
-from telegram.ext import ContextTypes
+from telegram.ext import ContextTypes, CommandHandler
 
 def cache_user(user_id, username, first_name):
     """Saves user mapping for later resolution and tracks stats using MongoDB."""
@@ -225,3 +225,112 @@ async def can_user_reload(chat_id, user_id, context):
         return False
     except:
         return False
+
+async def cache_user_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """MessageHandler to cache user data and detect name changes."""
+    user = update.effective_user
+    if not user or user.is_bot:
+        return
+
+    user_id = user.id
+    username = user.username
+    first_name = user.first_name
+    
+    try:
+        users_col = get_collection(COLLECTIONS["users"])
+        if users_col is None:
+            return
+
+        existing_user = users_col.find_one({"id": user_id})
+        
+        if existing_user:
+            old_name = existing_user.get("name")
+            if old_name and old_name != first_name:
+                # Name changed!
+                chat = update.effective_chat
+                if chat and chat.type in ["group", "supergroup"]:
+                    change_msg = (
+                        f"<blockquote>\n"
+                        f"υѕєя ¢нαηgє ηαмє ƒяσм {old_name} тσ {first_name}\n"
+                        f"</blockquote>"
+                    )
+                    try:
+                        await context.bot.send_message(
+                            chat_id=chat.id,
+                            text=change_msg,
+                            parse_mode='HTML'
+                        )
+                    except Exception as e:
+                        logging.error(f"Error sending name change message: {e}")
+                
+                # Track name history for Sangmata feature
+                history_col = get_collection("name_history")
+                if history_col is not None:
+                    history_col.insert_one({
+                        "user_id": user_id,
+                        "old_name": old_name,
+                        "new_name": first_name,
+                        "changed_at": datetime.datetime.now()
+                    })
+
+            # Update cache
+            update_data = {
+                "name": first_name,
+                "last_updated": datetime.datetime.now()
+            }
+            if username:
+                update_data["username"] = username.lower().replace('@', '')
+            
+            users_col.update_one({"id": user_id}, {"$set": update_data})
+        else:
+            # First time seeing this user
+            user_doc = {
+                "id": user_id,
+                "name": first_name,
+                "username": username.lower().replace('@', '') if username else None,
+                "joined_date": datetime.datetime.now().strftime("%Y-%m-%d"),
+                "msg_count": 0,
+                "created_at": datetime.datetime.now(),
+                "last_updated": datetime.datetime.now()
+            }
+            users_col.insert_one(user_doc)
+            
+    except Exception as e:
+        logging.error(f"Error in cache_user_handler: {e}")
+
+async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Sangmata feature: Show name history of a user."""
+    user_id, name = await get_user_id(update, context)
+    if not user_id:
+        user_id = update.effective_user.id
+        name = update.effective_user.first_name
+    
+    try:
+        history_col = get_collection("name_history")
+        if history_col is None:
+            return await update.message.reply_text("❌ Database error.")
+        
+        history = list(history_col.find({"user_id": user_id}).sort("changed_at", -1))
+        
+        if not history:
+            return await update.message.reply_text(f"🔍 No name history found for <b>{name}</b>.", parse_mode='HTML')
+        
+        text = f"📜 <b>Name History for {name}</b>\n\n"
+        for i, entry in enumerate(history[:10]): # Show last 10 changes
+            old = entry['old_name']
+            new = entry['new_name']
+            date = entry['changed_at'].strftime("%Y-%m-%d")
+            text += f"{i+1}. <code>{old}</code> ➜ <code>{new}</code> ({date})\n"
+        
+        await update.message.reply_text(text, parse_mode='HTML')
+    except Exception as e:
+        logging.error(f"Error in history_command: {e}")
+        await update.message.reply_text("❌ Error fetching history.")
+
+def get_sangmata_handlers():
+    """Return Sangmata handlers."""
+    return [CommandHandler(["history", "sg"], history_command)]
+
+async def cache_user_handler_legacy(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Legacy wrapper for existing bot.py usage if needed."""
+    await cache_user_handler(update, context)

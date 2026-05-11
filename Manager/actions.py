@@ -25,30 +25,20 @@ def parse_time(time_str):
         return timedelta(seconds=int(time_str[:-1]))
     return None
 
+from user_manager_mongo import get_user_id
+
 async def is_admin(chat, user_id):
     """Check if user is admin."""
-    member = await chat.get_member(user_id)
-    return isinstance(member, (ChatMemberAdministrator, ChatMemberOwner))
+    try:
+        member = await chat.get_member(user_id)
+        return isinstance(member, (ChatMemberAdministrator, ChatMemberOwner))
+    except:
+        return False
 
 def get_user_from_args(update, context):
     """Extract user ID and name from command args or reply."""
-    if update.message.reply_to_message:
-        user = update.message.reply_to_message.from_user
-        return user.id, user.full_name, " ".join(context.args) if context.args else None
-    
-    if not context.args:
-        return None, None, None
-    
-    target = context.args[0]
-    try:
-        if target.isdigit():
-            user_id = int(target)
-            return user_id, str(user_id), " ".join(context.args[1:]) if len(context.args) > 1 else None
-        else:
-            # It's a username
-            return target, target, " ".join(context.args[1:]) if len(context.args) > 1 else None
-    except:
-        return None, None, None
+    # This is a legacy function, we should use get_user_id from user_manager_mongo
+    return None, None, None
 
 async def ban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Ban a user from the group."""
@@ -69,7 +59,9 @@ async def ban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not await is_admin(chat, user.id):
             return await update.message.reply_text("You need to be an admin to use this command.")
     
-    user_id, name, reason = get_user_from_args(update, context)
+    user_id, name = await get_user_id(update, context)
+    reason = " ".join(context.args[1:]) if context.args and len(context.args) > 1 else " ".join(context.args) if context.args and not str(context.args[0]).startswith('@') and not str(context.args[0]).isdigit() else None
+    
     if not user_id:
         return await update.message.reply_text("Usage: /ban @username or reply to a user with /ban [reason]")
     
@@ -113,7 +105,9 @@ async def unban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not await is_admin(chat, user.id):
             return await update.message.reply_text("You need to be an admin to use this command.")
     
-    user_id, name, reason = get_user_from_args(update, context)
+    user_id, name = await get_user_id(update, context)
+    reason = " ".join(context.args[1:]) if context.args and len(context.args) > 1 else " ".join(context.args) if context.args and not str(context.args[0]).startswith('@') and not str(context.args[0]).isdigit() else None
+    
     if not user_id:
         return await update.message.reply_text("Usage: /unban @username or reply to a user with /unban [reason]")
     
@@ -154,7 +148,9 @@ async def mute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not await is_admin(chat, user.id):
             return await update.message.reply_text("You need to be an admin to use this command.")
     
-    user_id, name, reason = get_user_from_args(update, context)
+    user_id, name = await get_user_id(update, context)
+    reason = " ".join(context.args[1:]) if context.args and len(context.args) > 1 else " ".join(context.args) if context.args and not str(context.args[0]).startswith('@') and not str(context.args[0]).isdigit() else None
+    
     if not user_id:
         return await update.message.reply_text("Usage: /mute @username or reply to a user with /mute [reason]")
     
@@ -204,7 +200,9 @@ async def unmute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not await is_admin(chat, user.id):
             return await update.message.reply_text("You need to be an admin to use this command.")
     
-    user_id, name, reason = get_user_from_args(update, context)
+    user_id, name = await get_user_id(update, context)
+    reason = " ".join(context.args[1:]) if context.args and len(context.args) > 1 else " ".join(context.args) if context.args and not str(context.args[0]).startswith('@') and not str(context.args[0]).isdigit() else None
+    
     if not user_id:
         return await update.message.reply_text("Usage: /unmute @username or reply to a user with /unmute [reason]")
     
@@ -249,21 +247,21 @@ async def tmute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not await is_admin(chat, user.id):
             return await update.message.reply_text("You need to be an admin to use this command.")
     
+    user_id, name = await get_user_id(update, context)
+    
     if update.message.reply_to_message:
         if len(context.args) < 1:
             return await update.message.reply_text("Usage: /tmute @username <time> [reason] or reply with /tmute <time> [reason]")
-        target_user = update.message.reply_to_message.from_user
-        user_id = target_user.id
-        name = target_user.full_name
         time_str = context.args[0]
         reason = " ".join(context.args[1:]) if len(context.args) > 1 else None
     else:
         if len(context.args) < 2:
             return await update.message.reply_text("Usage: /tmute @username <time> [reason] or reply with /tmute <time> [reason]")
-        user_id = context.args[0]
-        name = user_id
         time_str = context.args[1]
         reason = " ".join(context.args[2:]) if len(context.args) > 2 else None
+    
+    if not user_id:
+        return await update.message.reply_text("User not found.")
     
     try:
         member = await chat.get_member(user_id)
@@ -319,7 +317,9 @@ async def kick_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not await is_admin(chat, user.id):
             return await update.message.reply_text("You need to be an admin to use this command.")
     
-    user_id, name, reason = get_user_from_args(update, context)
+    user_id, name = await get_user_id(update, context)
+    reason = " ".join(context.args[1:]) if context.args and len(context.args) > 1 else " ".join(context.args) if context.args and not str(context.args[0]).startswith('@') and not str(context.args[0]).isdigit() else None
+    
     if not user_id:
         return await update.message.reply_text("Usage: /kick @username or reply to a user with /kick [reason]")
     
@@ -398,7 +398,7 @@ async def sban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not await is_admin(chat, user.id):
             return await update.message.reply_text("You need to be an admin to use this command.")
     
-    user_id, name, reason = get_user_from_args(update, context)
+    user_id, name = await get_user_id(update, context)
     if not user_id:
         return await update.message.reply_text("Usage: /sban @username or reply to a user with /sban")
     
@@ -444,21 +444,21 @@ async def tban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not await is_admin(chat, user.id):
             return await update.message.reply_text("You need to be an admin to use this command.")
     
+    user_id, name = await get_user_id(update, context)
+    
     if update.message.reply_to_message:
         if len(context.args) < 1:
             return await update.message.reply_text("Usage: /tban @username <time> [reason] or reply with /tban <time> [reason]")
-        target_user = update.message.reply_to_message.from_user
-        user_id = target_user.id
-        name = target_user.full_name
         time_str = context.args[0]
         reason = " ".join(context.args[1:]) if len(context.args) > 1 else None
     else:
         if len(context.args) < 2:
             return await update.message.reply_text("Usage: /tban @username <time> [reason] or reply with /tban <time> [reason]")
-        user_id = context.args[0]
-        name = user_id
         time_str = context.args[1]
         reason = " ".join(context.args[2:]) if len(context.args) > 2 else None
+    
+    if not user_id:
+        return await update.message.reply_text("User not found.")
     
     try:
         member = await chat.get_member(user_id)

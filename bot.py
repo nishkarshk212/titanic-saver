@@ -26,8 +26,7 @@ from recurring import get_recurring_handlers, check_recurring_messages, count_re
 from Manager import get_manager_handlers
 from config import BOT_TOKEN, LOG_CHANNEL_ID, OWNER_ID, log_to_channel, send_bot_response, send_bot_media, START_IMG, to_small_caps
 from voice_chat import start_voice_chat_monitor, stop_voice_chat_monitor
-from user_manager_mongo import cache_user, increment_message_count, get_user_id, get_user_stats, is_user_admin
-from settings_manager_mongo import get_chat_settings
+from user_manager_mongo import cache_user_handler, get_user_id, get_user_stats, is_user_admin, get_sangmata_handlers
 
 # Configure logging
 logging.basicConfig(
@@ -88,16 +87,10 @@ async def start(update, context):
         parse_mode=ParseMode.HTML
     )
 
-async def cache_user_handler(update, context):
-    """Caches user information and tracks message counts."""
-    if not update.effective_chat: return
-    
-    # 1. Cache the sender and increment message count
-    if update.effective_user:
-        user = update.effective_user
-        cache_user(user.id, user.username, user.first_name)
-        if update.message and update.message.text and not update.message.text.startswith('/'):
-            increment_message_count(user.id)
+async def cache_user_handler_old(update, context):
+    """Legacy MessageHandler to cache user data to MongoDB for resolution."""
+    # This is replaced by the enhanced cache_user_handler in user_manager_mongo.py
+    pass
     
     # 2. Cache any users mentioned in the message
     if update.message and update.message.entities:
@@ -1140,6 +1133,10 @@ def main():
     # Add Blocking handlers (Group 12)
     for handler in get_blocking_handlers():
         application.add_handler(handler, group=12)
+    
+    # Add Sangmata handlers (Group 0)
+    for handler in get_sangmata_handlers():
+        application.add_handler(handler)
     
     # Add Recurring Message handlers (Group 13)
     for handler in get_recurring_handlers():
