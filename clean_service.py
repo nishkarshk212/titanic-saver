@@ -81,7 +81,7 @@ def get_clean_service_handlers():
             filters.StatusUpdate.NEW_CHAT_PHOTO |
             filters.StatusUpdate.DELETE_CHAT_PHOTO |
             filters.StatusUpdate.CHAT_CREATED |
-            filters.StatusUpdate.MIGRATED |
+            filters.StatusUpdate.MIGRATE |
             filters.StatusUpdate.MESSAGE_AUTO_DELETE_TIMER_CHANGED,
             clean_service_messages
         )
