@@ -59,18 +59,21 @@ async def start(update, context):
     
     video_url = random.choice(START_VIDEOS)
     
+    user_mention = update.effective_user.mention_html()
     start_message = (
-        f"๏ ᴛʜɪs ɪs {bot_name}\n\n"
-        "➻ ᴀ ᴘᴏᴡᴇʀғᴜʟ sᴇᴄᴜʀɪᴛʏ ʙᴏᴛ ᴅᴇsɪɢɴᴇᴅ ᴛᴏ ᴘʀᴏᴛᴇᴄᴛ ʏᴏᴜʀ ᴛᴇʟᴇɢʀᴀᴍ ɢʀᴏᴜᴘ\n"
-        "ᴀᴅᴅ ᴍᴇ ᴛᴏ ʏᴏᴜʀ ɢʀᴏᴜᴘ & ɢɪᴠᴇ ᴍᴇ ᴀᴅᴍɪɴ & ᴅᴇʟᴇᴛᴇ ᴍᴇssᴀɢᴇ ʀɪɢʜᴛ ɪ sᴛᴀʀᴛ ᴘʀᴏᴛᴇᴄᴛɪɴɢ ᴀᴜᴛᴏᴍᴀᴛɪᴄᴀʟʟʏ\n"
-        "➻ ɢɪᴠᴇ ᴍᴇ ᴀ ᴄʜᴀɴᴄᴇ ʜᴀɴᴅʟᴇ ʏᴏᴜʀ ɢʀᴏᴜᴘ."
+        f"<blockquote>"
+        f" ── @{bot_username} ── \n\n"
+        f" <tg-emoji emoji_id='6086714986309097798'>🔥</tg-emoji> 𝐇єу 𝐓нєяє •<tg-emoji emoji_id='6089165857856952184'>🎙</tg-emoji> {user_mention}! <tg-emoji emoji_id='6113685078825505075'>🌙</tg-emoji>✨ ᴅɪᴛᴄʜ ᴛʜᴇ ᴛʜʀᴇᴀᴅs, ʟᴇᴛ's ᴠɪʙᴇ ᴛᴏ ᴛʜᴇ ʀʜʏᴛʜᴍ. \n"
+        f" ✨ ᴊᴏɪɴ ᴍᴇ ᴏɴ ᴛᴇʟᴇɢʀᴀᴍ's ᴄᴜᴛɪᴇsᴛ  ʙᴏᴛ.<tg-emoji emoji_id='6269085886177087845'>🎶</tg-emoji>"
+        f"</blockquote>"
     )
     
     await send_bot_media(
         update, context,
         video=video_url,
         caption=start_message,
-        reply_markup=keyboard
+        reply_markup=keyboard,
+        parse_mode=ParseMode.HTML
     )
 
 async def cache_user_handler(update, context):
