@@ -255,11 +255,20 @@ async def cache_user_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
                         f"</blockquote>"
                     )
                     try:
-                        await context.bot.send_message(
+                        sent_msg = await context.bot.send_message(
                             chat_id=chat.id,
                             text=change_msg,
                             parse_mode='HTML'
                         )
+                        
+                        # Auto delete name change notification after 15 seconds
+                        async def auto_delete_name_change(chat_id, message_id):
+                            await asyncio.sleep(15)
+                            try:
+                                await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
+                            except: pass
+                        
+                        asyncio.create_task(auto_delete_name_change(chat.id, sent_msg.message_id))
                     except Exception as e:
                         logging.error(f"Error sending name change message: {e}")
                 
