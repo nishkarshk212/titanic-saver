@@ -27,6 +27,7 @@ DEFAULT_CHAT_SETTINGS = {
     "clean_pinned_message": True,
     "clean_title": True,
     "clean_photo": True,
+    "vc_user_join_enabled": True,
     "auto_delete_enabled": False,
     "auto_delete_time": 60,
     "warn_limit": 3,

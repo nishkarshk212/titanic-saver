@@ -12,6 +12,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.constants import ParseMode
 from config import BOT_TOKEN, to_small_caps
 from telegram.ext import Application, CallbackQueryHandler, ContextTypes
+from settings_manager_mongo import get_chat_settings
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -105,6 +106,13 @@ async def start_voice_chat_monitor(application: Application):
                     group_name = chat_entity.title if chat_entity and hasattr(chat_entity, 'title') else "the group"
                     chat_id = chat_entity.id if chat_entity else None
                     
+                    if not chat_id: continue
+
+                    # Check if VC join notification is enabled for this chat
+                    settings = get_chat_settings(chat_id)
+                    if not settings.get("vc_user_join_enabled", True):
+                        continue
+
                     if chat_id and (isinstance(chat_entity, PeerChannel) or (str(chat_id).startswith('-100') == False and chat_id > 0)):
                         if not str(chat_id).startswith('-100'):
                             chat_id = int(f"-100{chat_id}")

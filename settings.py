@@ -203,8 +203,9 @@ def get_main_settings_keyboard(chat_id=None):
         [InlineKeyboardButton("📜 Regulations", callback_data="set_view_regulations"),
          InlineKeyboardButton("👥 Members Mgmt", callback_data="set_view_members_mgmt")],
         [InlineKeyboardButton("🚧 Blocking", callback_data="set_view_blocking"),
+         InlineKeyboardButton("🎙 Voice Chat", callback_data="set_view_vc")],
+        [InlineKeyboardButton("👥 Manager", callback_data="set_view_manager"),
          InlineKeyboardButton("📋 Freed Members", callback_data="free_list_members")],
-        [InlineKeyboardButton("👥 Manager", callback_data="set_view_manager")],
         [InlineKeyboardButton("❌ Close Menu", callback_data="set_close")]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -635,6 +636,17 @@ def get_blocking_settings_keyboard(settings):
         [InlineKeyboardButton(f"Block Dice: {dice_status}", callback_data="set_toggle_block_dice")],
         [InlineKeyboardButton(f"Block Game: {game_status}", callback_data="set_toggle_block_game")],
         [InlineKeyboardButton("ℹ️ Toggle to block content instantly", callback_data="set_none")],
+        [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+def get_vc_settings_keyboard(settings):
+    """Get Voice Chat settings keyboard."""
+    vc_user_join_status = "✅" if settings.get("vc_user_join_enabled", True) else "❌"
+    
+    keyboard = [
+        [InlineKeyboardButton(f"User Join Notification: {vc_user_join_status}", callback_data="set_toggle_vc_user_join_enabled")],
+        [InlineKeyboardButton("ℹ️ Notifies when users join voice chat", callback_data="set_none")],
         [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -1148,6 +1160,20 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer("Members Management action completed.")
         return
 
+    if data == "set_view_vc":
+        settings = get_chat_settings(chat_id)
+        try:
+            await edit_bot_response(
+                query, context,
+                "🎙 <b>ᴠᴏɪᴄᴇ ᴄʜᴀᴛ ꜱᴇᴛᴛɪɴɢꜱ 🎙</b>\n\n"
+                "ᴄᴏɴᴛʀᴏʟ ᴠᴏɪᴄᴇ ᴄʜᴀᴛ ʀᴇʟᴀᴛᴇᴅ ɴᴏᴛɪꜰɪᴄᴀᴛɪᴏɴꜱ ᴀɴᴅ ꜰᴇᴀᴛᴜʀᴇꜱ:",
+                reply_markup=get_vc_settings_keyboard(settings),
+                parse_mode='HTML'
+            )
+        except BadRequest: pass
+        await query.answer()
+        return
+
     if data == "set_view_manager":
         settings = get_chat_settings(chat_id)
         try:
@@ -1229,6 +1255,8 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await query.edit_message_reply_markup(reply_markup=get_blocking_settings_keyboard(new_settings))
             elif key.startswith("manager_"):
                 await query.edit_message_reply_markup(reply_markup=get_manager_settings_keyboard(new_settings))
+            elif "vc_user_join" in key:
+                await query.edit_message_reply_markup(reply_markup=get_vc_settings_keyboard(new_settings))
         except BadRequest: pass
         await query.answer(f"Setting updated!")
         return
