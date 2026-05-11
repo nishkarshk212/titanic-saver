@@ -173,22 +173,18 @@ async def vc_join_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except: pass
 
         if is_active:
-            # Get group username for direct link if possible
+            # Direct deep link to join voice chat immediately
+            # Format: https://t.me/username?videochat or tg://video_chat?peer=chat_id
             chat = await context.bot.get_chat(chat_id)
             if chat.username:
                 join_link = f"https://t.me/{chat.username}?videochat"
             else:
-                # Fallback to a deep link that works in most clients
-                join_link = f"tg://video_chat?peer={chat_id}"
+                # Remove -100 prefix for the deep link peer parameter
+                clean_peer_id = str(chat_id).replace("-100", "")
+                join_link = f"tg://video_chat?peer={clean_peer_id}"
             
-            # Answer with URL
-            await query.answer()
-            await query.edit_message_reply_markup(
-                reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("✅ ᴄʟɪᴄᴋ ᴛᴏ ᴊᴏɪɴ", url=join_link)],
-                    [InlineKeyboardButton(to_small_caps("+ ᴀᴅᴅ ᴍᴇ ɪɴ ɢʀᴏᴜᴘ +"), url=f"https://t.me/{(await context.bot.get_me()).username}?startgroup=true")]
-                ])
-            )
+            # Answer with URL to open it immediately
+            await query.answer(url=join_link)
         else:
             await query.answer("ησ α¢тινє νσι¢є ¢нαт", show_alert=True)
             
