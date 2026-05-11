@@ -64,6 +64,20 @@ async def set_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ The replied message doesn't have any text to set as welcome.")
             return
             
+        # Also check for media in the replied message
+        if reply.photo:
+            update_chat_setting(chat_id, "welcome_media", reply.photo[-1].file_id)
+            update_chat_setting(chat_id, "welcome_media_type", "photo")
+            update_chat_setting(chat_id, "welcome_media_enabled", True)
+        elif reply.video:
+            update_chat_setting(chat_id, "welcome_media", reply.video.file_id)
+            update_chat_setting(chat_id, "welcome_media_type", "video")
+            update_chat_setting(chat_id, "welcome_media_enabled", True)
+        elif reply.animation:
+            update_chat_setting(chat_id, "welcome_media", reply.animation.file_id)
+            update_chat_setting(chat_id, "welcome_media_type", "animation")
+            update_chat_setting(chat_id, "welcome_media_enabled", True)
+            
     else:
         # Fallback to the text after the command
         text = update.message.text_html.split(" ", 1)
@@ -78,8 +92,8 @@ async def set_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def set_welcome_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Set the welcome message photo."""
-    if not update.message or not update.message.reply_to_message or not update.message.reply_to_message.photo:
-        await update.message.reply_text("Please reply to a photo message with /setphoto to set the welcome photo.")
+    if not update.message or not update.message.reply_to_message:
+        await update.message.reply_text("Please reply to a photo, video, or animation message with /setphoto to set the welcome media.")
         return
 
     # Check admin or owner
@@ -92,9 +106,24 @@ async def set_welcome_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("Admin only command.")
             return
 
-    photo_file_id = update.message.reply_to_message.photo[-1].file_id
-    update_chat_setting(chat_id, "welcome_media", photo_file_id)
-    await update.message.reply_text("Welcome photo updated!")
+    reply = update.message.reply_to_message
+    if reply.photo:
+        media_id = reply.photo[-1].file_id
+        media_type = "photo"
+    elif reply.video:
+        media_id = reply.video.file_id
+        media_type = "video"
+    elif reply.animation:
+        media_id = reply.animation.file_id
+        media_type = "animation"
+    else:
+        await update.message.reply_text("❌ Please reply to a photo, video, or animation.")
+        return
+
+    update_chat_setting(chat_id, "welcome_media", media_id)
+    update_chat_setting(chat_id, "welcome_media_type", media_type)
+    update_chat_setting(chat_id, "welcome_media_enabled", True)
+    await update.message.reply_text(f"✅ Welcome {media_type} updated and enabled!")
 
 async def set_welcome_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Set the welcome message button."""
