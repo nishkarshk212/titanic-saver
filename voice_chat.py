@@ -133,7 +133,8 @@ async def start_voice_chat_monitor(application: Application):
                         chat_id=chat_id,
                         text=welcome_text,
                         reply_markup=keyboard,
-                        parse_mode=ParseMode.HTML
+                        parse_mode=ParseMode.HTML,
+                        disable_web_page_preview=True
                     )
                     
                     # Auto delete after 1 minute
