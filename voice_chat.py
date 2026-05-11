@@ -108,16 +108,20 @@ async def start_voice_chat_monitor(application: Application):
                     
                     if not chat_id: continue
 
+                    # Normalize chat_id for settings check (Telethon IDs for channels/supergroups need -100 prefix)
+                    settings_chat_id = chat_id
+                    if isinstance(chat_entity, PeerChannel) or (str(chat_id).startswith('-100') == False and chat_id > 0):
+                        if not str(chat_id).startswith('-100'):
+                            settings_chat_id = int(f"-100{chat_id}")
+
                     # Check if VC join notification is enabled for this chat
-                    settings = get_chat_settings(chat_id)
+                    settings = get_chat_settings(settings_chat_id)
                     if not settings.get("vc_user_join_enabled", True):
+                        logger.info(f"VC join notification disabled for {settings_chat_id}")
                         continue
 
-                    if chat_id and (isinstance(chat_entity, PeerChannel) or (str(chat_id).startswith('-100') == False and chat_id > 0)):
-                        if not str(chat_id).startswith('-100'):
-                            chat_id = int(f"-100{chat_id}")
-
-                    if not chat_id: continue
+                    # Update the local chat_id variable to the normalized one for sending messages
+                    chat_id = settings_chat_id
 
                     welcome_text = (
                         f"<blockquote>\n"
