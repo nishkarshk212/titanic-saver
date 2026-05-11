@@ -174,16 +174,13 @@ async def vc_join_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if is_active:
             # Direct deep link to join voice chat immediately
-            # Format: https://t.me/username?videochat or tg://video_chat?peer=chat_id
             chat = await context.bot.get_chat(chat_id)
             if chat.username:
                 join_link = f"https://t.me/{chat.username}?videochat"
             else:
-                # Remove -100 prefix for the deep link peer parameter
                 clean_peer_id = str(chat_id).replace("-100", "")
                 join_link = f"tg://video_chat?peer={clean_peer_id}"
             
-            # Answer with URL to open it immediately
             await query.answer(url=join_link)
         else:
             await query.answer("Error checking voice chat status.", show_alert=True)
