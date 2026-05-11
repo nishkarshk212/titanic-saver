@@ -27,6 +27,7 @@ from Manager import get_manager_handlers
 from config import BOT_TOKEN, LOG_CHANNEL_ID, OWNER_ID, log_to_channel, send_bot_response, send_bot_media, START_IMG, to_small_caps
 from voice_chat import start_voice_chat_monitor, stop_voice_chat_monitor
 from user_manager_mongo import cache_user_handler, get_user_id, get_user_stats, is_user_admin, get_sangmata_handlers
+from settings_manager_mongo import get_chat_settings
 
 # Configure logging
 logging.basicConfig(

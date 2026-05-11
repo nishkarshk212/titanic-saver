@@ -5,6 +5,8 @@ import datetime
 from telethon import TelegramClient, events
 from telethon.tl.types import UpdateGroupCallParticipants, PeerChat, PeerChannel, PeerUser, UpdateGroupCall
 from telethon.tl.functions.phone import GetGroupCallRequest
+from telethon.tl.functions.channels import GetFullChannelRequest
+from telethon.tl.functions.messages import GetFullChatRequest
 from telethon.sessions import StringSession
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
@@ -27,7 +29,7 @@ ptb_application = None
 # Cache to prevent duplicate notifications
 notification_cache = {}
 
-# Map call IDs to chat IDs
+# Map call IDs to chat entities
 call_to_chat = {}
 
 async def start_voice_chat_monitor(application: Application):
@@ -42,21 +44,33 @@ async def start_voice_chat_monitor(application: Application):
     logger.info("🎙 Starting Voice Chat Monitor...")
     telethon_client = TelegramClient(StringSession(STRING_SESSION), API_ID, API_HASH)
     
-    @telethon_client.on(events.Raw(UpdateGroupCall))
-    async def handle_call_update(event):
-        """Maps call IDs to chat entities."""
-        try:
-            # When a call starts or is updated, we try to find its chat
-            # This is a bit advanced but helps in mapping
-            pass
-        except: pass
-
     @telethon_client.on(events.Raw(UpdateGroupCallParticipants))
     async def handle_voice_chat_join(event):
         """Handles voice chat join events."""
         try:
+            # We need to find the chat_id. 
+            # We'll try to find it by checking if we have mapped this call ID before.
+            chat_entity = call_to_chat.get(event.call.id)
+            
+            # If not mapped, try to find it by searching active dialogs
+            if not chat_entity:
+                async for dialog in telethon_client.iter_dialogs(limit=20):
+                    if dialog.is_group or dialog.is_channel:
+                        # For groups/channels, we can check if they have an active call
+                        try:
+                            full = await telethon_client(
+                                GetFullChannelRequest(channel=dialog.entity) if dialog.is_channel 
+                                else GetFullChatRequest(chat_id=dialog.id)
+                            )
+                            if hasattr(full, 'full_chat') and hasattr(full.full_chat, 'call'):
+                                if full.full_chat.call and full.full_chat.call.id == event.call.id:
+                                    chat_entity = dialog.entity
+                                    call_to_chat[event.call.id] = chat_entity
+                                    break
+                        except: continue
+
             for participant in event.participants:
-                # Only care about joins
+                # Only care about joins (those with a date)
                 if not hasattr(participant, 'date') or participant.date is None:
                     continue
                 
@@ -70,7 +84,7 @@ async def start_voice_chat_monitor(application: Application):
                 cache_key = f"{user_id}_{event.call.id}"
                 now = datetime.datetime.now()
                 if cache_key in notification_cache:
-                    if (now - notification_cache[cache_key]).total_seconds() < 30:
+                    if (now - notification_cache[cache_key]).total_seconds() < 60:
                         continue
                 notification_cache[cache_key] = now
 
@@ -80,25 +94,22 @@ async def start_voice_chat_monitor(application: Application):
                     user_name = user.first_name
                     user_mention = f'<a href="tg://user?id={user_id}">{user_name}</a>'
                     
-                    # Try to find the chat by checking all dialogs 
-                    # (This is a bit slow but ensures we find the right group)
-                    chat_id = None
-                    group_name = "the group"
+                    group_name = chat_entity.title if chat_entity and hasattr(chat_entity, 'title') else "the group"
+                    chat_id = chat_entity.id if chat_entity else None
                     
-                    async for dialog in telethon_client.iter_dialogs():
-                        if dialog.is_group or dialog.is_channel:
-                            # We check if the call ID matches or if we can find the call in this chat
-                            # For simplicity, we'll look for the user in the group
-                            # and assume it's the right one if they are in the voice chat
-                            pass
-                    
-                    # Fallback: Just log it for now
-                    logger.info(f"✅ Voice chat join detected: {user_name} ({user_id})")
-                    
-                    # The message you requested
+                    # Convert Telethon ID to PTB ID if it's a channel
+                    if chat_id and isinstance(chat_entity, PeerChannel) or (str(chat_id).startswith('-100') == False and chat_id > 0 and getattr(chat_entity, 'broadcast', False) or getattr(chat_entity, 'megagroup', False)):
+                        if not str(chat_id).startswith('-100'):
+                            chat_id = int(f"-100{chat_id}")
+
+                    # If we don't have a chat_id, we can't send the message
+                    if not chat_id:
+                        logger.warning(f"⚠️ VC join detected for {user_name} but could not resolve chat_id.")
+                        continue
+
                     welcome_text = (
                         f"<blockquote>\n"
-                        f"ωєℓ¢σмє тσ νσι¢є ¢нαт\n"
+                        f"ωєℓ¢σмє тσ {group_name}'s νσι¢є ¢нαт\n"
                         f"</blockquote>\n"
                         f"<blockquote>\n"
                         f"ηαмє : {user_mention}\n"
@@ -109,17 +120,27 @@ async def start_voice_chat_monitor(application: Application):
                     bot_info = await ptb_application.bot.get_me()
                     add_url = f"https://t.me/{bot_info.username}?startgroup=true"
                     
+                    # Try to get group link
+                    vc_link = add_url
+                    if hasattr(chat_entity, 'username') and chat_entity.username:
+                        vc_link = f"https://t.me/{chat_entity.username}"
+                    
                     keyboard = InlineKeyboardMarkup([
-                        [InlineKeyboardButton("ᴊᴏɪɴ ᴠᴏɪᴄᴇ ᴄʜᴀᴛ", url=add_url)],
+                        [InlineKeyboardButton("ᴊᴏɪɴ ᴠᴏɪᴄᴇ ᴄʜᴀᴛ", url=vc_link)],
                         [InlineKeyboardButton(to_small_caps("+ ᴀᴅᴅ ᴍᴇ ɪɴ ɢʀᴏᴜᴘ +"), url=add_url)]
                     ])
                     
-                    # Since we can't reliably get chat_id from raw UpdateGroupCallParticipants,
-                    # a better approach is to use PTB's built-in handlers if available 
-                    # or listen for Service Messages (ActionChatJoinedByLink, etc.)
+                    # Send via PTB application
+                    await ptb_application.bot.send_message(
+                        chat_id=chat_id,
+                        text=welcome_text,
+                        reply_markup=keyboard,
+                        parse_mode=ParseMode.HTML
+                    )
+                    logger.info(f"✅ Voice chat join notification sent for {user_name} in {group_name} ({chat_id})")
                     
                 except Exception as e:
-                    logger.error(f"❌ Error handling VC participant: {e}")
+                    logger.error(f"❌ Error sending VC notification: {e}")
                     
         except Exception as e:
             logger.error(f"❌ Error in handle_voice_chat_join: {e}")
@@ -132,4 +153,3 @@ async def stop_voice_chat_monitor():
     if telethon_client:
         await telethon_client.disconnect()
         logger.info("🎙 Voice Chat Monitor stopped.")
-
