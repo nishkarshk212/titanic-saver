@@ -59,7 +59,6 @@ async def start(update, context):
     
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("+ ᴀᴅᴅ ᴍᴇ ɪɴ ɢʀᴏᴜᴘ +", url=add_to_group_url)],
-        [InlineKeyboardButton(to_small_caps("「 Help And Commands 」"), callback_data="help_main")],
         [
             InlineKeyboardButton(to_small_caps("「 Support 」"), url="https://t.me/jayden_clan"),
             InlineKeyboardButton(to_small_caps("「 Updates 」"), url="https://t.me/Tele_212_bots")
