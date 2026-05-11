@@ -72,11 +72,11 @@ async def start(update, context):
     start_message = (
         f"── 「 {bot_mention} 」 ──\n\n"
         f"<blockquote>"
-        f"💜 𝐇єу 𝐓нєяє • 🎙 {user_mention} ! 🎶"
+        f"<b><tg-emoji emoji_id='6086714986309097798'>💜</tg-emoji> 𝐇єу 𝐓нєяє • 🎙 {user_mention} ! 🎶</b>"
         f"</blockquote>\n"
         f"<blockquote>"
-        f"» ᴅɪᴛᴄʜ ᴛʜᴇ ᴛʜʀᴇᴀᴅs, ʟᴇᴛ's ᴠɪʙᴇ ᴛᴏ ᴛʜᴇ ʀʜʏᴛʜᴍ.\n"
-        f"◎ ᴊᴏɪɴ ᴍᴇ ᴏɴ ᴛᴇʟᴇɢʀᴀᴍ's ᴄᴜᴛɪᴇsᴛ ᴍᴜsɪᴄ ʙᴏᴛ. 🎶"
+        f"<b>» ᴅɪᴛᴄʜ ᴛʜᴇ ᴛʜʀᴇᴀᴅs, ʟᴇᴛ's ᴠɪʙᴇ ᴛᴏ ᴛʜᴇ ʀʜʏᴛʜᴍ.\n"
+        f"◎ ᴊᴏɪɴ ᴍᴇ ᴏɴ ᴛᴇʟᴇɢʀᴀᴍ's ᴄᴜᴛɪᴇsᴛ ʙᴏᴛ. 🎶</b>"
         f"</blockquote>"
     )
     
