@@ -258,19 +258,31 @@ async def voice_chat_invite_handler(update: Update, context: ContextTypes.DEFAUL
 
     inviter = update.effective_user
     invited_users = update.message.video_chat_participants_invited.users
-    group_name = update.effective_chat.title
     
     logger.info(f"Processing {len(invited_users)} invited users")
     
+    # Static parts in mono
+    invited_mono = to_mono("invited")
+    to_mono_str = to_mono("to")
+    vc_mono = to_mono("'s voice chat")
+    
     for user in invited_users:
-        # Format: User invited user to {group name}'s voice chat
-        text = f"{inviter.first_name} invited {user.first_name} to {group_name}'s voice chat"
-        mono_text = to_mono(text)
+        # Format: {inviter_mention} 𝚒𝚗𝚟𝚒𝚝𝚎𝚍 {invitee_mention}𝚝𝚘 ˹ 🇹ɪᴛᴀɴɪᴄ ꭙ 🇼ᴏʀʟᴅ ˼ 🪽'𝚜 𝚟𝚘𝚒𝚌𝚎 𝚌𝚑𝚊𝚝
+        inviter_mention = inviter.mention_html()
+        invitee_mention = user.mention_html()
+        
+        # Constructing the message with requested styling
+        message_text = (
+            f"<blockquote>\n"
+            f"{inviter_mention} {invited_mono} {invitee_mention} {to_mono_str} "
+            f"˹ 🇹ɪᴛᴀɴɪᴄ ꭙ 🇼ᴏʀʟᴅ ˼ 🪽{vc_mono}\n"
+            f"</blockquote>"
+        )
         
         try:
             await context.bot.send_message(
                 chat_id=chat_id,
-                text=f"<blockquote>\n{mono_text}\n</blockquote>",
+                text=message_text,
                 parse_mode=ParseMode.HTML
             )
             logger.info(f"Sent VC invite notification for {user.first_name} in {chat_id}")
