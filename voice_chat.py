@@ -250,6 +250,11 @@ async def voice_chat_invite_handler(update: Update, context: ContextTypes.DEFAUL
     if not update.message or not update.message.video_chat_invited_users:
         return
     
+    chat_id = update.effective_chat.id
+    settings = get_chat_settings(chat_id)
+    if not settings.get("vc_invite_notification_enabled", True):
+        return
+
     inviter = update.effective_user
     invited_users = update.message.video_chat_invited_users
     group_name = update.effective_chat.title

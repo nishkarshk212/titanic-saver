@@ -643,10 +643,12 @@ def get_blocking_settings_keyboard(settings):
 def get_vc_settings_keyboard(settings):
     """Get Voice Chat settings keyboard."""
     vc_user_join_status = "✅" if settings.get("vc_user_join_enabled", True) else "❌"
+    vc_invite_status = "✅" if settings.get("vc_invite_notification_enabled", True) else "❌"
     
     keyboard = [
         [InlineKeyboardButton(f"User Join Notification: {vc_user_join_status}", callback_data="set_toggle_vc_user_join_enabled")],
-        [InlineKeyboardButton("ℹ️ Notifies when users join voice chat", callback_data="set_none")],
+        [InlineKeyboardButton(f"Invite Notification: {vc_invite_status}", callback_data="set_toggle_vc_invite_notification_enabled")],
+        [InlineKeyboardButton("ℹ️ Voice chat related notifications", callback_data="set_none")],
         [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -1207,7 +1209,7 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             update_chat_setting(chat_id, "banned_words_target", new_val)
         else:
             # Welcome and Clean settings enabled by default, others disabled by default
-            default_val = True if "welcome_" in key or "media_enabled" in key or "button_enabled" in key or "clean_" in key else False
+            default_val = True if "welcome_" in key or "media_enabled" in key or "button_enabled" in key or "clean_" in key or "vc_" in key else False
             new_val = not settings.get(key, default_val)
             update_chat_setting(chat_id, key, new_val)
         
@@ -1255,7 +1257,7 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await query.edit_message_reply_markup(reply_markup=get_blocking_settings_keyboard(new_settings))
             elif key.startswith("manager_"):
                 await query.edit_message_reply_markup(reply_markup=get_manager_settings_keyboard(new_settings))
-            elif "vc_user_join" in key:
+            elif "vc_" in key:
                 await query.edit_message_reply_markup(reply_markup=get_vc_settings_keyboard(new_settings))
         except BadRequest: pass
         await query.answer(f"Setting updated!")
