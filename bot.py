@@ -25,7 +25,7 @@ from blocking_handler import get_blocking_handlers
 from recurring import get_recurring_handlers, check_recurring_messages, count_recurring_messages
 from Manager import get_manager_handlers
 from config import BOT_TOKEN, LOG_CHANNEL_ID, OWNER_ID, log_to_channel, send_bot_response, send_bot_media, START_IMG, to_small_caps
-from voice_chat import start_voice_chat_monitor, stop_voice_chat_monitor
+from voice_chat import start_voice_chat_monitor, stop_voice_chat_monitor, get_voice_chat_handlers
 from user_manager_mongo import cache_user_handler, get_user_id, get_user_stats, is_user_admin, get_sangmata_handlers
 from settings_manager_mongo import get_chat_settings
 
@@ -1057,7 +1057,11 @@ def main():
     application.add_handler(CommandHandler("ban", ban_command, filters=filters.ChatType.CHANNEL))
     application.add_handler(CommandHandler("unban", unban_command, filters=filters.ChatType.CHANNEL))
 
-    # Add admin handlers (Group 0)
+    # Add Voice Chat handlers (Group 0)
+    for handler in get_voice_chat_handlers():
+        application.add_handler(handler)
+
+    # Add Admin handlers (Group 0)
     for handler in get_admin_handlers():
         application.add_handler(handler)
 
