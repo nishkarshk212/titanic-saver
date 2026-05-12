@@ -34,6 +34,9 @@ notification_cache = {}
 # Map call IDs to chat entities
 call_to_chat = {}
 
+# Pending invites: (chat_id, user_id) -> list of message_ids to delete upon join
+pending_invites = {}
+
 async def start_voice_chat_monitor(application: Application):
     """Starts the Telethon client to monitor voice chat events."""
     global telethon_client, ptb_application
@@ -120,6 +123,21 @@ async def start_voice_chat_monitor(application: Application):
 
                     # Update the local chat_id variable to the normalized one for sending messages
                     chat_id = settings_chat_id
+
+                    # --- DELETE INVITE NOTIFICATION IF USER JOINED ---
+                    try:
+                        invite_key = (chat_id, user_id)
+                        if invite_key in pending_invites:
+                            msg_ids = pending_invites.pop(invite_key)
+                            logger.info(f"User {user_id} joined VC in {chat_id}. Deleting {len(msg_ids)} invite messages.")
+                            for mid in msg_ids:
+                                try:
+                                    await ptb_application.bot.delete_message(chat_id=chat_id, message_id=mid)
+                                except Exception as e:
+                                    logger.warning(f"Could not delete invite message {mid}: {e}")
+                    except Exception as e:
+                        logger.error(f"Error handling invite cleanup on join: {e}")
+                    # --------------------------------------------------
 
                     welcome_text = (
                         f"<blockquote>\n"
@@ -280,12 +298,37 @@ async def voice_chat_invite_handler(update: Update, context: ContextTypes.DEFAUL
         )
         
         try:
-            await context.bot.send_message(
+            sent_msg = await context.bot.send_message(
                 chat_id=chat_id,
                 text=message_text,
                 parse_mode=ParseMode.HTML
             )
             logger.info(f"Sent VC invite notification for {user.first_name} in {chat_id}")
+            
+            # Store message IDs for deletion upon join
+            # We store the original service message ID AND the bot's notification ID
+            invite_key = (chat_id, user.id)
+            if invite_key not in pending_invites:
+                pending_invites[invite_key] = []
+            
+            # Add service message ID (if not already added)
+            service_msg_id = update.message.message_id
+            if service_msg_id not in pending_invites[invite_key]:
+                pending_invites[invite_key].append(service_msg_id)
+            
+            # Add bot's notification message ID
+            pending_invites[invite_key].append(sent_msg.message_id)
+            
+            # Optional: auto-cleanup pending_invites after some time (e.g., 1 hour)
+            async def cleanup_invite(key, msg_id):
+                await asyncio.sleep(3600)
+                if key in pending_invites and msg_id in pending_invites[key]:
+                    pending_invites[key].remove(msg_id)
+                    if not pending_invites[key]:
+                        pending_invites.pop(key, None)
+            
+            asyncio.create_task(cleanup_invite(invite_key, sent_msg.message_id))
+
         except Exception as e:
             logger.error(f"Error sending invite notification: {e}")
 
