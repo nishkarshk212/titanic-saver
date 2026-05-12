@@ -11,7 +11,8 @@ from telethon.sessions import StringSession
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.constants import ParseMode
 from config import BOT_TOKEN, to_small_caps
-from telegram.ext import Application, CallbackQueryHandler, ContextTypes
+from font import to_mono
+from telegram.ext import Application, CallbackQueryHandler, ContextTypes, MessageHandler, filters
 from settings_manager_mongo import get_chat_settings
 
 # Configure logging
@@ -40,6 +41,9 @@ async def start_voice_chat_monitor(application: Application):
     
     # Add callback handler for Join VC button
     application.add_handler(CallbackQueryHandler(vc_join_callback, pattern="^join_vc_"))
+    
+    # Add handler for voice chat invite notifications
+    application.add_handler(MessageHandler(filters.StatusUpdate.VIDEO_CHAT_INVITED_USERS, voice_chat_invite_handler))
     
     if not API_ID or not API_HASH or not STRING_SESSION:
         logger.warning("⚠️ Telethon credentials missing. Voice chat join notifications disabled.")
@@ -240,6 +244,25 @@ async def vc_join_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             await query.answer("Error checking voice chat status.", show_alert=True)
         except: pass
+
+async def voice_chat_invite_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handles notifications when users are invited to a voice chat."""
+    if not update.message or not update.message.video_chat_invited_users:
+        return
+    
+    inviter = update.effective_user
+    invited_users = update.message.video_chat_invited_users
+    group_name = update.effective_chat.title
+    
+    for user in invited_users:
+        # Format: User invited user to {group name}'s voice chat
+        text = f"{inviter.first_name} invited {user.first_name} to {group_name}'s voice chat"
+        mono_text = to_mono(text)
+        
+        await update.message.reply_text(
+            f"<blockquote>\n{mono_text}\n</blockquote>",
+            parse_mode=ParseMode.HTML
+        )
 
 async def stop_voice_chat_monitor():
     """Stops the Telethon client."""
