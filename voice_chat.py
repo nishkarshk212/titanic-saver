@@ -43,7 +43,7 @@ async def start_voice_chat_monitor(application: Application):
     application.add_handler(CallbackQueryHandler(vc_join_callback, pattern="^join_vc_"))
     
     # Add handler for voice chat invite notifications
-    application.add_handler(MessageHandler(filters.StatusUpdate.VIDEO_CHAT_INVITED_USERS, voice_chat_invite_handler))
+    application.add_handler(MessageHandler(filters.StatusUpdate.VIDEO_CHAT_PARTICIPANTS_INVITED, voice_chat_invite_handler))
     
     if not API_ID or not API_HASH or not STRING_SESSION:
         logger.warning("⚠️ Telethon credentials missing. Voice chat join notifications disabled.")
@@ -247,7 +247,7 @@ async def vc_join_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def voice_chat_invite_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handles notifications when users are invited to a voice chat."""
-    if not update.message or not update.message.video_chat_invited_users:
+    if not update.message or not update.message.video_chat_participants_invited:
         return
     
     chat_id = update.effective_chat.id
@@ -256,7 +256,7 @@ async def voice_chat_invite_handler(update: Update, context: ContextTypes.DEFAUL
         return
 
     inviter = update.effective_user
-    invited_users = update.message.video_chat_invited_users
+    invited_users = update.message.video_chat_participants_invited.users
     group_name = update.effective_chat.title
     
     for user in invited_users:
@@ -264,10 +264,14 @@ async def voice_chat_invite_handler(update: Update, context: ContextTypes.DEFAUL
         text = f"{inviter.first_name} invited {user.first_name} to {group_name}'s voice chat"
         mono_text = to_mono(text)
         
-        await update.message.reply_text(
-            f"<blockquote>\n{mono_text}\n</blockquote>",
-            parse_mode=ParseMode.HTML
-        )
+        try:
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=f"<blockquote>\n{mono_text}\n</blockquote>",
+                parse_mode=ParseMode.HTML
+            )
+        except Exception as e:
+            logger.error(f"Error sending invite notification: {e}")
 
 async def stop_voice_chat_monitor():
     """Stops the Telethon client."""
