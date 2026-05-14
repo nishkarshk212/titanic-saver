@@ -2,6 +2,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler, MessageHandler, filters
 from telegram.error import BadRequest
 from settings_manager_mongo import get_chat_settings, update_chat_setting
+from database import get_collection, COLLECTIONS
 from config import OWNER_ID, send_bot_response, edit_bot_response
 from user_manager_mongo import can_user_configure_settings
 from anonymous_admin import is_anonymous_admin, check_anonymous_admin_change_info_permission
@@ -16,11 +17,68 @@ async def delete_saved_message(context, message):
     except Exception as e:
         logging.warning(f"Failed to delete saved message: {e}")
 
+async def get_manageable_groups(user_id, context):
+    """Find all groups where the user has permission to change settings."""
+    groups = []
+    settings_col = get_collection(COLLECTIONS["settings"])
+    if settings_col is None:
+        return groups
+    
+    # Get all unique chat_ids from settings
+    cursor = settings_col.find({}, {"chat_id": 1})
+    for doc in cursor:
+        try:
+            chat_id = int(doc["chat_id"])
+            
+            # Skip if it's the user's own private chat ID (though unlikely to be here)
+            if chat_id > 0: continue
+
+            # OWNER always has access
+            if user_id == OWNER_ID:
+                try:
+                    chat = await context.bot.get_chat(chat_id)
+                    groups.append({"id": chat_id, "title": chat.title or str(chat_id)})
+                except Exception:
+                    groups.append({"id": chat_id, "title": f"Group {chat_id}"})
+                continue
+
+            # Check if user can configure settings in this chat
+            if await can_user_configure_settings(chat_id, user_id, context):
+                try:
+                    chat = await context.bot.get_chat(chat_id)
+                    groups.append({"id": chat_id, "title": chat.title or str(chat_id)})
+                except Exception:
+                    # If we can't get chat info, maybe the bot was removed
+                    groups.append({"id": chat_id, "title": f"Group {chat_id}"})
+        except Exception:
+            continue
+    return groups
+
 async def settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Settings command handler - shows option to open in group or private."""
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
-    
+    chat_type = update.effective_chat.type
+
+    # If it's a private chat, show group selection
+    if chat_type == "private":
+        groups = await get_manageable_groups(user_id, context)
+        if not groups:
+            await send_bot_response(update, context, "You don't manage any groups with this bot yet.")
+            return
+        
+        keyboard = []
+        for group in groups:
+            keyboard.append([InlineKeyboardButton(group['title'], callback_data=f"set_view_main_for_{group['id']}")])
+        
+        message_text = (
+            "Manage group Settings\n"
+            "👉🏻 Select the group whose settings you want to change."
+        )
+        
+        await update.message.reply_text(message_text, reply_markup=InlineKeyboardMarkup(keyboard))
+        return
+
     # Check command access for settings
     from settings_manager_mongo import check_command_access
     if not await check_command_access(chat_id, user_id, 'settings', context):
@@ -697,7 +755,7 @@ def get_manager_settings_keyboard(settings):
 
 async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    chat_id = update.effective_chat.id
+    interaction_chat_id = update.effective_chat.id
     user_id = update.effective_user.id
     
     # Handle "Open Here" button
@@ -725,6 +783,17 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode='HTML'
         )
         return
+
+    # Handle Group Selection in Private
+    if query.data.startswith("set_view_main_for_"):
+        actual_chat_id = int(query.data.replace("set_view_main_for_", ""))
+        context.user_data['settings_chat_id'] = actual_chat_id
+        await show_settings_panel(query, context, actual_chat_id)
+        await query.answer()
+        return
+    
+    # Determine the actual chat_id (could be from private chat with stored group_id)
+    chat_id = context.user_data.get('settings_chat_id', interaction_chat_id)
     
     # Granular permission check
     if not await can_user_configure_settings(chat_id, user_id, context):
@@ -769,9 +838,7 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
         
     if data == "set_view_main":
-        # Determine the actual chat_id (could be from private chat with stored group_id)
-        actual_chat_id = context.user_data.get('settings_chat_id', chat_id)
-        await show_settings_panel(query, context, actual_chat_id)
+        await show_settings_panel(query, context, chat_id)
         await query.answer()
         return
 
