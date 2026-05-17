@@ -449,6 +449,9 @@ def get_clean_settings_keyboard(settings):
 
 def get_auto_delete_settings_keyboard(settings):
     status = "✅" if settings.get("auto_delete_enabled", False) else "❌"
+    text_status = "✅" if settings.get("auto_delete_text", True) else "❌"
+    stickers_status = "✅" if settings.get("auto_delete_stickers", True) else "❌"
+    media_status = "✅" if settings.get("auto_delete_media", True) else "❌"
     total_seconds = settings.get("auto_delete_time", 60)
     
     # Calculate H, M, S
@@ -458,6 +461,9 @@ def get_auto_delete_settings_keyboard(settings):
     
     keyboard = [
         [InlineKeyboardButton(f"Auto Delete: {status}", callback_data="set_toggle_auto_delete_enabled")],
+        [InlineKeyboardButton(f"Text Messages: {text_status}", callback_data="set_toggle_auto_delete_text")],
+        [InlineKeyboardButton(f"Stickers: {stickers_status}", callback_data="set_toggle_auto_delete_stickers")],
+        [InlineKeyboardButton(f"Media: {media_status}", callback_data="set_toggle_auto_delete_media")],
         [
             InlineKeyboardButton("-H", callback_data="set_time_sub_3600"),
             InlineKeyboardButton(f"{h} Hours", callback_data="set_none"),
@@ -1275,8 +1281,8 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             new_val = "everyone" if current == "members" else "members"
             update_chat_setting(chat_id, "banned_words_target", new_val)
         else:
-            # Welcome and Clean settings enabled by default, others disabled by default
-            default_val = True if "welcome_" in key or "media_enabled" in key or "button_enabled" in key or "clean_" in key or "vc_" in key else False
+            # Welcome, Clean and Auto Delete (specific types) settings enabled by default, others disabled by default
+            default_val = True if "welcome_" in key or "media_enabled" in key or "button_enabled" in key or "clean_" in key or "vc_" in key or "auto_delete_text" in key or "auto_delete_stickers" in key or "auto_delete_media" in key else False
             new_val = not settings.get(key, default_val)
             update_chat_setting(chat_id, key, new_val)
         
