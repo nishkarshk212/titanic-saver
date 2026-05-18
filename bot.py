@@ -24,6 +24,7 @@ from sticker_manager import get_sticker_handlers
 from blocking_handler import get_blocking_handlers
 from edit_handler import get_edit_handlers
 from bio_handler import get_bio_handlers
+from font_normalizer import normalize_text
 from recurring import get_recurring_handlers, check_recurring_messages, count_recurring_messages
 from Manager import get_manager_handlers
 from config import BOT_TOKEN, LOG_CHANNEL_ID, OWNER_ID, log_to_channel, send_bot_response, send_bot_media, START_IMG, to_small_caps
@@ -954,8 +955,14 @@ async def check_banned_words(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if not banned_words:
         return
         
-    text = update.message.text.lower()
-    found_words = [word for word in banned_words if word in text]
+    original_text = update.message.text.lower()
+    normalized_text_val = normalize_text(update.message.text)
+    
+    found_words = []
+    for word in banned_words:
+        word_lower = word.lower()
+        if word_lower in original_text or word_lower in normalized_text_val:
+            found_words.append(word)
     
     if found_words:
         # Delete message if enabled
