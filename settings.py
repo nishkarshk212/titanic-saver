@@ -242,8 +242,7 @@ async def show_settings_panel(query_or_update, context, chat_id, is_private=Fals
 
 def get_main_settings_keyboard(chat_id=None):
     keyboard = [
-        [InlineKeyboardButton("👋 Welcome", callback_data="set_view_welcome"), 
-         InlineKeyboardButton("🧹 Clean Service", callback_data="set_view_clean")],
+        [InlineKeyboardButton("👋 Welcome", callback_data="set_view_welcome")],
         [InlineKeyboardButton("📏 Msg Length", callback_data="set_view_msg_length"),
          InlineKeyboardButton("🛡️ Moderation", callback_data="set_view_mod")],
         [InlineKeyboardButton("🗑️ Cmd Deletion", callback_data="set_view_command_deletion"),
@@ -339,10 +338,10 @@ def get_warning_time_settings_keyboard(settings):
     keyboard = [
         [InlineKeyboardButton(f"🕒 Warning Deletion: {time_str}", callback_data="set_none")],
         [
-            InlineKeyboardButton("-1m", callback_data="set_warn_time_sub_60"),
-            InlineKeyboardButton("-10s", callback_data="set_warn_time_sub_10"),
-            InlineKeyboardButton("+10s", callback_data="set_warn_time_add_10"),
-            InlineKeyboardButton("+1m", callback_data="set_warn_time_add_60")
+            InlineKeyboardButton("-1min", callback_data="set_warn_time_sub_60"),
+            InlineKeyboardButton("-10sec", callback_data="set_warn_time_sub_10"),
+            InlineKeyboardButton("+10sec", callback_data="set_warn_time_add_10"),
+            InlineKeyboardButton("+1min", callback_data="set_warn_time_add_60")
         ],
         [InlineKeyboardButton("🔙 Back", callback_data="set_view_deleting")]
     ]
