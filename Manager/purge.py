@@ -95,10 +95,67 @@ async def delete_msg(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await update.message.reply_text(f"**Failed to delete message:**\n<code>{str(e)}</code>", parse_mode='HTML')
 
+async def purge_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Delete all messages in the group."""
+    chat = update.effective_chat
+    user_id = update.effective_user.id
+    
+    # Check permissions
+    from user_manager_mongo import is_user_admin
+    if not await is_user_admin(chat.id, user_id, context):
+        return await update.message.reply_text("Only admins can use this command.")
+
+    if chat.type not in ['group', 'supergroup']:
+        return await update.message.reply_text("This command works only in supergroups.")
+
+    # Confirmation logic if not already confirmed
+    if not context.args or context.args[0] != "confirm":
+        return await update.message.reply_text(
+            "⚠️ **WARNING**\n\n"
+            "This will attempt to delete ALL messages in this group. This action cannot be undone.\n\n"
+            "Type `/purgeall confirm` to proceed.",
+            parse_mode='Markdown'
+        )
+
+    status_msg = await update.message.reply_text("🚀 **Starting global purge...**", parse_mode='Markdown')
+    
+    current_id = update.message.id
+    deleted_count = 0
+    
+    # We delete in batches of 100 backwards
+    # We'll try to delete up to 10000 messages or until we hit too many errors
+    try:
+        for i in range(current_id, 0, -100):
+            batch = list(range(max(1, i - 100), i))
+            try:
+                await context.bot.delete_messages(chat.id, batch)
+                deleted_count += len(batch)
+                if deleted_count % 500 == 0:
+                    await status_msg.edit_text(f"🚀 **Purging...**\nDeleted: `{deleted_count}` messages", parse_mode='Markdown')
+                await asyncio.sleep(0.5) # Avoid flood limits
+            except BadRequest as e:
+                if "Message to delete not found" in str(e):
+                    continue
+                elif "Message can't be deleted" in str(e):
+                    # Probably reached messages older than 48h or bot lacks rights for old messages
+                    # But in supergroups, bots with delete rights can delete any message.
+                    continue
+                else:
+                    break
+            except Exception:
+                break
+                
+        await status_msg.edit_text(f"✅ **Global purge complete!**\nTotal deleted: `{deleted_count}` messages", parse_mode='Markdown')
+        await asyncio.sleep(5)
+        await status_msg.delete()
+    except Exception as e:
+        await status_msg.edit_text(f"❌ **Purge interrupted:**\n`{str(e)}`", parse_mode='Markdown')
+
 def get_purge_handlers():
     """Return purge handlers."""
     return [
         CommandHandler("purge", purge),
         CommandHandler("spurge", spurge),
         CommandHandler("del", delete_msg),
+        CommandHandler(["purgeall", "cleanall"], purge_all),
     ]

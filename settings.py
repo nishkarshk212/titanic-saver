@@ -318,6 +318,7 @@ def get_members_mgmt_keyboard():
         ],
         [InlineKeyboardButton("❗ Kick muted/restricted users", callback_data="mgmt_kick_restricted")],
         [InlineKeyboardButton("💀 Kick deleted accounts", callback_data="mgmt_kick_deleted")],
+        [InlineKeyboardButton("🗑️ Delete all messages", callback_data="mgmt_delete_all")],
         [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -1231,6 +1232,46 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 except:
                     errors += 1
             await context.bot.send_message(chat_id, f"✅ Done! Kicked {count} deleted accounts. ({errors} errors)")
+        elif action == "delete_all":
+            # Show confirmation
+            keyboard = [
+                [InlineKeyboardButton("✅ Yes, Delete Everything", callback_data="mgmt_confirm_delete_all")],
+                [InlineKeyboardButton("❌ No, Cancel", callback_data="set_view_members_mgmt")]
+            ]
+            await query.edit_message_text(
+                "⚠️ <b>WARNING: DELETE ALL MESSAGES</b>\n\n"
+                "Are you sure you want to delete ALL messages in this group?\n"
+                "This action cannot be undone and may take some time.",
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode='HTML'
+            )
+            return
+        elif action == "confirm_delete_all":
+            # Start deletion process
+            await query.edit_message_text("🚀 <b>Global purge in progress...</b>\nYou can close this menu, the process will continue in the background.", parse_mode='HTML')
+            
+            # Run in background to not block the bot
+            async def background_purge(b, c_id, msg_id):
+                deleted = 0
+                try:
+                    for i in range(msg_id, 0, -100):
+                        batch = list(range(max(1, i - 100), i))
+                        try:
+                            await b.delete_messages(c_id, batch)
+                            deleted += len(batch)
+                            await asyncio.sleep(0.5)
+                        except BadRequest as e:
+                            if "Message to delete not found" in str(e) or "Message can't be deleted" in str(e):
+                                continue
+                            else: break
+                        except: break
+                    await b.send_message(c_id, f"✅ <b>Global purge complete!</b>\nTotal deleted: `{deleted}` messages", parse_mode='HTML')
+                except Exception as e:
+                    logging.error(f"Error in background purge: {e}")
+
+            asyncio.create_task(background_purge(context.bot, chat_id, query.message.id))
+            await query.answer("Global purge started!")
+            return
             
         await query.answer("Members Management action completed.")
         return
