@@ -49,17 +49,8 @@ async def apply_bio_penalty(update: Update, context, user_id: int, bio: str):
     if penalty == "off":
         return
 
-    # Use mention_html() if update.effective_user matches user_id, else try to get from context
-    if update.effective_user and update.effective_user.id == user_id:
-        user_mention = update.effective_user.mention_html()
-    else:
-        try:
-            # Check if context has bot attribute (PTB Application or Context)
-            bot = context.bot if hasattr(context, 'bot') else context
-            member = await bot.get_chat_member(chat_id, user_id)
-            user_mention = member.user.mention_html()
-        except:
-            user_mention = f"User {user_id}"
+    # Show only user ID as requested
+    user_id_str = f"<code>{user_id}</code>"
 
     limit = settings.get("bio_link_warn_limit", 3)
     current_warns = add_warn(chat_id, user_id)
@@ -82,27 +73,27 @@ async def apply_bio_penalty(update: Update, context, user_id: int, bio: str):
             try:
                 await bot.restrict_chat_member(chat_id, user_id, permissions=ChatPermissions(can_send_messages=False))
                 keyboard.insert(0, [InlineKeyboardButton("🔊 Unmute", callback_data=f"edit_unmute_{user_id}")])
-                msg_text = f"🚫 {user_mention} has been muted for reaching the warn limit (Link in bio)."
+                msg_text = f"🚫 User {user_id_str} has been muted for reaching the warn limit (Link in bio)."
             except Exception as e:
                 logging.error(f"Failed to mute user in bio check: {e}")
-                msg_text = f"⚠️ {user_mention}, links are not allowed in your bio! ({current_warns}/{limit})"
+                msg_text = f"⚠️ User {user_id_str}, links are not allowed in your bio! ({current_warns}/{limit})"
         elif penalty == "kick":
             try:
                 await bot.ban_chat_member(chat_id, user_id)
                 await bot.unban_chat_member(chat_id, user_id)
-                msg_text = f"👢 {user_mention} has been kicked for reaching the warn limit (Link in bio)."
+                msg_text = f"👢 User {user_id_str} has been kicked for reaching the warn limit (Link in bio)."
             except Exception as e:
                 logging.error(f"Failed to kick user in bio check: {e}")
-                msg_text = f"⚠️ {user_mention}, links are not allowed in your bio! ({current_warns}/{limit})"
+                msg_text = f"⚠️ User {user_id_str}, links are not allowed in your bio! ({current_warns}/{limit})"
         elif penalty == "ban":
             try:
                 await bot.ban_chat_member(chat_id, user_id)
-                msg_text = f"🔨 {user_mention} has been banned for reaching the warn limit (Link in bio)."
+                msg_text = f"🔨 User {user_id_str} has been banned for reaching the warn limit (Link in bio)."
             except Exception as e:
                 logging.error(f"Failed to ban user in bio check: {e}")
-                msg_text = f"⚠️ {user_mention}, links are not allowed in your bio! ({current_warns}/{limit})"
+                msg_text = f"⚠️ User {user_id_str}, links are not allowed in your bio! ({current_warns}/{limit})"
     else:
-        msg_text = f"⚠️ {user_mention}, links are not allowed in your bio! ({current_warns}/{limit})\nPlease remove it to avoid further penalties."
+        msg_text = f"⚠️ User {user_id_str}, links are not allowed in your bio! ({current_warns}/{limit})\nPlease remove it to avoid further penalties."
 
     try:
         sent_msg = await bot.send_message(
@@ -112,19 +103,19 @@ async def apply_bio_penalty(update: Update, context, user_id: int, bio: str):
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
         
-        # Auto delete warning message after 10 seconds
+        # Auto delete warning message after 5 minutes (300 seconds)
         # If we have a job_queue, use it
         job_queue = getattr(context, 'job_queue', None)
         if job_queue:
             job_queue.run_once(
                 delete_message_job,
-                10,
+                300,
                 data={"chat_id": chat_id, "message_id": sent_msg.message_id}
             )
         else:
             # Fallback for when we don't have job_queue (e.g. called from voice_chat.py with ptb_application)
             async def fallback_delete():
-                await asyncio.sleep(10)
+                await asyncio.sleep(300)
                 try: await bot.delete_message(chat_id, sent_msg.message_id)
                 except: pass
             asyncio.create_task(fallback_delete())

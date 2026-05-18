@@ -45,7 +45,8 @@ async def edited_message_handler(update: Update, context: ContextTypes.DEFAULT_T
     if penalty == "off":
         return
 
-    user_name = update.effective_user.mention_html()
+    # Show only user ID as requested
+    user_id_str = f"<code>{user_id}</code>"
     limit = settings.get("edit_checks_warn_limit", 3)
     
     # Always increment warn count for any penalty that isn't 'off'
@@ -65,17 +66,17 @@ async def edited_message_handler(update: Update, context: ContextTypes.DEFAULT_T
         if penalty == "mute" or penalty == "warn": # 'warn' defaults to mute in original code
             await mute_user(update, context, user_id, reason="Reached warn limit for editing messages")
             keyboard.insert(0, [InlineKeyboardButton("🔊 Unmute", callback_data=f"edit_unmute_{user_id}")])
-            msg_text = f"🚫 {user_name} has been muted for reaching the warn limit (editing messages)."
+            msg_text = f"🚫 User {user_id_str} has been muted for reaching the warn limit (editing messages)."
         elif penalty == "kick":
             await kick_user(update, context, user_id, reason="Reached warn limit for editing messages")
-            msg_text = f"👢 {user_name} has been kicked for reaching the warn limit (editing messages)."
+            msg_text = f"👢 User {user_id_str} has been kicked for reaching the warn limit (editing messages)."
         elif penalty == "ban":
             await ban_user(update, context, user_id, reason="Reached warn limit for editing messages")
-            msg_text = f"🔨 {user_name} has been banned for reaching the warn limit (editing messages)."
+            msg_text = f"🔨 User {user_id_str} has been banned for reaching the warn limit (editing messages)."
         else:
-            msg_text = f"⚠️ {user_name}, edited messages are not allowed! ({current_warns}/{limit})"
+            msg_text = f"⚠️ User {user_id_str}, edited messages are not allowed! ({current_warns}/{limit})"
     else:
-        msg_text = f"⚠️ {user_name}, edited messages are not allowed here! ({current_warns}/{limit})"
+        msg_text = f"⚠️ User {user_id_str}, edited messages are not allowed here! ({current_warns}/{limit})"
 
     try:
         sent_msg = await context.bot.send_message(
@@ -85,11 +86,11 @@ async def edited_message_handler(update: Update, context: ContextTypes.DEFAULT_T
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
         
-        # Auto delete warning message after 10 seconds
+        # Auto delete warning message after 5 minutes (300 seconds)
         if context.job_queue:
             context.job_queue.run_once(
                 delete_message_job,
-                10,
+                300,
                 data={"chat_id": chat_id, "message_id": sent_msg.message_id}
             )
     except Exception as e:
