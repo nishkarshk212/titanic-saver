@@ -3,7 +3,8 @@ import asyncio
 from telegram import Update
 from telegram.ext import ContextTypes, MessageHandler, filters
 from settings_manager_mongo import get_chat_settings
-from user_manager_mongo import is_user_admin, get_user_warns, add_user_warn, reset_user_warns
+from moderation_manager_mongo import get_user_warns, add_warn, reset_warns
+from user_manager_mongo import is_user_admin
 from moderation import ban_user, mute_user, kick_user
 from telegram.error import BadRequest
 
@@ -47,10 +48,11 @@ async def edited_message_handler(update: Update, context: ContextTypes.DEFAULT_T
     
     if penalty == "warn":
         limit = settings.get("edit_checks_warn_limit", 3)
-        current_warns = await add_user_warn(chat_id, user_id)
+        # Note: add_warn and reset_warns are sync in moderation_manager_mongo
+        current_warns = add_warn(chat_id, user_id)
         
         if current_warns >= limit:
-            await reset_user_warns(chat_id, user_id)
+            reset_warns(chat_id, user_id)
             await mute_user(update, context, user_id, reason="Reached warn limit for editing messages")
             await context.bot.send_message(
                 chat_id, 

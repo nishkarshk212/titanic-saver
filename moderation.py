@@ -94,6 +94,37 @@ async def check_bot_admin_rights(chat_id, context, required_rights=None):
     except Exception as e:
         return False, f"❌ Error checking bot rights: {str(e)}"
 
+async def mute_user(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int, reason: str = None):
+    """Helper to mute a user."""
+    chat_id = update.effective_chat.id
+    try:
+        await context.bot.restrict_chat_member(chat_id, user_id, permissions=ChatPermissions(can_send_messages=False))
+        return True
+    except Exception as e:
+        logging.error(f"Error in mute_user: {e}")
+        return False
+
+async def kick_user(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int, reason: str = None):
+    """Helper to kick a user."""
+    chat_id = update.effective_chat.id
+    try:
+        # unban_chat_member kicks the user if they are in the group
+        await context.bot.unban_chat_member(chat_id, user_id)
+        return True
+    except Exception as e:
+        logging.error(f"Error in kick_user: {e}")
+        return False
+
+async def ban_user(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int, reason: str = None):
+    """Helper to ban a user."""
+    chat_id = update.effective_chat.id
+    try:
+        await context.bot.ban_chat_member(chat_id, user_id)
+        return True
+    except Exception as e:
+        logging.error(f"Error in ban_user: {e}")
+        return False
+
 async def ban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Bans a user or channel from the chat or channel."""
     chat_id = update.effective_chat.id
