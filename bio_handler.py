@@ -132,17 +132,21 @@ async def apply_bio_penalty(update: Update, context, user_id: int, bio: str):
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
         
-        # Auto delete warning message after 5 minutes (300 seconds)
+        # Auto delete warning message after custom time (default 5 minutes)
+        warn_delete_time = settings.get("warning_delete_time", 300)
+        
+        # If we have a job_queue, use it
         job_queue = getattr(context, 'job_queue', None)
         if job_queue:
             job_queue.run_once(
                 delete_message_job,
-                300,
+                warn_delete_time,
                 data={"chat_id": chat_id, "message_id": sent_msg.message_id}
             )
         else:
+            # Fallback for when we don't have job_queue (e.g. called from voice_chat.py with ptb_application)
             async def fallback_delete():
-                await asyncio.sleep(300)
+                await asyncio.sleep(warn_delete_time)
                 try: await bot.delete_message(chat_id, sent_msg.message_id)
                 except: pass
             asyncio.create_task(fallback_delete())

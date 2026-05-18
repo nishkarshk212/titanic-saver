@@ -315,9 +315,36 @@ def get_deleting_messages_keyboard():
         [InlineKeyboardButton("🔗 Bio Link Check", callback_data="set_view_bio_link")],
         [InlineKeyboardButton("💭 Service Messages", callback_data="set_view_clean")],
         [InlineKeyboardButton("📓 Block cancellation", callback_data="set_view_blocking")],
+        [InlineKeyboardButton("🕒 Warning Time", callback_data="set_view_warning_time")],
         [InlineKeyboardButton("💥 Delete all messages", callback_data="set_view_global_purge")],
         [InlineKeyboardButton("♻️ Self-Destruction", callback_data="set_view_auto_delete")],
         [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+def get_warning_time_settings_keyboard(settings):
+    """Get Warning Deletion Time settings keyboard."""
+    warn_delete_time = settings.get("warning_delete_time", 300) # Default 5 mins
+    
+    # Calculate H, M, S
+    h = warn_delete_time // 3600
+    m = (warn_delete_time % 3600) // 60
+    s = warn_delete_time % 60
+    
+    time_str = ""
+    if h > 0: time_str += f"{h}h "
+    if m > 0: time_str += f"{m}m "
+    if s > 0 or (h == 0 and m == 0): time_str += f"{s}s"
+    
+    keyboard = [
+        [InlineKeyboardButton(f"🕒 Warning Deletion: {time_str}", callback_data="set_none")],
+        [
+            InlineKeyboardButton("-1m", callback_data="set_warn_time_sub_60"),
+            InlineKeyboardButton("-10s", callback_data="set_warn_time_sub_10"),
+            InlineKeyboardButton("+10s", callback_data="set_warn_time_add_10"),
+            InlineKeyboardButton("+1m", callback_data="set_warn_time_add_60")
+        ],
+        [InlineKeyboardButton("🔙 Back", callback_data="set_view_deleting")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -1397,6 +1424,19 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer()
         return
 
+    if data == "set_view_warning_time":
+        settings = get_chat_settings(chat_id)
+        try:
+            await edit_bot_response(
+                query, context,
+                "🕒 <b>Warning Deletion Time</b>\n\nConfigure how long warning messages (like Bio Link or Edit Protection) should stay in the group before being deleted:",
+                reply_markup=get_warning_time_settings_keyboard(settings),
+                parse_mode='HTML'
+            )
+        except BadRequest: pass
+        await query.answer()
+        return
+
     if data == "set_view_bio_link":
         settings = get_chat_settings(chat_id)
         try:
@@ -1642,6 +1682,21 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except BadRequest: pass
         status = f"set to {new_limit} chars" if new_limit > 0 else "disabled"
         await query.answer(f"Message length limit {status}")
+        return
+
+    # Handle Warning Deletion Time adjustment buttons
+    if data.startswith("set_warn_time_"):
+        action, amount = data.replace("set_warn_time_", "").split("_")
+        amount = int(amount)
+        settings = get_chat_settings(chat_id)
+        current_time = settings.get("warning_delete_time", 300)
+        new_time = current_time + amount if action == "add" else max(0, current_time - amount)
+        update_chat_setting(chat_id, "warning_delete_time", new_time)
+        new_settings = get_chat_settings(chat_id)
+        try:
+            await query.edit_message_reply_markup(reply_markup=get_warning_time_settings_keyboard(new_settings))
+        except BadRequest: pass
+        await query.answer(f"Warning deletion time set to {new_time}s")
         return
 
     # Handle Time adjustment buttons

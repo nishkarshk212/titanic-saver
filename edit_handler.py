@@ -86,11 +86,12 @@ async def edited_message_handler(update: Update, context: ContextTypes.DEFAULT_T
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
         
-        # Auto delete warning message after 5 minutes (300 seconds)
+        # Auto delete warning message after custom time (default 5 minutes)
+        warn_delete_time = settings.get("warning_delete_time", 300)
         if context.job_queue:
             context.job_queue.run_once(
                 delete_message_job,
-                300,
+                warn_delete_time,
                 data={"chat_id": chat_id, "message_id": sent_msg.message_id}
             )
     except Exception as e:
