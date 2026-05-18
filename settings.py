@@ -315,7 +315,7 @@ def get_deleting_messages_keyboard():
     keyboard = [
         [InlineKeyboardButton("🤖 Commands", callback_data="set_view_command_deletion")],
         [InlineKeyboardButton("🤫 Global Silence", callback_data="set_view_mod")],
-        [InlineKeyboardButton("✍️ Edit Checks", callback_data="set_view_blocking")],
+        [InlineKeyboardButton("✍️ Edit Checks", callback_data="set_view_edit_checks")],
         [InlineKeyboardButton("💭 Service Messages", callback_data="set_view_clean")],
         [InlineKeyboardButton("🕒 Scheduled deletion", callback_data="set_view_auto_delete")],
         [InlineKeyboardButton("📓 Block cancellation", callback_data="set_view_blocking")],
@@ -323,6 +323,29 @@ def get_deleting_messages_keyboard():
         [InlineKeyboardButton("♻️ Messages self-destruction", callback_data="set_view_auto_delete")],
         [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
     ]
+    return InlineKeyboardMarkup(keyboard)
+
+def get_edit_checks_keyboard(settings):
+    """Get Edit Checks settings keyboard."""
+    status = "✅" if settings.get("edit_checks_enabled", False) else "❌"
+    target = settings.get("edit_checks_target", "members").title()
+    penalty = settings.get("edit_checks_penalty", "off").title()
+    limit = settings.get("edit_checks_warn_limit", 3)
+    
+    keyboard = [
+        [InlineKeyboardButton(f"Edit Protection: {status}", callback_data="set_toggle_edit_checks_enabled")],
+        [InlineKeyboardButton(f"🎯 Target: {target}", callback_data="set_toggle_edit_checks_target")],
+        [InlineKeyboardButton(f"⚖️ Penalty: {penalty}", callback_data="set_toggle_edit_checks_penalty")],
+    ]
+    
+    if penalty.lower() == "warn":
+        keyboard.append([
+            InlineKeyboardButton("-", callback_data="set_edit_warn_sub"),
+            InlineKeyboardButton(f"Warn Limit: {limit}", callback_data="set_none"),
+            InlineKeyboardButton("+", callback_data="set_edit_warn_add")
+        ])
+        
+    keyboard.append([InlineKeyboardButton("🔙 Back", callback_data="set_view_deleting")])
     return InlineKeyboardMarkup(keyboard)
 
 def get_members_mgmt_keyboard():
@@ -1289,6 +1312,19 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer()
         return
 
+    if data == "set_view_edit_checks":
+        settings = get_chat_settings(chat_id)
+        try:
+            await edit_bot_response(
+                query, context,
+                "✍️ <b>Edit Checks Configuration</b>\nAutomatically delete messages when they are edited:",
+                reply_markup=get_edit_checks_keyboard(settings),
+                parse_mode='HTML'
+            )
+        except BadRequest: pass
+        await query.answer()
+        return
+
     if data == "set_view_global_purge":
         bot_info = await context.bot.get_me()
         bot_username = f"@{bot_info.username}"
@@ -1332,6 +1368,24 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer()
         return
 
+    if data.startswith("set_edit_warn_"):
+        action = data.split("_")[-1]
+        settings = get_chat_settings(chat_id)
+        current = settings.get("edit_checks_warn_limit", 3)
+        
+        if action == "add":
+            new_val = min(10, current + 1)
+        else:
+            new_val = max(1, current - 1)
+            
+        update_chat_setting(chat_id, "edit_checks_warn_limit", new_val)
+        new_settings = get_chat_settings(chat_id)
+        try:
+            await query.edit_message_reply_markup(reply_markup=get_edit_checks_keyboard(new_settings))
+        except BadRequest: pass
+        await query.answer(f"Warn limit set to {new_val}")
+        return
+
     if data.startswith("set_toggle_"):
         key = data.replace("set_toggle_", "")
         settings = get_chat_settings(chat_id)
@@ -1351,6 +1405,18 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             current = settings.get("banned_words_target", "members")
             new_val = "everyone" if current == "members" else "members"
             update_chat_setting(chat_id, "banned_words_target", new_val)
+        elif key == "edit_checks_target":
+            # Toggle: members -> everyone -> members
+            current = settings.get("edit_checks_target", "members")
+            new_val = "everyone" if current == "members" else "members"
+            update_chat_setting(chat_id, "edit_checks_target", new_val)
+        elif key == "edit_checks_penalty":
+            # Rotate: off -> warn -> mute -> kick -> ban -> off
+            penalties = ["off", "warn", "mute", "kick", "ban"]
+            current = settings.get("edit_checks_penalty", "off")
+            next_idx = (penalties.index(current) + 1) % len(penalties)
+            new_val = penalties[next_idx]
+            update_chat_setting(chat_id, "edit_checks_penalty", new_val)
         else:
             # Welcome, Clean and Auto Delete (specific types) settings enabled by default, others disabled by default
             default_val = True if "welcome_" in key or "media_enabled" in key or "button_enabled" in key or "clean_" in key or "vc_" in key or "auto_delete_text" in key or "auto_delete_stickers" in key or "auto_delete_media" in key else False
@@ -1403,6 +1469,8 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await query.edit_message_reply_markup(reply_markup=get_manager_settings_keyboard(new_settings))
             elif "vc_" in key:
                 await query.edit_message_reply_markup(reply_markup=get_vc_settings_keyboard(new_settings))
+            elif "edit_checks" in key:
+                await query.edit_message_reply_markup(reply_markup=get_edit_checks_keyboard(new_settings))
         except BadRequest: pass
         await query.answer(f"Setting updated!")
         return
