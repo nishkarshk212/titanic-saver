@@ -11,7 +11,7 @@ from telegram.error import BadRequest
 from config import delete_message_job
 
 # URL Regex to detect links and usernames in bio
-URL_PATTERN = re.compile(r'(https?://\S+|www\.\S+|t\.me/\S+|@\w+)', re.IGNORECASE)
+URL_PATTERN = re.compile(r'(https?://\S+|www\.\S+|t\.me\S*|@\w+|[\w-]+\.(com|net|org|me|info|biz|io|co|xyz|top|link|tk|ga|ml|cf|gq))', re.IGNORECASE)
 
 # Cache to avoid repeated API calls (user_id -> timestamp)
 # Bio doesn't change per chat, so we can cache per user globally
@@ -33,6 +33,7 @@ async def check_user_bio(user_id):
         
     # Don't try to connect here, it should be handled in voice_chat.py
     if not client.is_connected():
+        # logging.debug("Telethon client not connected")
         return False, None
     
     try:
@@ -41,20 +42,30 @@ async def check_user_bio(user_id):
         async def fetch_bio():
             # Ensure we have the entity from cache if possible
             try:
-                entity = await client.get_input_entity(user_id)
-            except:
-                entity = await client.get_entity(user_id)
-                
-            full_user = await client(GetFullUserRequest(entity))
-            return full_user.full_user.about
+                # Telethon can usually handle user_id directly if it has seen the user
+                full_user = await client(GetFullUserRequest(user_id))
+                return full_user.full_user.about
+            except Exception as e:
+                # If it hasn't seen the user, try to get entity first
+                try:
+                    entity = await client.get_entity(user_id)
+                    full_user = await client(GetFullUserRequest(entity))
+                    return full_user.full_user.about
+                except:
+                    raise e
 
         bio = await asyncio.wait_for(fetch_bio(), timeout=5.0)
-        if bio and URL_PATTERN.search(bio):
-            return True, bio
+        # logging.info(f"Bio found for {user_id}: {bio}")
+        
+        if bio:
+            match = URL_PATTERN.search(bio)
+            if match:
+                logging.info(f"🚨 Bio Link detected for {user_id}: {match.group(0)}")
+                return True, bio
     except asyncio.TimeoutError:
         logging.warning(f"Timeout checking bio for {user_id}")
     except Exception as e:
-        if "Could not find the input entity" not in str(e):
+        if "Could not find the input entity" not in str(e) and "User not found" not in str(e):
             logging.error(f"Error checking bio for {user_id}: {e}")
     
     return False, None
@@ -172,9 +183,14 @@ async def bio_link_message_handler(update: Update, context: ContextTypes.DEFAULT
 
     # Run the check in the background to not block the main message loop
     async def run_background_check():
-        has_link, bio = await check_user_bio(user_id)
-        if has_link:
-            await apply_bio_penalty(update, context, user_id, bio)
+        try:
+            # Small delay to ensure Telethon has a chance to "see" the user
+            await asyncio.sleep(1)
+            has_link, bio = await check_user_bio(user_id)
+            if has_link:
+                await apply_bio_penalty(update, context, user_id, bio)
+        except Exception as e:
+            logging.error(f"Error in background bio check for {user_id}: {e}")
             
     asyncio.create_task(run_background_check())
 

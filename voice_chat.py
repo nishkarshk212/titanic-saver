@@ -145,18 +145,23 @@ async def start_voice_chat_monitor(application: Application):
                         from bio_handler import check_user_bio, apply_bio_penalty
                         # Background task for bio check as well
                         async def background_bio_check(c_id, u_id, m_html):
-                            has_link, bio = await check_user_bio(u_id)
-                            if has_link:
-                                # Skip admins
-                                if not await is_user_admin(c_id, u_id, ptb_application):
-                                    class MockUpdate:
-                                        def __init__(self, _c_id, _u_id, _m_html):
-                                            self.effective_chat = type('Chat', (), {'id': _c_id})()
-                                            self.effective_user = type('User', (), {'id': _u_id, 'mention_html': lambda: _m_html})()
-                                            self.message = None
-                                    
-                                    mock_update = MockUpdate(c_id, u_id, m_html)
-                                    await apply_bio_penalty(mock_update, ptb_application, u_id, bio)
+                            try:
+                                # Wait a bit for Telethon to stabilize
+                                await asyncio.sleep(2)
+                                has_link, bio = await check_user_bio(u_id)
+                                if has_link:
+                                    # Skip admins
+                                    if not await is_user_admin(c_id, u_id, ptb_application):
+                                        class MockUpdate:
+                                            def __init__(self, _c_id, _u_id, _m_html):
+                                                self.effective_chat = type('Chat', (), {'id': _c_id})()
+                                                self.effective_user = type('User', (), {'id': _u_id, 'mention_html': lambda: _m_html})()
+                                                self.message = None
+                                        
+                                        mock_update = MockUpdate(c_id, u_id, m_html)
+                                        await apply_bio_penalty(mock_update, ptb_application, u_id, bio)
+                            except Exception as e:
+                                logger.error(f"Error in VC background bio check for {u_id}: {e}")
                         
                         asyncio.create_task(background_bio_check(chat_id, user_id, mention))
                     # ----------------------
