@@ -1,7 +1,7 @@
 import logging
-from telegram import Update, ChatPermissions
+from telegram import Update, ChatPermissions, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
-from telegram.ext import ContextTypes, CommandHandler
+from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler
 from telegram.error import BadRequest
 from config import OWNER_ID, log_to_channel, send_bot_response
 from settings_manager_mongo import get_chat_settings
@@ -249,7 +249,8 @@ async def muter_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await send_bot_response(
             update, context,
             "🛡️ <b>Muter List:</b>\n" + "\n".join(muter_list),
-            parse_mode=ParseMode.HTML
+            parse_mode=ParseMode.HTML,
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Close", callback_data="close_moderation")]])
         )
         return
 
@@ -362,7 +363,8 @@ async def voicechatmgr_command(update: Update, context: ContextTypes.DEFAULT_TYP
         await send_bot_response(
             update, context,
             "🎙️ <b>Voice Chat Managers:</b>\n" + "\n".join(manager_list),
-            parse_mode=ParseMode.HTML
+            parse_mode=ParseMode.HTML,
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Close", callback_data="close_moderation")]])
         )
         return
 
@@ -399,6 +401,19 @@ async def unvoicechatmgr_command(update: Update, context: ContextTypes.DEFAULT_T
     remove_voice_chat_manager(chat_id, user_id)
     await send_bot_response(update, context, f"✅ Removed {user_name} from voice chat managers.")
 
+async def close_moderation(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Close the moderation list."""
+    query = update.callback_query
+    chat_id = update.effective_chat.id
+    user_id = update.effective_user.id
+    
+    if not await is_user_admin(chat_id, user_id, context):
+        await query.answer("Only admins can close this list.", show_alert=True)
+        return
+        
+    await query.message.delete()
+    await query.answer()
+
 def get_moderation_handlers():
     return [
         CommandHandler("ban", ban_command),
@@ -410,5 +425,6 @@ def get_moderation_handlers():
         CommandHandler("warn", warn_command),
         CommandHandler("unwarn", unwarn_command),
         CommandHandler("voicechatmgr", voicechatmgr_command),
-        CommandHandler("unvoicechatmgr", unvoicechatmgr_command)
+        CommandHandler("unvoicechatmgr", unvoicechatmgr_command),
+        CallbackQueryHandler(close_moderation, pattern="^close_moderation$")
     ]

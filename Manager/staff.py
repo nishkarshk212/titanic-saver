@@ -4,9 +4,10 @@ Ported from AnnieXMusic to python-telegram-bot
 """
 
 import html
-from telegram import Update
-from telegram.ext import ContextTypes, CommandHandler
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler
 from telegram.constants import ChatMemberStatus
+from user_manager_mongo import is_user_admin
 
 def mention_html(user):
     """Create HTML mention."""
@@ -66,7 +67,8 @@ async def list_admins(update: Update, context: ContextTypes.DEFAULT_TYPE):
         total = len(owners) + len(human_admins) + len(bot_admins)
         txt += f"\n<b>Total Admins:</b> {total}"
         
-        await context.bot.send_message(chat.id, txt, parse_mode='HTML')
+        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Close", callback_data="close_staff")]])
+        await context.bot.send_message(chat.id, txt, parse_mode='HTML', reply_markup=keyboard)
         
     except Exception as e:
         if 'ChatAdminRequired' in str(type(e)):
@@ -101,15 +103,30 @@ async def list_bots(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         txt += f"\n<b>Total Bots:</b> {len(bots)}"
         
-        await context.bot.send_message(chat.id, txt, parse_mode='HTML')
+        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Close", callback_data="close_staff")]])
+        await context.bot.send_message(chat.id, txt, parse_mode='HTML', reply_markup=keyboard)
         
     except Exception as e:
         if 'ChatAdminRequired' in str(type(e)):
             await update.message.reply_text("❌ <i>I need admin rights to list bots here.</i>", parse_mode='HTML')
+
+async def close_staff(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Close the staff list."""
+    query = update.callback_query
+    chat_id = update.effective_chat.id
+    user_id = update.effective_user.id
+    
+    if not await is_user_admin(chat_id, user_id, context):
+        await query.answer("Only admins can close this list.", show_alert=True)
+        return
+        
+    await query.message.delete()
+    await query.answer()
 
 def get_staff_handlers():
     """Return staff handlers."""
     return [
         CommandHandler(["admins", "staff"], list_admins),
         CommandHandler("bots", list_bots),
+        CallbackQueryHandler(close_staff, pattern="^close_staff$"),
     ]

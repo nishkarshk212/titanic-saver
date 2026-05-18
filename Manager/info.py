@@ -48,9 +48,10 @@ async def whois_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         
         profile_url = f"https://t.me/{user.username}" if user.username else f"tg://user?id={user.id}"
-        buttons = InlineKeyboardMarkup([[
-            InlineKeyboardButton("👤 View Profile", url=profile_url),
-        ]])
+        buttons = InlineKeyboardMarkup([
+            [InlineKeyboardButton("👤 View Profile", url=profile_url)],
+            [InlineKeyboardButton("❌ Close", callback_data="info_close")]
+        ])
         
         await loading.edit_text(
             text=text,

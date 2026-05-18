@@ -1,12 +1,12 @@
 import logging
 import shlex
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
-from telegram.ext import ContextTypes, CommandHandler, MessageHandler, filters
+from telegram.ext import ContextTypes, CommandHandler, MessageHandler, filters, CallbackQueryHandler
 from filters_manager_mongo import get_chat_filters, add_chat_filter, remove_chat_filter, remove_all_chat_filters
-from user_manager_mongo import can_user_configure_settings
+from user_manager_mongo import can_user_configure_settings, is_user_admin
 from moderation import can_user_ban
-from config import OWNER_ID
+from config import OWNER_ID, send_bot_response, edit_bot_response
 
 async def set_filter(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Set a new filter for the chat."""
@@ -96,7 +96,21 @@ async def list_filters(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for trigger in chat_filters.keys():
         msg += f"• `{trigger}`\n"
     
-    await update.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN)
+    keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Close", callback_data="close_filter")]])
+    await update.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN, reply_markup=keyboard)
+
+async def close_filter(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Close the filters list."""
+    query = update.callback_query
+    chat_id = update.effective_chat.id
+    user_id = update.effective_user.id
+    
+    if not await is_user_admin(chat_id, user_id, context):
+        await query.answer("Only admins can close this list.", show_alert=True)
+        return
+        
+    await query.message.delete()
+    await query.answer()
 
 async def stop_filter(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Stop a specific filter."""
@@ -177,6 +191,7 @@ def get_filter_handlers():
         CommandHandler("filters", list_filters),
         CommandHandler("stop", stop_filter),
         CommandHandler("stopall", stop_all_filters),
+        CallbackQueryHandler(close_filter, pattern="^close_filter$"),
         # This one handles the actual triggers, put it in a separate group in bot.py
         MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS, filter_reply_handler)
     ]

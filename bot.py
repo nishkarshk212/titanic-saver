@@ -924,7 +924,8 @@ async def adminlist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if bots:
             text += f"🤖 <b>Bots ({len(bots)}):</b>\n" + "\n".join(bots) + "\n"
             
-        await update.message.reply_text(text, parse_mode='HTML', disable_web_page_preview=True)
+        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Close", callback_data="info_close")]])
+        await update.message.reply_text(text, parse_mode='HTML', disable_web_page_preview=True, reply_markup=keyboard)
         
     except Exception as e:
         logging.error(f"Error in adminlist command: {e}")
