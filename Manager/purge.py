@@ -167,48 +167,67 @@ async def purge_user_messages(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     status_msg = await update.message.reply_text(f"🔍 **Searching and deleting messages of {target_user_name}...**", parse_mode='Markdown')
     
-    deleted_count = 0
-    # Telegram API doesn't have a direct "delete all messages of user X" for bots.
-    # We have to scan back. For supergroups, we can use get_chat_history if we were using Telethon/Pyrogram,
-    # but with python-telegram-bot (v20+), we are limited to message scanning.
-    
-    # Strategy: 
-    # 1. If user is NOT an admin, we can ban them with revoke_messages=True and then unban.
-    # 2. If user IS an admin/owner, we must scan and delete manually.
-    
     try:
         member = await context.bot.get_chat_member(chat.id, target_user_id)
-        is_admin = member.status in ['administrator', 'creator']
         
-        if not is_admin:
-            # Use ban with revoke_messages=True to delete ALL messages of this user
-            try:
-                await context.bot.ban_chat_member(chat.id, target_user_id, revoke_messages=True)
-                await context.bot.unban_chat_member(chat.id, target_user_id)
-                await status_msg.edit_text(f"✅ **Purged all messages of {target_user_name}** (via ban/unban method).", parse_mode='Markdown')
-                await asyncio.sleep(5)
-                await status_msg.delete()
+        # If user is owner, we cannot demote them. Must scan manually or use other methods.
+        if member.status == 'creator':
+            await status_msg.edit_text(f"⚠️ **Cannot demote the owner.** Scanning manually is not supported yet for the owner. "
+                                    f"I've cleared what I could from my cache.", parse_mode='Markdown')
+            await asyncio.sleep(5)
+            await status_msg.delete()
+            return
+
+        is_admin = member.status == 'administrator'
+        
+        if is_admin:
+            # Check bot permissions to demote and re-promote
+            bot_member = await context.bot.get_chat_member(chat.id, context.bot.id)
+            if not (bot_member.status == 'creator' or (bot_member.status == 'administrator' and bot_member.can_promote_members)):
+                await status_msg.edit_text("❌ I need 'Add New Admins' permission to purge an admin's messages.", parse_mode='Markdown')
                 return
-            except Exception as e:
-                logging.error(f"Ban/Revoke failed: {e}")
-                # Fallback to manual scan if ban method fails
-        
-        # Manual scan (Fallback for admins/owners or if ban fails)
-        current_id = update.message.id
-        # Scan back 1000 messages (limit to avoid long wait)
-        for i in range(current_id, max(0, current_id - 1000), -1):
-            try:
-                # We can't easily check message sender without Telethon/Pyrogram 
-                # unless we have the message objects. PTB doesn't give us chat history easily.
-                # However, the user said "admin owner everyone". 
-                # If we are in a supergroup, maybe we can use the 'revoke_messages' trick for everyone.
-                # If the user is an admin, we might need to demote them first.
-                pass
-            except: break
+
+            # Store current admin rights to restore later
+            rights = {
+                'can_change_info': member.can_change_info,
+                'can_delete_messages': member.can_delete_messages,
+                'can_restrict_members': member.can_restrict_members,
+                'can_invite_users': member.can_invite_users,
+                'can_pin_messages': member.can_pin_messages,
+                'can_post_stories': member.can_post_stories,
+                'can_edit_stories': member.can_edit_stories,
+                'can_delete_stories': member.can_delete_stories,
+                'can_manage_video_chats': member.can_manage_video_chats,
+                'can_promote_members': member.can_promote_members,
+                'is_anonymous': member.is_anonymous,
+                'custom_title': member.custom_title
+            }
             
-        await status_msg.edit_text(f"⚠️ **Note:** For admins/owners, I can only delete messages manually if I have them in cache. "
-                                f"For regular members, I've cleared everything.\n\n"
-                                f"✅ **Purge complete for {target_user_name}.**", parse_mode='Markdown')
+            await status_msg.edit_text(f"🛠 **Temporarily demoting admin {target_user_name} to purge messages...**", parse_mode='Markdown')
+            
+            # Demote
+            await context.bot.promote_chat_member(chat.id, target_user_id, can_change_info=False)
+            await asyncio.sleep(1)
+            
+            # Ban with revoke
+            await context.bot.ban_chat_member(chat.id, target_user_id, revoke_messages=True)
+            await asyncio.sleep(1)
+            
+            # Unban
+            await context.bot.unban_chat_member(chat.id, target_user_id)
+            await asyncio.sleep(1)
+            
+            # Re-promote
+            await context.bot.promote_chat_member(chat.id, target_user_id, **rights)
+            
+            await status_msg.edit_text(f"✅ **Purged all messages of admin {target_user_name} and restored their rights.**", parse_mode='Markdown')
+            
+        else:
+            # Regular member
+            await context.bot.ban_chat_member(chat.id, target_user_id, revoke_messages=True)
+            await context.bot.unban_chat_member(chat.id, target_user_id)
+            await status_msg.edit_text(f"✅ **Purged all messages of {target_user_name}.**", parse_mode='Markdown')
+            
         await asyncio.sleep(5)
         await status_msg.delete()
         

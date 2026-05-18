@@ -262,9 +262,10 @@ def get_main_settings_keyboard(chat_id=None):
          InlineKeyboardButton("👥 Members Mgmt", callback_data="set_view_members_mgmt")],
         [InlineKeyboardButton("🚧 Blocking", callback_data="set_view_blocking"),
          InlineKeyboardButton("🎙 Voice Chat", callback_data="set_view_vc")],
-        [InlineKeyboardButton("👥 Manager", callback_data="set_view_manager"),
-         InlineKeyboardButton("📋 Freed Members", callback_data="free_list_members")],
-        [InlineKeyboardButton("❌ Close Menu", callback_data="set_close")]
+        [InlineKeyboardButton("🗑️ Deleting Messages", callback_data="set_view_deleting"),
+         InlineKeyboardButton("👥 Manager", callback_data="set_view_manager")],
+        [InlineKeyboardButton("📋 Freed Members", callback_data="free_list_members"),
+         InlineKeyboardButton("❌ Close Menu", callback_data="set_close")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -305,6 +306,21 @@ def get_banned_words_keyboard(settings):
             InlineKeyboardButton("➖ Remove", callback_data="set_config_banned_words_remove")
         ],
         [InlineKeyboardButton("🔤 List", callback_data="set_view_banned_words_list")],
+        [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+def get_deleting_messages_keyboard():
+    """Get Deleting Messages sub-menu keyboard."""
+    keyboard = [
+        [InlineKeyboardButton("🤖 Commands", callback_data="set_view_command_deletion")],
+        [InlineKeyboardButton("🤫 Global Silence", callback_data="set_view_mod")],
+        [InlineKeyboardButton("✍️ Edit Checks", callback_data="set_view_blocking")],
+        [InlineKeyboardButton("💭 Service Messages", callback_data="set_view_clean")],
+        [InlineKeyboardButton("🕒 Scheduled deletion", callback_data="set_view_auto_delete")],
+        [InlineKeyboardButton("📓 Block cancellation", callback_data="set_view_blocking")],
+        [InlineKeyboardButton("💥 Delete all messages", callback_data="set_view_global_purge")],
+        [InlineKeyboardButton("♻️ Messages self-destruction", callback_data="set_view_auto_delete")],
         [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -1256,6 +1272,61 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 query, context,
                 "👥 Manager Module Settings\n\nEnable or disable Manager commands:",
                 reply_markup=get_manager_settings_keyboard(settings)
+            )
+        except BadRequest: pass
+        await query.answer()
+        return
+
+    if data == "set_view_deleting":
+        try:
+            await edit_bot_response(
+                query, context,
+                "🗑️ <b>Deleting Messages</b>\nWhat messages do you want the Bot to delete?",
+                reply_markup=get_deleting_messages_keyboard(),
+                parse_mode='HTML'
+            )
+        except BadRequest: pass
+        await query.answer()
+        return
+
+    if data == "set_view_global_purge":
+        bot_info = await context.bot.get_me()
+        bot_username = f"@{bot_info.username}"
+        
+        # Check bot permissions
+        try:
+            bot_member = await context.bot.get_chat_member(chat_id, context.bot.id)
+            has_perms = (
+                bot_member.status == 'administrator' and
+                bot_member.can_restrict_members and
+                bot_member.can_delete_messages and
+                bot_member.can_promote_members and
+                bot_member.can_invite_users
+            )
+        except:
+            has_perms = False
+            
+        text = (
+            f"💥 <b>Delete all messages</b>\n\n"
+            f"In order to delete the entire history, the Bot {bot_username} must be "
+            f"Admin with privileges of <b>block users</b>, <b>delete messages</b>, <b>add "
+            f"Administrators</b> and <b>invite users with group link</b>.\n\n"
+            f"If you already see that the Bot has these privileges, try to remove it from "
+            f"the group and add it again with all privileges."
+        )
+        
+        keyboard = []
+        if has_perms:
+            keyboard.append([InlineKeyboardButton("🚀 Start Global Purge", callback_data="mgmt_confirm_delete_all")])
+        
+        keyboard.append([InlineKeyboardButton("🔙 Back", callback_data="set_view_deleting")])
+        
+        try:
+            await edit_bot_response(
+                query, context,
+                text,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode='HTML'
             )
         except BadRequest: pass
         await query.answer()
