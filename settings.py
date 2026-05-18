@@ -1324,6 +1324,7 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_message(chat_id, f"✅ Done! Kicked {count} deleted accounts. ({errors} errors)")
         elif action == "confirm_delete_all":
             # Start deletion process
+            logging.info(f"🚀 Global purge requested for chat {chat_id} by user {user_id}")
             try:
                 await query.edit_message_text("🚀 <b>Global purge in progress...</b>\nYou can close this menu, the process will continue in the background.", parse_mode='HTML')
             except Exception as e:
@@ -1332,7 +1333,19 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # Run in background to not block the bot
             async def background_purge(b, c_id, start_msg_id):
                 deleted = 0
+                logging.info(f"Starting background purge for {c_id} from ID {start_msg_id}")
                 try:
+                    # If start_msg_id is too low (e.g. from private chat), 
+                    # we should try to get a more realistic starting ID
+                    if start_msg_id < 1000 and str(c_id).startswith('-100'):
+                        try:
+                            temp_msg = await b.send_message(c_id, "...")
+                            start_msg_id = temp_msg.message_id
+                            await temp_msg.delete()
+                        except:
+                            # Fallback to a high number if we can't send message
+                            start_msg_id = 1000000 
+                    
                     # We delete in batches of 100 backwards
                     # This will cover all messages including every type of service message
                     consecutive_errors = 0
@@ -1342,13 +1355,14 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             await b.delete_messages(c_id, batch)
                             deleted += len(batch)
                             consecutive_errors = 0
-                            await asyncio.sleep(0.2) # Optimized for speed
+                            await asyncio.sleep(0.1) # Further optimized
                         except BadRequest as e:
                             err = str(e)
                             if "Message to delete not found" in err or "Message can't be deleted" in err:
                                 consecutive_errors += 1
                                 # Stop if 5000 messages in a row are missing/undeletable
                                 if consecutive_errors > 50:
+                                    logging.info(f"Purge stopped for {c_id}: too many consecutive errors at ID {i}")
                                     break
                                 continue
                             elif "Flood control exceeded" in err:
@@ -1358,16 +1372,20 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                 await asyncio.sleep(wait_time + 1)
                                 continue
                             else: 
+                                logging.warning(f"Purge batch failed for {c_id}: {err}")
                                 break
                         except Exception as e:
-                            logging.error(f"Unexpected error in purge batch: {e}")
+                            logging.error(f"Unexpected error in purge batch for {c_id}: {e}")
                             break
                     
                     await b.send_message(c_id, f"✅ <b>Global purge complete!</b>\nTotal deleted: `{deleted}` messages\nAll service messages, VC invites, and joins have been cleared.", parse_mode='HTML')
+                    logging.info(f"✅ Global purge complete for {c_id}. Total: {deleted}")
                 except Exception as e:
-                    logging.error(f"Error in background purge: {e}")
+                    logging.error(f"Error in background purge for {c_id}: {e}")
 
-            asyncio.create_task(background_purge(context.bot, chat_id, query.message.message_id))
+            # Get a fresh message ID if possible
+            actual_start_id = query.message.message_id
+            asyncio.create_task(background_purge(context.bot, chat_id, actual_start_id))
             try:
                 await query.answer("Global purge started!")
             except:
@@ -1931,5 +1949,7 @@ def get_settings_handlers():
         CallbackQueryHandler(open_settings_here, pattern="^settings_open_here_"),
         CallbackQueryHandler(settings_callback, pattern="^set_"),
         CallbackQueryHandler(settings_callback, pattern="^settings_"),
+        CallbackQueryHandler(settings_callback, pattern="^mgmt_"),
+        CallbackQueryHandler(settings_callback, pattern="^free_"),
         MessageHandler(filters.ALL & ~filters.COMMAND, handle_setting_input)
     ]
