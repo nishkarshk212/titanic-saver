@@ -50,6 +50,14 @@ async def start_voice_chat_monitor(application: Application):
     logger.info("🎙 Starting Voice Chat Monitor...")
     telethon_client = TelegramClient(StringSession(STRING_SESSION), API_ID, API_HASH)
     
+    # Connect and start the client properly
+    try:
+        await telethon_client.start()
+        logger.info("✅ Telethon client started successfully!")
+    except Exception as e:
+        logger.error(f"❌ Failed to start Telethon client: {e}")
+        return
+    
     @telethon_client.on(events.Raw(UpdateGroupCallParticipants))
     async def handle_voice_chat_join(event):
         """Handles voice chat join events for Users and Channels."""
@@ -57,19 +65,26 @@ async def start_voice_chat_monitor(application: Application):
             chat_entity = call_to_chat.get(event.call.id)
             
             if not chat_entity:
-                async for dialog in telethon_client.iter_dialogs(limit=20):
-                    if dialog.is_group or dialog.is_channel:
-                        try:
-                            full = await telethon_client(
-                                GetFullChannelRequest(channel=dialog.entity) if dialog.is_channel 
-                                else GetFullChatRequest(chat_id=dialog.id)
-                            )
-                            if hasattr(full, 'full_chat') and hasattr(full.full_chat, 'call'):
-                                if full.full_chat.call and full.full_chat.call.id == event.call.id:
-                                    chat_entity = dialog.entity
-                                    call_to_chat[event.call.id] = chat_entity
-                                    break
-                        except: continue
+                # Use a timeout for dialog iteration
+                try:
+                    async for dialog in telethon_client.iter_dialogs(limit=20):
+                        if dialog.is_group or dialog.is_channel:
+                            try:
+                                full = await asyncio.wait_for(
+                                    telethon_client(
+                                        GetFullChannelRequest(channel=dialog.entity) if dialog.is_channel 
+                                        else GetFullChatRequest(chat_id=dialog.id)
+                                    ),
+                                    timeout=5.0
+                                )
+                                if hasattr(full, 'full_chat') and hasattr(full.full_chat, 'call'):
+                                    if full.full_chat.call and full.full_chat.call.id == event.call.id:
+                                        chat_entity = dialog.entity
+                                        call_to_chat[event.call.id] = chat_entity
+                                        break
+                            except: continue
+                except Exception as e:
+                    logger.warning(f"Error iterating dialogs: {e}")
 
             for participant in event.participants:
                 if not hasattr(participant, 'date') or participant.date is None:
@@ -97,7 +112,8 @@ async def start_voice_chat_monitor(application: Application):
                 notification_cache[cache_key] = now
 
                 try:
-                    entity = await telethon_client.get_entity(peer)
+                    # Use timeout for entity fetching
+                    entity = await asyncio.wait_for(telethon_client.get_entity(peer), timeout=5.0)
                     name = getattr(entity, 'first_name', getattr(entity, 'title', "Unknown"))
                     
                     if peer_type == "channel":
@@ -110,16 +126,15 @@ async def start_voice_chat_monitor(application: Application):
                     
                     if not chat_id: continue
 
-                    # Normalize chat_id for settings check (Telethon IDs for channels/supergroups need -100 prefix)
+                    # Normalize chat_id for settings check
                     settings_chat_id = chat_id
-                    if isinstance(chat_entity, PeerChannel) or (str(chat_id).startswith('-100') == False and chat_id > 0):
+                    if isinstance(chat_entity, (PeerChannel, PeerChat)) or (str(chat_id).startswith('-100') == False and chat_id > 0):
                         if not str(chat_id).startswith('-100'):
                             settings_chat_id = int(f"-100{chat_id}")
 
                     # Check if VC join notification is enabled for this chat
                     settings = get_chat_settings(settings_chat_id)
                     if not settings.get("vc_user_join_enabled", True):
-                        logger.info(f"VC join notification disabled for {settings_chat_id}")
                         continue
 
                     # Update the local chat_id variable to the normalized one for sending messages
@@ -128,18 +143,22 @@ async def start_voice_chat_monitor(application: Application):
                     # --- BIO LINK CHECK ---
                     if peer_type == "user" and settings.get("bio_link_check_enabled", False):
                         from bio_handler import check_user_bio, apply_bio_penalty
-                        has_link, bio = await check_user_bio(user_id)
-                        if has_link:
-                            # Skip admins
-                            if not await is_user_admin(chat_id, user_id, ptb_application):
-                                class MockUpdate:
-                                    def __init__(self, c_id, u_id, m_html):
-                                        self.effective_chat = type('Chat', (), {'id': c_id})()
-                                        self.effective_user = type('User', (), {'id': u_id, 'mention_html': lambda: m_html})()
-                                        self.message = None
-                                
-                                mock_update = MockUpdate(chat_id, user_id, mention)
-                                asyncio.create_task(apply_bio_penalty(mock_update, ptb_application, user_id, bio))
+                        # Background task for bio check as well
+                        async def background_bio_check(c_id, u_id, m_html):
+                            has_link, bio = await check_user_bio(u_id)
+                            if has_link:
+                                # Skip admins
+                                if not await is_user_admin(c_id, u_id, ptb_application):
+                                    class MockUpdate:
+                                        def __init__(self, _c_id, _u_id, _m_html):
+                                            self.effective_chat = type('Chat', (), {'id': _c_id})()
+                                            self.effective_user = type('User', (), {'id': _u_id, 'mention_html': lambda: _m_html})()
+                                            self.message = None
+                                    
+                                    mock_update = MockUpdate(c_id, u_id, m_html)
+                                    await apply_bio_penalty(mock_update, ptb_application, u_id, bio)
+                        
+                        asyncio.create_task(background_bio_check(chat_id, user_id, mention))
                     # ----------------------
 
                     # --- DELETE INVITE NOTIFICATION IF USER JOINED ---

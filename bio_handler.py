@@ -29,32 +29,30 @@ async def check_user_bio(user_id):
     """Checks user bio for links using Telethon."""
     client = await get_telethon_client()
     if not client:
-        logging.warning("Telethon client not found")
         return False, None
         
+    # Don't try to connect here, it should be handled in voice_chat.py
     if not client.is_connected():
-        try:
-            await client.connect()
-        except Exception as e:
-            logging.error(f"Failed to connect Telethon client: {e}")
-            return False, None
+        return False, None
     
     try:
         from telethon.tl.functions.users import GetFullUserRequest
-        # Ensure we have the entity
-        try:
-            entity = await client.get_input_entity(user_id)
-        except:
-            # If not in cache, try to get it
-            entity = await client.get_entity(user_id)
-            
-        full_user = await client(GetFullUserRequest(entity))
-        bio = full_user.full_user.about
-        if bio:
-            # Log bio for debugging if needed (limited)
-            # logging.info(f"Checking bio for {user_id}: {bio[:20]}...")
-            if URL_PATTERN.search(bio):
-                return True, bio
+        # Use a timeout for Telethon calls to prevent "stuck" behavior
+        async def fetch_bio():
+            # Ensure we have the entity from cache if possible
+            try:
+                entity = await client.get_input_entity(user_id)
+            except:
+                entity = await client.get_entity(user_id)
+                
+            full_user = await client(GetFullUserRequest(entity))
+            return full_user.full_user.about
+
+        bio = await asyncio.wait_for(fetch_bio(), timeout=5.0)
+        if bio and URL_PATTERN.search(bio):
+            return True, bio
+    except asyncio.TimeoutError:
+        logging.warning(f"Timeout checking bio for {user_id}")
     except Exception as e:
         if "Could not find the input entity" not in str(e):
             logging.error(f"Error checking bio for {user_id}: {e}")
@@ -169,13 +167,16 @@ async def bio_link_message_handler(update: Update, context: ContextTypes.DEFAULT
     if now - last_check < 600: # 10 minutes
         return
     
-    has_link, bio = await check_user_bio(user_id)
-    
-    # Update cache after check
+    # Update cache immediately to prevent concurrent checks for the same user
     bio_check_cache[user_id] = now
 
-    if has_link:
-        await apply_bio_penalty(update, context, user_id, bio)
+    # Run the check in the background to not block the main message loop
+    async def run_background_check():
+        has_link, bio = await check_user_bio(user_id)
+        if has_link:
+            await apply_bio_penalty(update, context, user_id, bio)
+            
+    asyncio.create_task(run_background_check())
 
 def get_bio_handlers():
     """Returns the bio link message handler."""
