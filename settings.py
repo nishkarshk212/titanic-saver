@@ -244,23 +244,21 @@ def get_main_settings_keyboard(chat_id=None):
     keyboard = [
         [InlineKeyboardButton("👋 Welcome", callback_data="set_view_welcome"), 
          InlineKeyboardButton("🧹 Clean Service", callback_data="set_view_clean")],
-        [InlineKeyboardButton("💣 Auto Delete", callback_data="set_view_auto_delete"), 
-         InlineKeyboardButton("📏 Msg Length", callback_data="set_view_msg_length")],
-        [InlineKeyboardButton("🛡️ Moderation", callback_data="set_view_mod"), 
-         InlineKeyboardButton("🗑️ Cmd Deletion", callback_data="set_view_command_deletion")],
-        [InlineKeyboardButton("📌 Pinned Msg", callback_data="set_view_pinned_messages"), 
-         InlineKeyboardButton("🤖 Bot Protection", callback_data="set_view_bot_protection")],
-        [InlineKeyboardButton("🔗 Link Spam", callback_data="set_view_link_spam"), 
-         InlineKeyboardButton("🔄 Forward Protect", callback_data="set_view_forward_protection")],
-        [InlineKeyboardButton("🔑 Cmd Access", callback_data="set_view_command_access"), 
-         InlineKeyboardButton("🎛️ Command Perms", callback_data="set_view_command_permissions")],
-        [InlineKeyboardButton("🌐 Language Filter", callback_data="set_view_language_filter"),
-         InlineKeyboardButton("🕒 Recurring Msg", callback_data="set_view_recurring")],
-        [InlineKeyboardButton("🔗 Group Link", callback_data="set_view_group_link"),
-         InlineKeyboardButton("🚫 Banned Words", callback_data="set_view_banned_words")],
-        [InlineKeyboardButton("📜 Regulations", callback_data="set_view_regulations"),
-         InlineKeyboardButton("👥 Members Mgmt", callback_data="set_view_members_mgmt")],
-        [InlineKeyboardButton("🚧 Blocking", callback_data="set_view_blocking"),
+        [InlineKeyboardButton("📏 Msg Length", callback_data="set_view_msg_length"),
+         InlineKeyboardButton("🛡️ Moderation", callback_data="set_view_mod")],
+        [InlineKeyboardButton("🗑️ Cmd Deletion", callback_data="set_view_command_deletion"),
+         InlineKeyboardButton("📌 Pinned Msg", callback_data="set_view_pinned_messages")],
+        [InlineKeyboardButton("🤖 Bot Protection", callback_data="set_view_bot_protection"),
+         InlineKeyboardButton("🔗 Link Spam", callback_data="set_view_link_spam")],
+        [InlineKeyboardButton("🔄 Forward Protect", callback_data="set_view_forward_protection"),
+         InlineKeyboardButton("🔑 Cmd Access", callback_data="set_view_command_access")],
+        [InlineKeyboardButton("🎛️ Command Perms", callback_data="set_view_command_permissions"),
+         InlineKeyboardButton("🌐 Language Filter", callback_data="set_view_language_filter")],
+        [InlineKeyboardButton("🕒 Recurring Msg", callback_data="set_view_recurring"),
+         InlineKeyboardButton("🔗 Group Link", callback_data="set_view_group_link")],
+        [InlineKeyboardButton("🚫 Banned Words", callback_data="set_view_banned_words"),
+         InlineKeyboardButton("📜 Regulations", callback_data="set_view_regulations")],
+        [InlineKeyboardButton("👥 Members Mgmt", callback_data="set_view_members_mgmt"),
          InlineKeyboardButton("🎙 Voice Chat", callback_data="set_view_vc")],
         [InlineKeyboardButton("🗑️ Deleting Messages", callback_data="set_view_deleting"),
          InlineKeyboardButton("👥 Manager", callback_data="set_view_manager")],
@@ -313,14 +311,11 @@ def get_banned_words_keyboard(settings):
 def get_deleting_messages_keyboard():
     """Get Deleting Messages sub-menu keyboard."""
     keyboard = [
-        [InlineKeyboardButton("🤖 Commands", callback_data="set_view_command_deletion")],
-        [InlineKeyboardButton("🤫 Global Silence", callback_data="set_view_mod")],
         [InlineKeyboardButton("✍️ Edit Checks", callback_data="set_view_edit_checks")],
         [InlineKeyboardButton("💭 Service Messages", callback_data="set_view_clean")],
-        [InlineKeyboardButton("🕒 Scheduled deletion", callback_data="set_view_auto_delete")],
         [InlineKeyboardButton("📓 Block cancellation", callback_data="set_view_blocking")],
         [InlineKeyboardButton("💥 Delete all messages", callback_data="set_view_global_purge")],
-        [InlineKeyboardButton("♻️ Messages self-destruction", callback_data="set_view_auto_delete")],
+        [InlineKeyboardButton("♻️ Self-Destruction", callback_data="set_view_auto_delete")],
         [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -499,7 +494,7 @@ def get_auto_delete_settings_keyboard(settings):
     s = total_seconds % 60
     
     keyboard = [
-        [InlineKeyboardButton(f"Auto Delete: {status}", callback_data="set_toggle_auto_delete_enabled")],
+        [InlineKeyboardButton(f"Self-Destruction: {status}", callback_data="set_toggle_auto_delete_enabled")],
         [InlineKeyboardButton(f"Text Messages: {text_status}", callback_data="set_toggle_auto_delete_text")],
         [InlineKeyboardButton(f"Stickers: {stickers_status}", callback_data="set_toggle_auto_delete_stickers")],
         [InlineKeyboardButton(f"Media: {media_status}", callback_data="set_toggle_auto_delete_media")],
@@ -916,8 +911,9 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             await edit_bot_response(
                 query, context,
-                "💣 Auto Delete Configuration\n\nAutomatically delete group messages after a set time:",
-                reply_markup=get_auto_delete_settings_keyboard(settings)
+                "♻️ <b>Self-Destruction Configuration</b>\n\nAutomatically delete group messages after a set time:",
+                reply_markup=get_auto_delete_settings_keyboard(settings),
+                parse_mode='HTML'
             )
         except BadRequest: pass
         await query.answer()
@@ -1234,7 +1230,13 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if data.startswith("mgmt_"):
         action = data.split("_", 1)[1]
-        await query.answer(f"Action '{action}' in progress...")
+        
+        # Don't answer yet if it's a confirmation that needs to edit message
+        if action != "confirm_delete_all":
+            try:
+                await query.answer(f"Action '{action}' in progress...")
+            except:
+                pass
         
         # Use existing mass action functions
         from Manager.mass_actions import do_unmuteall, do_unbanall, do_kickall
@@ -1272,32 +1274,52 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_message(chat_id, f"✅ Done! Kicked {count} deleted accounts. ({errors} errors)")
         elif action == "confirm_delete_all":
             # Start deletion process
-            await query.edit_message_text("🚀 <b>Global purge in progress...</b>\nYou can close this menu, the process will continue in the background.", parse_mode='HTML')
+            try:
+                await query.edit_message_text("🚀 <b>Global purge in progress...</b>\nYou can close this menu, the process will continue in the background.", parse_mode='HTML')
+            except Exception as e:
+                logging.error(f"Failed to edit message for global purge: {e}")
             
             # Run in background to not block the bot
-            async def background_purge(b, c_id, msg_id):
+            async def background_purge(b, c_id, start_msg_id):
                 deleted = 0
                 try:
-                    for i in range(msg_id, 0, -100):
+                    # We'll try to delete from start_msg_id down to 1
+                    # To be more efficient, we'll stop if we hit too many consecutive errors
+                    consecutive_errors = 0
+                    for i in range(start_msg_id, 0, -100):
                         batch = list(range(max(1, i - 100), i))
                         try:
                             await b.delete_messages(c_id, batch)
                             deleted += len(batch)
+                            consecutive_errors = 0
                             await asyncio.sleep(0.5)
                         except BadRequest as e:
                             if "Message to delete not found" in str(e) or "Message can't be deleted" in str(e):
+                                consecutive_errors += 1
+                                if consecutive_errors > 50: # Stop if 5000 messages in a row are missing/undeletable
+                                    break
                                 continue
-                            else: break
-                        except: break
+                            else: 
+                                break
+                        except Exception as e:
+                            logging.error(f"Unexpected error in purge batch: {e}")
+                            break
+                    
                     await b.send_message(c_id, f"✅ <b>Global purge complete!</b>\nTotal deleted: `{deleted}` messages", parse_mode='HTML')
                 except Exception as e:
                     logging.error(f"Error in background purge: {e}")
 
-            asyncio.create_task(background_purge(context.bot, chat_id, query.message.id))
-            await query.answer("Global purge started!")
+            asyncio.create_task(background_purge(context.bot, chat_id, query.message.message_id))
+            try:
+                await query.answer("Global purge started!")
+            except:
+                pass
             return
             
-        await query.answer("Members Management action completed.")
+        try:
+            await query.answer("Members Management action completed.")
+        except:
+            pass
         return
 
     if data == "set_view_vc":
