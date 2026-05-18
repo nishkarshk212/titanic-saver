@@ -9,6 +9,7 @@ from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler
 from telegram.constants import ChatMemberStatus
 import re
 from settings_manager_mongo import get_chat_settings
+from Manager.actions import check_admin_permission, check_bot_permission
 
 MASS_CMDS = ["kickall", "banall", "unbanall", "muteall", "unmuteall", "unpinall"]
 
@@ -18,11 +19,6 @@ def confirmation_keyboard(cmd):
         [InlineKeyboardButton("Yes", callback_data=f"{cmd}_yes"),
          InlineKeyboardButton("No", callback_data=f"{cmd}_no")]
     ])
-
-async def is_owner_or_admin(chat, user_id):
-    """Check if user is owner or admin."""
-    member = await chat.get_member(user_id)
-    return hasattr(member, 'privileges') or member.status == 'creator'
 
 async def ask_mass_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Ask for confirmation before mass action."""
@@ -38,8 +34,16 @@ async def ask_mass_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not settings.get("manager_mass_actions_enabled", True):
         return await update.message.reply_text(f"❌ Mass action commands are currently disabled.")
     
-    if not await is_owner_or_admin(chat, user.id):
-        return await update.message.reply_text(f"❌ Only the owner/admin may run \"{cmd}\".")
+    # Permission check
+    permission = 'can_pin_messages' if cmd == 'unpinall' else 'can_restrict_members'
+    has_perm, error_msg = await check_admin_permission(update, context, permission)
+    if not has_perm:
+        return await update.message.reply_text(error_msg)
+    
+    # Bot permission check
+    has_bot_perm, bot_error_msg = await check_bot_permission(update, context, permission)
+    if not has_bot_perm:
+        return await update.message.reply_text(bot_error_msg)
     
     await update.message.reply_text(
         f"⚠️ {user.mention_html()}, confirm `{cmd}` for this group?",
@@ -59,11 +63,17 @@ async def handle_mass_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     cmd, answer = match.groups()
     chat_id = query.message.chat_id
-    user_id = query.from_user.id
-    chat = await context.bot.get_chat(chat_id)
     
-    if not await is_owner_or_admin(chat, user_id):
-        return await query.answer("Only the group owner/admin can confirm.", show_alert=True)
+    # Permission check
+    permission = 'can_pin_messages' if cmd == 'unpinall' else 'can_restrict_members'
+    has_perm, error_msg = await check_admin_permission(update, context, permission)
+    if not has_perm:
+        return await query.answer(error_msg, show_alert=True)
+    
+    # Bot permission check
+    has_bot_perm, bot_error_msg = await check_bot_permission(update, context, permission)
+    if not has_bot_perm:
+        return await query.answer(bot_error_msg, show_alert=True)
     
     if answer == "no":
         return await query.message.edit_text(f"❌ `{cmd}` canceled.", parse_mode='HTML')

@@ -123,7 +123,8 @@ COLLECTIONS = {
     "banned_channels": "banned_channels",
     "blocked_content": "blocked_content",
     "filters": "filters",
-    "group_muters": "group_muters"
+    "group_muters": "group_muters",
+    "admins": "admins"
 }
 
 def initialize_collections():
@@ -166,6 +167,10 @@ def initialize_collections():
         # Filters indexes
         filters_col = database[COLLECTIONS["filters"]]
         filters_col.create_index([("chat_id", 1), ("trigger", 1)], unique=True)
+
+        # Admins collection indexes
+        admins_col = database[COLLECTIONS["admins"]]
+        admins_col.create_index([("chat_id", 1), ("user_id", 1)], unique=True)
         
         logging.info("✅ MongoDB collections and indexes initialized successfully")
         return True

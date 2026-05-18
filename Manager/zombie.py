@@ -12,6 +12,7 @@ from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler
 from telegram.constants import ChatMemberStatus
 from settings_manager_mongo import get_chat_settings
 from database import get_collection, COLLECTIONS
+from Manager.actions import check_admin_permission, check_bot_permission
 
 chatQueue = set()
 stopProcess = {}
@@ -136,6 +137,16 @@ async def zombie_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not settings.get("manager_zombie_enabled", True):
         return await update.message.reply_text("❌ The /zombies command is currently disabled.")
     
+    # Permission check
+    has_perm, error_msg = await check_admin_permission(update, context, 'can_restrict_members')
+    if not has_perm:
+        return await update.message.reply_text(error_msg)
+    
+    # Bot permission check
+    has_bot_perm, bot_error_msg = await check_bot_permission(update, context, 'can_restrict_members')
+    if not has_bot_perm:
+        return await update.message.reply_text(bot_error_msg)
+    
     if len(args) > 1:
         try:
             target_id = int(args[1])
@@ -205,14 +216,6 @@ async def zombie_channel_scan(update, context, channel_id, user_id):
 async def zombie_group_scan(update, context):
     """Scan group for zombies."""
     chat = update.effective_chat
-    
-    # Check if user is admin
-    try:
-        user_member = await chat.get_member(update.effective_user.id)
-        if user_member.status not in ['administrator', 'creator']:
-            return await update.message.reply_text("<i>Only admins can use this.</i>", parse_mode='HTML')
-    except:
-        return
     
     # Check if bot is admin
     try:

@@ -9,6 +9,7 @@ from telegram.ext import ContextTypes, CommandHandler
 from telegram.constants import ChatMemberStatus
 from settings_manager_mongo import get_chat_settings
 from config import delete_message_job
+from Manager.actions import check_admin_permission, check_bot_permission
 
 async def is_group_admin(chat, user_id):
     """Check if user is admin with required permissions."""
@@ -33,9 +34,15 @@ async def pin_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.reply_to_message:
         return await update.message.reply_text("Reply to a message to pin it!")
     
-    member = await chat.get_member(user.id)
-    if not hasattr(member, 'privileges') or not member.privileges.can_pin_messages:
-        return await update.message.reply_text("You don't have permission to pin messages.")
+    # Permission check
+    has_perm, error_msg = await check_admin_permission(update, context, 'can_pin_messages')
+    if not has_perm:
+        return await update.message.reply_text(error_msg)
+    
+    # Bot permission check
+    has_bot_perm, bot_error_msg = await check_bot_permission(update, context, 'can_pin_messages')
+    if not has_bot_perm:
+        return await update.message.reply_text(bot_error_msg)
     
     try:
         await update.message.reply_to_message.pin()
@@ -64,9 +71,15 @@ async def unpin_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.reply_to_message:
         return await update.message.reply_text("Reply to a message to unpin it!")
     
-    member = await chat.get_member(user.id)
-    if not hasattr(member, 'privileges') or not member.privileges.can_pin_messages:
-        return await update.message.reply_text("You don't have permission to unpin messages.")
+    # Permission check
+    has_perm, error_msg = await check_admin_permission(update, context, 'can_pin_messages')
+    if not has_perm:
+        return await update.message.reply_text(error_msg)
+    
+    # Bot permission check
+    has_bot_perm, bot_error_msg = await check_bot_permission(update, context, 'can_pin_messages')
+    if not has_bot_perm:
+        return await update.message.reply_text(bot_error_msg)
     
     try:
         await update.message.reply_to_message.unpin()
@@ -90,9 +103,15 @@ async def set_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.reply_to_message:
         return await update.message.reply_text("Reply to a photo or document.")
     
-    member = await chat.get_member(user.id)
-    if not hasattr(member, 'privileges') or not member.privileges.can_change_info:
-        return await update.message.reply_text("You lack permission to change group info.")
+    # Permission check
+    has_perm, error_msg = await check_admin_permission(update, context, 'can_change_info')
+    if not has_perm:
+        return await update.message.reply_text(error_msg)
+    
+    # Bot permission check
+    has_bot_perm, bot_error_msg = await check_bot_permission(update, context, 'can_change_info')
+    if not has_bot_perm:
+        return await update.message.reply_text(bot_error_msg)
     
     target = update.message.reply_to_message
     
@@ -118,9 +137,15 @@ async def remove_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if chat.type not in ['group', 'supergroup']:
         return await update.message.reply_text("This command works only in groups!")
     
-    member = await chat.get_member(user.id)
-    if not hasattr(member, 'privileges') or not member.privileges.can_change_info:
-        return await update.message.reply_text("You lack permission to change group info.")
+    # Permission check
+    has_perm, error_msg = await check_admin_permission(update, context, 'can_change_info')
+    if not has_perm:
+        return await update.message.reply_text(error_msg)
+    
+    # Bot permission check
+    has_bot_perm, bot_error_msg = await check_bot_permission(update, context, 'can_change_info')
+    if not has_bot_perm:
+        return await update.message.reply_text(bot_error_msg)
     
     try:
         await context.bot.delete_chat_photo(chat.id)
@@ -136,9 +161,15 @@ async def set_title(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if chat.type not in ['group', 'supergroup']:
         return await update.message.reply_text("This command works only in groups!")
     
-    member = await chat.get_member(user.id)
-    if not hasattr(member, 'privileges') or not member.privileges.can_change_info:
-        return await update.message.reply_text("You lack permission to change group info.")
+    # Permission check
+    has_perm, error_msg = await check_admin_permission(update, context, 'can_change_info')
+    if not has_perm:
+        return await update.message.reply_text(error_msg)
+    
+    # Bot permission check
+    has_bot_perm, bot_error_msg = await check_bot_permission(update, context, 'can_change_info')
+    if not has_bot_perm:
+        return await update.message.reply_text(bot_error_msg)
     
     title = None
     if context.args:
@@ -176,9 +207,15 @@ async def set_description(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if chat.type not in ['group', 'supergroup']:
         return await update.message.reply_text("This command works only in groups!")
     
-    member = await chat.get_member(user.id)
-    if not hasattr(member, 'privileges') or not member.privileges.can_change_info:
-        return await update.message.reply_text("You lack permission to change group info.")
+    # Permission check
+    has_perm, error_msg = await check_admin_permission(update, context, 'can_change_info')
+    if not has_perm:
+        return await update.message.reply_text(error_msg)
+    
+    # Bot permission check
+    has_bot_perm, bot_error_msg = await check_bot_permission(update, context, 'can_change_info')
+    if not has_bot_perm:
+        return await update.message.reply_text(bot_error_msg)
     
     description = None
     if context.args:

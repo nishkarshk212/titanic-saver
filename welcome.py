@@ -296,6 +296,13 @@ async def on_chat_member_update(update: Update, context: ContextTypes.DEFAULT_TY
     # Debug log
     logging.info(f"Chat Member Update in {chat_id}: {old_status} -> {new_status} for user {result.new_chat_member.user.id}")
     
+    # Check if the bot itself was added or its status changed
+    if result.new_chat_member.user.id == context.bot.id:
+        if new_status in ['member', 'administrator']:
+            from admin_manager_mongo import sync_admins
+            await sync_admins(chat_id, context)
+            logging.info(f"Bot joined or refreshed in chat {chat_id}, synced admins.")
+    
     # Active statuses that should receive a welcome message
     active_statuses = ['member', 'administrator', 'restricted']
     

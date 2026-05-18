@@ -8,6 +8,7 @@ from telegram import Update
 from telegram.ext import ContextTypes, CommandHandler
 from telegram.error import Forbidden, BadRequest
 from settings_manager_mongo import get_chat_settings
+from Manager.actions import check_admin_permission, check_bot_permission
 
 def divide_chunks(l, n=100):
     """Divide list into chunks."""
@@ -22,6 +23,16 @@ async def purge(update: Update, context: ContextTypes.DEFAULT_TYPE):
     settings = get_chat_settings(chat.id)
     if not settings.get("manager_purge_enabled", True):
         return await update.message.reply_text("❌ The /purge command is currently disabled.")
+    
+    # Permission check
+    has_perm, error_msg = await check_admin_permission(update, context, 'can_delete_messages')
+    if not has_perm:
+        return await update.message.reply_text(error_msg)
+    
+    # Bot permission check
+    has_bot_perm, bot_error_msg = await check_bot_permission(update, context, 'can_delete_messages')
+    if not has_bot_perm:
+        return await update.message.reply_text(bot_error_msg)
     
     if chat.type not in ['group', 'supergroup']:
         return await update.message.reply_text("I can't purge messages in a basic group. Please convert it to a supergroup.")
@@ -55,6 +66,16 @@ async def spurge(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Silent purge (delete command message too)."""
     chat = update.effective_chat
     
+    # Permission check
+    has_perm, error_msg = await check_admin_permission(update, context, 'can_delete_messages')
+    if not has_perm:
+        return await update.message.reply_text(error_msg)
+    
+    # Bot permission check
+    has_bot_perm, bot_error_msg = await check_bot_permission(update, context, 'can_delete_messages')
+    if not has_bot_perm:
+        return await update.message.reply_text(bot_error_msg)
+    
     if chat.type not in ['group', 'supergroup']:
         return await update.message.reply_text("I can't purge messages in a basic group. Please convert it to a supergroup.")
     
@@ -83,6 +104,16 @@ async def delete_msg(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Delete a single message."""
     chat = update.effective_chat
     
+    # Permission check
+    has_perm, error_msg = await check_admin_permission(update, context, 'can_delete_messages')
+    if not has_perm:
+        return await update.message.reply_text(error_msg)
+    
+    # Bot permission check
+    has_bot_perm, bot_error_msg = await check_bot_permission(update, context, 'can_delete_messages')
+    if not has_bot_perm:
+        return await update.message.reply_text(bot_error_msg)
+    
     if chat.type not in ['group', 'supergroup']:
         return await update.message.reply_text("I can't delete messages in a basic group.")
     
@@ -98,12 +129,16 @@ async def delete_msg(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def purge_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Delete all messages in the group."""
     chat = update.effective_chat
-    user_id = update.effective_user.id
     
-    # Check permissions
-    from user_manager_mongo import is_user_admin
-    if not await is_user_admin(chat.id, user_id, context):
-        return await update.message.reply_text("Only admins can use this command.")
+    # Permission check
+    has_perm, error_msg = await check_admin_permission(update, context, 'can_delete_messages')
+    if not has_perm:
+        return await update.message.reply_text(error_msg)
+    
+    # Bot permission check
+    has_bot_perm, bot_error_msg = await check_bot_permission(update, context, 'can_delete_messages')
+    if not has_bot_perm:
+        return await update.message.reply_text(bot_error_msg)
 
     if chat.type not in ['group', 'supergroup']:
         return await update.message.reply_text("This command works only in supergroups.")
@@ -154,13 +189,18 @@ async def purge_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def purge_user_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Delete all messages of a specific user in the group."""
     chat = update.effective_chat
-    sender_id = update.effective_user.id
     
-    # Check permissions
-    from user_manager_mongo import is_user_admin, get_user_id
-    if not await is_user_admin(chat.id, sender_id, context):
-        return await update.message.reply_text("Only admins can use this command.")
-
+    # Permission check
+    has_perm, error_msg = await check_admin_permission(update, context, 'can_delete_messages')
+    if not has_perm:
+        return await update.message.reply_text(error_msg)
+    
+    # Bot permission check
+    has_bot_perm, bot_error_msg = await check_bot_permission(update, context, 'can_delete_messages')
+    if not has_bot_perm:
+        return await update.message.reply_text(bot_error_msg)
+  
+    from user_manager_mongo import get_user_id
     target_user_id, target_user_name = await get_user_id(update, context)
     if not target_user_id:
         return await update.message.reply_text("Please reply to a user or provide a user ID/username to purge their messages.")

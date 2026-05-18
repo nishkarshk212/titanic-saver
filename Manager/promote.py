@@ -8,9 +8,10 @@ import logging
 from datetime import datetime, timedelta
 from telegram import Update, ChatAdministratorRights
 from telegram.ext import ContextTypes, CommandHandler
-from Manager.actions import parse_time, is_admin
+from Manager.actions import parse_time, is_admin, check_admin_permission, check_bot_permission
 from settings_manager_mongo import get_chat_settings
 from anonymous_admin import is_anonymous_admin, check_anonymous_admin_promote_permission
+from admin_manager_mongo import sync_admins, remove_admin_cache
 
 # Privilege presets
 LIMITED_PRIVS = ChatAdministratorRights(
@@ -89,14 +90,15 @@ async def promote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not settings.get("manager_promote_enabled", True):
         return await update.message.reply_text("❌ The /promote command is currently disabled.")
     
-    # Check if it's an anonymous admin
-    if is_anonymous_admin(user.id):
-        has_perm, error_msg = await check_anonymous_admin_promote_permission(chat.id, context)
-        if not has_perm:
-            return await update.message.reply_text(error_msg)
-    else:
-        if not await is_admin(chat, user.id):
-            return await update.message.reply_text("You need to be an admin to use this command.")
+    # Permission check
+    has_perm, error_msg = await check_admin_permission(update, context, 'can_promote_members')
+    if not has_perm:
+        return await update.message.reply_text(error_msg)
+    
+    # Bot permission check
+    has_bot_perm, bot_error_msg = await check_bot_permission(update, context, 'can_promote_members')
+    if not has_bot_perm:
+        return await update.message.reply_text(bot_error_msg)
     
     user_id, name, title = get_user_and_title(update, context)
     if not user_id:
@@ -124,6 +126,9 @@ async def promote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except:
                 title = "⚠️ Couldn't set custom title (not a supergroup)"
         
+        # Sync with database
+        await sync_admins(chat.id, context)
+        
         admin_name = user.full_name
         text = f"» Promoted a user in {chat.title}\n"
         text += f" User  : {name}\n"
@@ -140,14 +145,15 @@ async def fullpromote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     user = update.effective_user
     
-    # Check if it's an anonymous admin
-    if is_anonymous_admin(user.id):
-        has_perm, error_msg = await check_anonymous_admin_promote_permission(chat.id, context)
-        if not has_perm:
-            return await update.message.reply_text(error_msg)
-    else:
-        if not await is_admin(chat, user.id):
-            return await update.message.reply_text("You need to be an admin to use this command.")
+    # Permission check
+    has_perm, error_msg = await check_admin_permission(update, context, 'can_promote_members')
+    if not has_perm:
+        return await update.message.reply_text(error_msg)
+    
+    # Bot permission check
+    has_bot_perm, bot_error_msg = await check_bot_permission(update, context, 'can_promote_members')
+    if not has_bot_perm:
+        return await update.message.reply_text(bot_error_msg)
     
     user_id, name, title = get_user_and_title(update, context)
     if not user_id:
@@ -175,6 +181,9 @@ async def fullpromote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except:
                 title = "⚠️ Couldn't set custom title (not a supergroup)"
         
+        # Sync with database
+        await sync_admins(chat.id, context)
+        
         admin_name = user.full_name
         text = f"» Fully promoted a user in {chat.title}\n"
         text += f" User  : {name}\n"
@@ -196,14 +205,15 @@ async def demote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not settings.get("manager_demote_enabled", True):
         return await update.message.reply_text("❌ The /demote command is currently disabled.")
     
-    # Check if it's an anonymous admin
-    if is_anonymous_admin(user.id):
-        has_perm, error_msg = await check_anonymous_admin_promote_permission(chat.id, context)
-        if not has_perm:
-            return await update.message.reply_text(error_msg)
-    else:
-        if not await is_admin(chat, user.id):
-            return await update.message.reply_text("You need to be an admin to use this command.")
+    # Permission check
+    has_perm, error_msg = await check_admin_permission(update, context, 'can_promote_members')
+    if not has_perm:
+        return await update.message.reply_text(error_msg)
+    
+    # Bot permission check
+    has_bot_perm, bot_error_msg = await check_bot_permission(update, context, 'can_promote_members')
+    if not has_bot_perm:
+        return await update.message.reply_text(bot_error_msg)
     
     user_id, name, _ = get_user_and_title(update, context)
     if not user_id:
@@ -225,6 +235,9 @@ async def demote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
             can_manage_chat=DEMOTE_PRIVS.can_manage_chat,
         )
         
+        # Remove from database cache
+        remove_admin_cache(chat.id, user_id)
+        
         admin_name = user.full_name
         text = f"» Demoted a user in {chat.title}\n"
         text += f" User  : {name}\n"
@@ -239,14 +252,15 @@ async def tempadmin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     user = update.effective_user
     
-    # Check if it's an anonymous admin
-    if is_anonymous_admin(user.id):
-        has_perm, error_msg = await check_anonymous_admin_promote_permission(chat.id, context)
-        if not has_perm:
-            return await update.message.reply_text(error_msg)
-    else:
-        if not await is_admin(chat, user.id):
-            return await update.message.reply_text("You need to be an admin to use this command.")
+    # Permission check
+    has_perm, error_msg = await check_admin_permission(update, context, 'can_promote_members')
+    if not has_perm:
+        return await update.message.reply_text(error_msg)
+    
+    # Bot permission check
+    has_bot_perm, bot_error_msg = await check_bot_permission(update, context, 'can_promote_members')
+    if not has_bot_perm:
+        return await update.message.reply_text(bot_error_msg)
     
     if update.message.reply_to_message:
         if len(context.args) < 1:
@@ -290,6 +304,9 @@ async def tempadmin(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except:
                 title = "⚠️ Couldn't set custom title (not a supergroup)"
         
+        # Sync with database
+        await sync_admins(chat.id, context)
+        
         admin_name = user.full_name
         text = f"» Temp-promoted for {time_str} in {chat.title}\n"
         text += f" User  : {name}\n"
@@ -313,6 +330,10 @@ async def tempadmin(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     can_promote_members=DEMOTE_PRIVS.can_promote_members,
                     can_manage_chat=DEMOTE_PRIVS.can_manage_chat,
                 )
+                
+                # Remove from database cache
+                remove_admin_cache(chat.id, user_id)
+                
                 await context.bot.send_message(chat.id, f"Auto-demoted {name} after {time_str}.")
             except:
                 pass

@@ -1,0 +1,115 @@
+import logging
+import datetime
+from database import get_collection, COLLECTIONS
+from telegram import Update, ChatMemberAdministrator, ChatMemberOwner
+from telegram.ext import ContextTypes
+
+def update_admin_cache(chat_id, user_id, permissions):
+    """
+    Store or update admin permissions in MongoDB.
+    
+    permissions: dict of boolean permissions (e.g., {'can_restrict_members': True, ...})
+    """
+    try:
+        admins_col = get_collection(COLLECTIONS["admins"])
+        if admins_col is None:
+            return False
+        
+        # Ensure we only store valid boolean permissions
+        clean_permissions = {k: bool(v) for k, v in permissions.items() if k.startswith('can_') or k == 'is_anonymous'}
+        
+        admins_col.update_one(
+            {"chat_id": chat_id, "user_id": user_id},
+            {
+                "$set": {
+                    "permissions": clean_permissions,
+                    "last_updated": datetime.datetime.now()
+                }
+            },
+            upsert=True
+        )
+        return True
+    except Exception as e:
+        logging.error(f"Error updating admin cache: {e}")
+        return False
+
+def get_stored_admin_permissions(chat_id, user_id):
+    """Get stored admin permissions from MongoDB."""
+    try:
+        admins_col = get_collection(COLLECTIONS["admins"])
+        if admins_col is None:
+            return None
+        
+        doc = admins_col.find_one({"chat_id": chat_id, "user_id": user_id})
+        if doc:
+            return doc.get("permissions")
+        return None
+    except Exception as e:
+        logging.error(f"Error getting stored admin permissions: {e}")
+        return None
+
+def is_stored_admin(chat_id, user_id):
+    """Check if user is a stored admin in the database."""
+    try:
+        admins_col = get_collection(COLLECTIONS["admins"])
+        if admins_col is None:
+            return False
+        
+        count = admins_col.count_documents({"chat_id": chat_id, "user_id": user_id})
+        return count > 0
+    except Exception as e:
+        logging.error(f"Error checking stored admin: {e}")
+        return False
+
+async def sync_admins(chat_id, context: ContextTypes.DEFAULT_TYPE):
+    """Fetch current admins from Telegram and sync with MongoDB."""
+    try:
+        admins = await context.bot.get_chat_administrators(chat_id)
+        admins_col = get_collection(COLLECTIONS["admins"])
+        
+        if admins_col is None:
+            return 0
+
+        # Sync permissions for all admins
+        for admin in admins:
+            user = admin.user
+            permissions = {
+                "can_change_info": getattr(admin, "can_change_info", False),
+                "can_delete_messages": getattr(admin, "can_delete_messages", False),
+                "can_restrict_members": getattr(admin, "can_restrict_members", False),
+                "can_invite_users": getattr(admin, "can_invite_users", False),
+                "can_pin_messages": getattr(admin, "can_pin_messages", False),
+                "can_promote_members": getattr(admin, "can_promote_members", False),
+                "can_manage_chat": getattr(admin, "can_manage_chat", False),
+                "can_manage_video_chats": getattr(admin, "can_manage_video_chats", False),
+                "can_post_stories": getattr(admin, "can_post_stories", False),
+                "can_edit_stories": getattr(admin, "can_edit_stories", False),
+                "can_delete_stories": getattr(admin, "can_delete_stories", False),
+                "is_anonymous": getattr(admin, "is_anonymous", False),
+            }
+            
+            # Special handling for owner
+            if admin.status == 'creator':
+                # Owners have all permissions
+                for k in permissions:
+                    permissions[k] = True
+            
+            update_admin_cache(chat_id, user.id, permissions)
+            
+        return len(admins)
+    except Exception as e:
+        logging.error(f"Error syncing admins for chat {chat_id}: {e}")
+        return 0
+
+def remove_admin_cache(chat_id, user_id):
+    """Remove admin from database (e.g., when demoted)."""
+    try:
+        admins_col = get_collection(COLLECTIONS["admins"])
+        if admins_col is None:
+            return False
+        
+        admins_col.delete_one({"chat_id": chat_id, "user_id": user_id})
+        return True
+    except Exception as e:
+        logging.error(f"Error removing admin from cache: {e}")
+        return False
