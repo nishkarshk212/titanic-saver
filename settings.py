@@ -312,12 +312,34 @@ def get_deleting_messages_keyboard():
     """Get Deleting Messages sub-menu keyboard."""
     keyboard = [
         [InlineKeyboardButton("✍️ Edit Checks", callback_data="set_view_edit_checks")],
+        [InlineKeyboardButton("🔗 Bio Link Check", callback_data="set_view_bio_link")],
         [InlineKeyboardButton("💭 Service Messages", callback_data="set_view_clean")],
         [InlineKeyboardButton("📓 Block cancellation", callback_data="set_view_blocking")],
         [InlineKeyboardButton("💥 Delete all messages", callback_data="set_view_global_purge")],
         [InlineKeyboardButton("♻️ Self-Destruction", callback_data="set_view_auto_delete")],
         [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
     ]
+    return InlineKeyboardMarkup(keyboard)
+
+def get_bio_link_settings_keyboard(settings):
+    """Get Bio Link Check settings keyboard."""
+    status = "✅" if settings.get("bio_link_check_enabled", False) else "❌"
+    penalty = settings.get("bio_link_penalty", "warn").title()
+    limit = settings.get("bio_link_warn_limit", 3)
+    
+    keyboard = [
+        [InlineKeyboardButton(f"Bio Link Check: {status}", callback_data="set_toggle_bio_link_check_enabled")],
+        [InlineKeyboardButton(f"⚖️ Penalty: {penalty}", callback_data="set_toggle_bio_link_penalty")],
+    ]
+    
+    if penalty.lower() == "warn":
+        keyboard.append([
+            InlineKeyboardButton("-", callback_data="set_bio_warn_sub"),
+            InlineKeyboardButton(f"Warn Limit: {limit}", callback_data="set_none"),
+            InlineKeyboardButton("+", callback_data="set_bio_warn_add")
+        ])
+        
+    keyboard.append([InlineKeyboardButton("🔙 Back", callback_data="set_view_deleting")])
     return InlineKeyboardMarkup(keyboard)
 
 def get_edit_checks_keyboard(settings):
@@ -1373,6 +1395,19 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer()
         return
 
+    if data == "set_view_bio_link":
+        settings = get_chat_settings(chat_id)
+        try:
+            await edit_bot_response(
+                query, context,
+                "🔗 <b>Bio Link Checker Configuration</b>\nAutomatically apply penalties to users with links in their bio:",
+                reply_markup=get_bio_link_settings_keyboard(settings),
+                parse_mode='HTML'
+            )
+        except BadRequest: pass
+        await query.answer()
+        return
+
     if data == "set_view_global_purge":
         bot_info = await context.bot.get_me()
         bot_username = f"@{bot_info.username}"
@@ -1434,6 +1469,24 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer(f"Warn limit set to {new_val}")
         return
 
+    if data.startswith("set_bio_warn_"):
+        action = data.split("_")[-1]
+        settings = get_chat_settings(chat_id)
+        current = settings.get("bio_link_warn_limit", 3)
+        
+        if action == "add":
+            new_val = min(10, current + 1)
+        else:
+            new_val = max(1, current - 1)
+            
+        update_chat_setting(chat_id, "bio_link_warn_limit", new_val)
+        new_settings = get_chat_settings(chat_id)
+        try:
+            await query.edit_message_reply_markup(reply_markup=get_bio_link_settings_keyboard(new_settings))
+        except BadRequest: pass
+        await query.answer(f"Warn limit set to {new_val}")
+        return
+
     if data.startswith("set_toggle_"):
         key = data.replace("set_toggle_", "")
         settings = get_chat_settings(chat_id)
@@ -1465,6 +1518,13 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             next_idx = (penalties.index(current) + 1) % len(penalties)
             new_val = penalties[next_idx]
             update_chat_setting(chat_id, "edit_checks_penalty", new_val)
+        elif key == "bio_link_penalty":
+            # Rotate: off -> warn -> mute -> kick -> ban -> off
+            penalties = ["off", "warn", "mute", "kick", "ban"]
+            current = settings.get("bio_link_penalty", "warn")
+            next_idx = (penalties.index(current) + 1) % len(penalties)
+            new_val = penalties[next_idx]
+            update_chat_setting(chat_id, "bio_link_penalty", new_val)
         else:
             # Welcome, Clean and Auto Delete (specific types) settings enabled by default, others disabled by default
             default_val = True if "welcome_" in key or "media_enabled" in key or "button_enabled" in key or "clean_" in key or "vc_" in key or "auto_delete_text" in key or "auto_delete_stickers" in key or "auto_delete_media" in key else False
@@ -1519,6 +1579,8 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await query.edit_message_reply_markup(reply_markup=get_vc_settings_keyboard(new_settings))
             elif "edit_checks" in key:
                 await query.edit_message_reply_markup(reply_markup=get_edit_checks_keyboard(new_settings))
+            elif "bio_link" in key:
+                await query.edit_message_reply_markup(reply_markup=get_bio_link_settings_keyboard(new_settings))
         except BadRequest: pass
         await query.answer(f"Setting updated!")
         return

@@ -23,6 +23,7 @@ from language_filter import get_language_handlers
 from sticker_manager import get_sticker_handlers
 from blocking_handler import get_blocking_handlers
 from edit_handler import get_edit_handlers
+from bio_handler import get_bio_handlers
 from recurring import get_recurring_handlers, check_recurring_messages, count_recurring_messages
 from Manager import get_manager_handlers
 from config import BOT_TOKEN, LOG_CHANNEL_ID, OWNER_ID, log_to_channel, send_bot_response, send_bot_media, START_IMG, to_small_caps
@@ -1078,6 +1079,10 @@ def main():
     # Add moderation handlers (Group 0)
     for handler in get_moderation_handlers():
         application.add_handler(handler)
+
+    # Add Bio Link handlers (Group 5)
+    for handler in get_bio_handlers():
+        application.add_handler(handler, group=5)
 
     # Add welcome handlers (Group 0)
     for handler in get_welcome_handlers():

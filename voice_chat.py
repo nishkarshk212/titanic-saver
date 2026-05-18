@@ -14,6 +14,7 @@ from config import BOT_TOKEN, to_small_caps
 from font import to_mono
 from telegram.ext import Application, CallbackQueryHandler, ContextTypes, MessageHandler, filters
 from settings_manager_mongo import get_chat_settings
+from user_manager_mongo import is_user_admin
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -123,6 +124,23 @@ async def start_voice_chat_monitor(application: Application):
 
                     # Update the local chat_id variable to the normalized one for sending messages
                     chat_id = settings_chat_id
+
+                    # --- BIO LINK CHECK ---
+                    if peer_type == "user" and settings.get("bio_link_check_enabled", False):
+                        from bio_handler import check_user_bio, apply_bio_penalty
+                        has_link, bio = await check_user_bio(user_id)
+                        if has_link:
+                            # Skip admins
+                            if not await is_user_admin(chat_id, user_id, ptb_application):
+                                class MockUpdate:
+                                    def __init__(self, c_id, u_id, m_html):
+                                        self.effective_chat = type('Chat', (), {'id': c_id})()
+                                        self.effective_user = type('User', (), {'id': u_id, 'mention_html': lambda: m_html})()
+                                        self.message = None
+                                
+                                mock_update = MockUpdate(chat_id, user_id, mention)
+                                asyncio.create_task(apply_bio_penalty(mock_update, ptb_application, user_id, bio))
+                    # ----------------------
 
                     # --- DELETE INVITE NOTIFICATION IF USER JOINED ---
                     try:
