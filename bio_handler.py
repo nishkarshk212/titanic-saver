@@ -171,23 +171,20 @@ async def bio_link_message_handler(update: Update, context: ContextTypes.DEFAULT
     if await is_user_admin(chat_id, user_id, context):
         return
 
-    # Check cache (once every 10 minutes per user)
-    import time
-    now = time.time()
-    last_check = bio_check_cache.get(user_id, 0)
-    if now - last_check < 600: # 10 minutes
-        return
-    
-    # Update cache immediately to prevent concurrent checks for the same user
-    bio_check_cache[user_id] = now
-
     # Run the check in the background to not block the main message loop
     async def run_background_check():
         try:
             # Small delay to ensure Telethon has a chance to "see" the user
-            await asyncio.sleep(1)
+            await asyncio.sleep(0.5)
             has_link, bio = await check_user_bio(user_id)
             if has_link:
+                # If bio link detected, delete the triggering message immediately if it exists
+                if update.message:
+                    try:
+                        await update.message.delete()
+                    except Exception as e:
+                        logging.error(f"Failed to delete message after bio link detection: {e}")
+                
                 await apply_bio_penalty(update, context, user_id, bio)
         except Exception as e:
             logging.error(f"Error in background bio check for {user_id}: {e}")
