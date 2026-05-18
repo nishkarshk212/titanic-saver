@@ -334,9 +334,9 @@ def get_bio_link_settings_keyboard(settings):
     
     if penalty.lower() == "warn":
         keyboard.append([
-            InlineKeyboardButton("-", callback_data="set_bio_warn_sub"),
-            InlineKeyboardButton(f"Warn Limit: {limit}", callback_data="set_none"),
-            InlineKeyboardButton("+", callback_data="set_bio_warn_add")
+            InlineKeyboardButton("➖", callback_data="set_bio_warn_sub"),
+            InlineKeyboardButton(f"⚠ Limit: {limit}", callback_data="set_none"),
+            InlineKeyboardButton("➕", callback_data="set_bio_warn_add")
         ])
         
     keyboard.append([InlineKeyboardButton("🔙 Back", callback_data="set_view_deleting")])
@@ -357,9 +357,9 @@ def get_edit_checks_keyboard(settings):
     
     if penalty.lower() == "warn":
         keyboard.append([
-            InlineKeyboardButton("-", callback_data="set_edit_warn_sub"),
-            InlineKeyboardButton(f"Warn Limit: {limit}", callback_data="set_none"),
-            InlineKeyboardButton("+", callback_data="set_edit_warn_add")
+            InlineKeyboardButton("➖", callback_data="set_edit_warn_sub"),
+            InlineKeyboardButton(f"⚠ Limit: {limit}", callback_data="set_none"),
+            InlineKeyboardButton("➕", callback_data="set_edit_warn_add")
         ])
         
     keyboard.append([InlineKeyboardButton("🔙 Back", callback_data="set_view_deleting")])
