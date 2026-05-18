@@ -10,30 +10,51 @@ from moderation import mute_user, kick_user, ban_user
 from telegram.error import BadRequest
 from config import delete_message_job
 
-# URL Regex to detect links in bio
-URL_PATTERN = re.compile(r'https?://\S+|www\.\S+|t\.me/\S+|@\S+')
+# URL Regex to detect links and usernames in bio
+URL_PATTERN = re.compile(r'(https?://\S+|www\.\S+|t\.me/\S+|@\w+)', re.IGNORECASE)
 
-# Cache to avoid repeated API calls to check bios (chat_id -> user_id -> timestamp)
+# Cache to avoid repeated API calls (user_id -> timestamp)
+# Bio doesn't change per chat, so we can cache per user globally
 bio_check_cache = {}
 
 async def get_telethon_client():
     """Import and return telethon_client from voice_chat."""
-    from voice_chat import telethon_client
-    return telethon_client
+    try:
+        from voice_chat import telethon_client
+        return telethon_client
+    except ImportError:
+        return None
 
 async def check_user_bio(user_id):
     """Checks user bio for links using Telethon."""
     client = await get_telethon_client()
-    if not client or not client.is_connected():
-        logging.warning("Telethon client not available for bio check")
+    if not client:
+        logging.warning("Telethon client not found")
         return False, None
+        
+    if not client.is_connected():
+        try:
+            await client.connect()
+        except Exception as e:
+            logging.error(f"Failed to connect Telethon client: {e}")
+            return False, None
     
     try:
         from telethon.tl.functions.users import GetFullUserRequest
-        full_user = await client(GetFullUserRequest(user_id))
+        # Ensure we have the entity
+        try:
+            entity = await client.get_input_entity(user_id)
+        except:
+            # If not in cache, try to get it
+            entity = await client.get_entity(user_id)
+            
+        full_user = await client(GetFullUserRequest(entity))
         bio = full_user.full_user.about
-        if bio and URL_PATTERN.search(bio):
-            return True, bio
+        if bio:
+            # Log bio for debugging if needed (limited)
+            # logging.info(f"Checking bio for {user_id}: {bio[:20]}...")
+            if URL_PATTERN.search(bio):
+                return True, bio
     except Exception as e:
         if "Could not find the input entity" not in str(e):
             logging.error(f"Error checking bio for {user_id}: {e}")
@@ -69,7 +90,6 @@ async def apply_bio_penalty(update: Update, context, user_id: int, bio: str):
         reset_warns(chat_id, user_id)
         
         if penalty == "mute" or penalty == "warn":
-            # We need update and context for mute_user, but we can call context.bot.restrict_chat_member directly
             try:
                 await bot.restrict_chat_member(chat_id, user_id, permissions=ChatPermissions(can_send_messages=False))
                 keyboard.insert(0, [InlineKeyboardButton("🔊 Unmute", callback_data=f"edit_unmute_{user_id}")])
@@ -104,7 +124,6 @@ async def apply_bio_penalty(update: Update, context, user_id: int, bio: str):
         )
         
         # Auto delete warning message after 5 minutes (300 seconds)
-        # If we have a job_queue, use it
         job_queue = getattr(context, 'job_queue', None)
         if job_queue:
             job_queue.run_once(
@@ -113,14 +132,12 @@ async def apply_bio_penalty(update: Update, context, user_id: int, bio: str):
                 data={"chat_id": chat_id, "message_id": sent_msg.message_id}
             )
         else:
-            # Fallback for when we don't have job_queue (e.g. called from voice_chat.py with ptb_application)
             async def fallback_delete():
                 await asyncio.sleep(300)
                 try: await bot.delete_message(chat_id, sent_msg.message_id)
                 except: pass
             asyncio.create_task(fallback_delete())
             
-        # If it was a message that triggered this, try to delete it too
         if hasattr(update, 'message') and update.message:
             try:
                 await update.message.delete()
@@ -145,17 +162,18 @@ async def bio_link_message_handler(update: Update, context: ContextTypes.DEFAULT
     if await is_user_admin(chat_id, user_id, context):
         return
 
-    # Check cache (once every 1 hour per user per chat)
-    now = asyncio.get_event_loop().time()
-    user_cache = bio_check_cache.get(chat_id, {})
-    last_check = user_cache.get(user_id, 0)
-    if now - last_check < 3600:
+    # Check cache (once every 10 minutes per user)
+    import time
+    now = time.time()
+    last_check = bio_check_cache.get(user_id, 0)
+    if now - last_check < 600: # 10 minutes
         return
     
-    user_cache[user_id] = now
-    bio_check_cache[chat_id] = user_cache
-
     has_link, bio = await check_user_bio(user_id)
+    
+    # Update cache after check
+    bio_check_cache[user_id] = now
+
     if has_link:
         await apply_bio_penalty(update, context, user_id, bio)
 
