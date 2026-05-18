@@ -167,9 +167,15 @@ async def bio_link_message_handler(update: Update, context: ContextTypes.DEFAULT
     if not settings.get("bio_link_check_enabled", False):
         return
 
-    # Skip admins
-    if await is_user_admin(chat_id, user_id, context):
+    # Check target (members, admin, everyone)
+    target = settings.get("bio_link_target", "members").lower()
+    is_admin = await is_user_admin(chat_id, user_id, context)
+    
+    if target == "members" and is_admin:
         return
+    elif target == "admin" and not is_admin:
+        return
+    # if target is "everyone", we don't return early
 
     # Run the check in the background to not block the main message loop
     async def run_background_check():

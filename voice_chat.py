@@ -150,16 +150,24 @@ async def start_voice_chat_monitor(application: Application):
                                 await asyncio.sleep(2)
                                 has_link, bio = await check_user_bio(u_id)
                                 if has_link:
-                                    # Skip admins
-                                    if not await is_user_admin(c_id, u_id, ptb_application):
-                                        class MockUpdate:
-                                            def __init__(self, _c_id, _u_id, _m_html):
-                                                self.effective_chat = type('Chat', (), {'id': _c_id})()
-                                                self.effective_user = type('User', (), {'id': _u_id, 'mention_html': lambda: _m_html})()
-                                                self.message = None
-                                        
-                                        mock_update = MockUpdate(c_id, u_id, m_html)
-                                        await apply_bio_penalty(mock_update, ptb_application, u_id, bio)
+                                    # Check target (members, admin, everyone)
+                                    target = settings.get("bio_link_target", "members").lower()
+                                    is_admin = await is_user_admin(chat_id, user_id, ptb_application)
+                                    
+                                    if target == "members" and is_admin:
+                                        return
+                                    elif target == "admin" and not is_admin:
+                                        return
+                                    # if target is "everyone", we don't return early
+
+                                    class MockUpdate:
+                                        def __init__(self, _c_id, _u_id, _m_html):
+                                            self.effective_chat = type('Chat', (), {'id': _c_id})()
+                                            self.effective_user = type('User', (), {'id': _u_id, 'mention_html': lambda: _m_html})()
+                                            self.message = None
+                                    
+                                    mock_update = MockUpdate(chat_id, user_id, mention)
+                                    await apply_bio_penalty(mock_update, ptb_application, user_id, bio)
                             except Exception as e:
                                 logger.error(f"Error in VC background bio check for {u_id}: {e}")
                         

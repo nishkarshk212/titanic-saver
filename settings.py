@@ -324,11 +324,13 @@ def get_deleting_messages_keyboard():
 def get_bio_link_settings_keyboard(settings):
     """Get Bio Link Check settings keyboard."""
     status = "✅" if settings.get("bio_link_check_enabled", False) else "❌"
+    target = settings.get("bio_link_target", "members").title()
     penalty = settings.get("bio_link_penalty", "warn").title()
     limit = settings.get("bio_link_warn_limit", 3)
     
     keyboard = [
         [InlineKeyboardButton(f"Bio Link Check: {status}", callback_data="set_toggle_bio_link_check_enabled")],
+        [InlineKeyboardButton(f"🎯 Target: {target}", callback_data="set_toggle_bio_link_target")],
         [InlineKeyboardButton(f"⚖️ Penalty: {penalty}", callback_data="set_toggle_bio_link_penalty")],
     ]
     
@@ -1507,10 +1509,17 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             new_val = "everyone" if current == "members" else "members"
             update_chat_setting(chat_id, "banned_words_target", new_val)
         elif key == "edit_checks_target":
-            # Toggle: members -> everyone -> members
+            # Rotate: members -> everyone -> members
             current = settings.get("edit_checks_target", "members")
             new_val = "everyone" if current == "members" else "members"
             update_chat_setting(chat_id, "edit_checks_target", new_val)
+        elif key == "bio_link_target":
+            # Rotate: members -> admin -> everyone -> members
+            targets = ["members", "admin", "everyone"]
+            current = settings.get("bio_link_target", "members")
+            next_idx = (targets.index(current) + 1) % len(targets)
+            new_val = targets[next_idx]
+            update_chat_setting(chat_id, "bio_link_target", new_val)
         elif key == "edit_checks_penalty":
             # Rotate: off -> warn -> mute -> kick -> ban -> off
             penalties = ["off", "warn", "mute", "kick", "ban"]
