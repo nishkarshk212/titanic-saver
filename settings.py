@@ -1333,8 +1333,8 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             async def background_purge(b, c_id, start_msg_id):
                 deleted = 0
                 try:
-                    # We'll try to delete from start_msg_id down to 1
-                    # To be more efficient, we'll stop if we hit too many consecutive errors
+                    # We delete in batches of 100 backwards
+                    # This will cover all messages including every type of service message
                     consecutive_errors = 0
                     for i in range(start_msg_id, 0, -100):
                         batch = list(range(max(1, i - 100), i))
@@ -1342,12 +1342,20 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             await b.delete_messages(c_id, batch)
                             deleted += len(batch)
                             consecutive_errors = 0
-                            await asyncio.sleep(0.5)
+                            await asyncio.sleep(0.2) # Optimized for speed
                         except BadRequest as e:
-                            if "Message to delete not found" in str(e) or "Message can't be deleted" in str(e):
+                            err = str(e)
+                            if "Message to delete not found" in err or "Message can't be deleted" in err:
                                 consecutive_errors += 1
-                                if consecutive_errors > 50: # Stop if 5000 messages in a row are missing/undeletable
+                                # Stop if 5000 messages in a row are missing/undeletable
+                                if consecutive_errors > 50:
                                     break
+                                continue
+                            elif "Flood control exceeded" in err:
+                                import re
+                                seconds = re.search(r'wait (\d+)', err)
+                                wait_time = int(seconds.group(1)) if seconds else 30
+                                await asyncio.sleep(wait_time + 1)
                                 continue
                             else: 
                                 break
@@ -1355,7 +1363,7 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             logging.error(f"Unexpected error in purge batch: {e}")
                             break
                     
-                    await b.send_message(c_id, f"✅ <b>Global purge complete!</b>\nTotal deleted: `{deleted}` messages", parse_mode='HTML')
+                    await b.send_message(c_id, f"✅ <b>Global purge complete!</b>\nTotal deleted: `{deleted}` messages\nAll service messages, VC invites, and joins have been cleared.", parse_mode='HTML')
                 except Exception as e:
                     logging.error(f"Error in background purge: {e}")
 

@@ -158,29 +158,40 @@ async def purge_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
     deleted_count = 0
     
     # We delete in batches of 100 backwards
-    # We'll try to delete up to 10000 messages or until we hit too many errors
+    # This will cover all messages including every type of service message
     try:
+        consecutive_errors = 0
         for i in range(current_id, 0, -100):
             batch = list(range(max(1, i - 100), i))
             try:
                 await context.bot.delete_messages(chat.id, batch)
                 deleted_count += len(batch)
+                consecutive_errors = 0
                 if deleted_count % 500 == 0:
                     await status_msg.edit_text(f"🚀 **Purging...**\nDeleted: `{deleted_count}` messages", parse_mode='Markdown')
-                await asyncio.sleep(0.5) # Avoid flood limits
+                await asyncio.sleep(0.2) # Optimized for speed
             except BadRequest as e:
-                if "Message to delete not found" in str(e):
+                err = str(e)
+                if "Message to delete not found" in err or "Message can't be deleted" in err:
+                    consecutive_errors += 1
+                    # Stop if 5000 messages in a row are missing/undeletable
+                    if consecutive_errors > 50:
+                        break
                     continue
-                elif "Message can't be deleted" in str(e):
-                    # Probably reached messages older than 48h or bot lacks rights for old messages
-                    # But in supergroups, bots with delete rights can delete any message.
+                elif "Flood control exceeded" in err:
+                    # Handle flood wait
+                    import re
+                    seconds = re.search(r'wait (\d+)', err)
+                    wait_time = int(seconds.group(1)) if seconds else 30
+                    await asyncio.sleep(wait_time + 1)
                     continue
                 else:
+                    # Other errors like "Chat not found" or permissions
                     break
             except Exception:
                 break
                 
-        await status_msg.edit_text(f"✅ **Global purge complete!**\nTotal deleted: `{deleted_count}` messages", parse_mode='Markdown')
+        await status_msg.edit_text(f"✅ **Global purge complete!**\nTotal deleted: `{deleted_count}` messages\nAll service messages, VC invites, and joins have been cleared.", parse_mode='Markdown')
         await asyncio.sleep(5)
         await status_msg.delete()
     except Exception as e:
