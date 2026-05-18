@@ -1040,8 +1040,8 @@ def main():
         initialize_collections()
         print("✅ MongoDB database initialized successfully!")
 
-    # Initialize the bot application
-    application = ApplicationBuilder().token(BOT_TOKEN).build()
+    # Initialize the bot application with optimization
+    application = ApplicationBuilder().token(BOT_TOKEN).concurrent_updates(True).build()
 
     # Add general handlers (Group 0)
     application.add_handler(CommandHandler("start", start))

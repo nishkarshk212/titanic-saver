@@ -6,49 +6,61 @@ from config import OWNER_ID, delete_message_job
 from telegram import Update
 from telegram.ext import ContextTypes, CommandHandler
 
+# In-memory cache for recently cached users to avoid redundant DB calls
+# Format: {user_id: last_cached_timestamp}
+USER_CACHE = {}
+CACHE_TTL = 3600 # Cache for 1 hour
+
 def cache_user(user_id, username, first_name):
-    """Saves user mapping for later resolution and tracks stats using MongoDB."""
+    """Saves user mapping for later resolution and tracks stats using MongoDB in background."""
+    now_ts = datetime.datetime.now().timestamp()
+    
+    # Skip if recently cached
+    if user_id in USER_CACHE and (now_ts - USER_CACHE[user_id]) < CACHE_TTL:
+        # Still increment message count but skip full cache update
+        asyncio.create_task(asyncio.to_thread(increment_message_count, user_id))
+        return True
+
+    # Update memory cache
+    USER_CACHE[user_id] = now_ts
+
+    # Move DB operations to background
+    asyncio.create_task(asyncio.to_thread(_cache_user_db, user_id, username, first_name))
+    return True
+
+def _cache_user_db(user_id, username, first_name):
+    """Internal function to handle DB operations for caching."""
     try:
         users_col = get_collection(COLLECTIONS["users"])
         if users_col is None:
-            logging.error("MongoDB not connected - cannot cache user")
             return False
         
-        uid_str = str(user_id)
         now = datetime.datetime.now().strftime("%Y-%m-%d")
         
-        # Find existing user by ID
-        existing_user = users_col.find_one({"id": user_id})
+        # Use upsert to simplify find + update/insert into one operation
+        update_data = {
+            "name": first_name,
+            "last_updated": datetime.datetime.now()
+        }
+        if username:
+            update_data["username"] = username.lower().replace('@', '')
         
-        if existing_user:
-            # Update existing user
-            update_data = {
-                "name": first_name,
-                "last_updated": datetime.datetime.now()
-            }
-            if username:
-                update_data["username"] = username.lower().replace('@', '')
-            
-            users_col.update_one(
-                {"id": user_id},
-                {"$set": update_data}
-            )
-        else:
-            # Create new user
-            user_doc = {
-                "id": user_id,
-                "name": first_name,
-                "username": username.lower().replace('@', '') if username else None,
-                "joined_date": now,
-                "msg_count": 0,
-                "created_at": datetime.datetime.now(),
-                "last_updated": datetime.datetime.now()
-            }
-            users_col.insert_one(user_doc)
-        
+        users_col.update_one(
+            {"id": user_id},
+            {
+                "$set": update_data,
+                "$setOnInsert": {
+                    "joined_date": now,
+                    "msg_count": 0,
+                    "created_at": datetime.datetime.now()
+                },
+                "$inc": {"msg_count": 1} # Also increment msg count here
+            },
+            upsert=True
+        )
         return True
     except Exception as e:
-        logging.error(f"Error caching user: {e}")
+        logging.error(f"Error in background caching user: {e}")
         return False
 
 def increment_message_count(user_id):

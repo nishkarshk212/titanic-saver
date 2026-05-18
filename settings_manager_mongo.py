@@ -2,6 +2,9 @@ import logging
 import datetime
 from database import get_collection, COLLECTIONS
 
+# In-memory cache for chat settings
+SETTINGS_CACHE = {}
+
 DEFAULT_CHAT_SETTINGS = {
     "welcome_enabled": True,
     "welcome_media_enabled": True,
@@ -153,29 +156,39 @@ DEFAULT_CHAT_SETTINGS = {
 }
 
 def get_chat_settings(chat_id):
-    """Get chat settings from MongoDB."""
+    """Get chat settings from MongoDB with in-memory caching."""
+    chat_id_str = str(chat_id)
+    
+    # Return from cache if available
+    if chat_id_str in SETTINGS_CACHE:
+        return SETTINGS_CACHE[chat_id_str].copy()
+        
     try:
         settings_col = get_collection(COLLECTIONS["settings"])
         if settings_col is None:
             logging.error("MongoDB not connected - returning default settings")
             return DEFAULT_CHAT_SETTINGS.copy()
         
-        chat_id_str = str(chat_id)
         settings_doc = settings_col.find_one({"chat_id": chat_id_str})
         
         if settings_doc:
             # Merge with defaults to ensure all keys exist
             current_settings = settings_doc.get("settings", {})
+            updated = False
             for key, default_value in DEFAULT_CHAT_SETTINGS.items():
                 if key not in current_settings:
                     current_settings[key] = default_value
+                    updated = True
             
-            # Update the document with any new defaults
-            settings_col.update_one(
-                {"chat_id": chat_id_str},
-                {"$set": {"settings": current_settings, "updated_at": datetime.datetime.now()}}
-            )
+            # Update the document with any new defaults if needed
+            if updated:
+                settings_col.update_one(
+                    {"chat_id": chat_id_str},
+                    {"$set": {"settings": current_settings, "updated_at": datetime.datetime.now()}}
+                )
             
+            # Store in cache
+            SETTINGS_CACHE[chat_id_str] = current_settings.copy()
             return current_settings
         else:
             # Create new settings with defaults
@@ -186,33 +199,38 @@ def get_chat_settings(chat_id):
                 "created_at": datetime.datetime.now(),
                 "updated_at": datetime.datetime.now()
             })
+            # Store in cache
+            SETTINGS_CACHE[chat_id_str] = new_settings.copy()
             return new_settings
     except Exception as e:
         logging.error(f"Error getting chat settings: {e}")
         return DEFAULT_CHAT_SETTINGS.copy()
 
 def update_chat_setting(chat_id, key, value):
-    """Update a specific chat setting in MongoDB."""
+    """Update a specific chat setting in MongoDB and update cache."""
+    chat_id_str = str(chat_id)
     try:
         settings_col = get_collection(COLLECTIONS["settings"])
         if settings_col is None:
             logging.error("MongoDB not connected - cannot update setting")
             return False
         
-        chat_id_str = str(chat_id)
-        
         # Ensure the document exists
         settings_doc = settings_col.find_one({"chat_id": chat_id_str})
         if not settings_doc:
-            # Create the document first
+            # Create the document first with defaults
+            current_settings = DEFAULT_CHAT_SETTINGS.copy()
+            current_settings[key] = value
             settings_col.insert_one({
                 "chat_id": chat_id_str,
-                "settings": DEFAULT_CHAT_SETTINGS.copy(),
+                "settings": current_settings,
                 "created_at": datetime.datetime.now(),
                 "updated_at": datetime.datetime.now()
             })
+            SETTINGS_CACHE[chat_id_str] = current_settings.copy()
+            return True
         
-        # Update the specific setting
+        # Update the specific setting in DB
         result = settings_col.update_one(
             {"chat_id": chat_id_str},
             {
@@ -223,6 +241,13 @@ def update_chat_setting(chat_id, key, value):
             }
         )
         
+        # Update cache if it exists
+        if chat_id_str in SETTINGS_CACHE:
+            SETTINGS_CACHE[chat_id_str][key] = value
+        else:
+            # Refresh full settings into cache
+            get_chat_settings(chat_id)
+            
         return result.modified_count > 0 or result.upserted_id is not None
     except Exception as e:
         logging.error(f"Error updating chat setting: {e}")

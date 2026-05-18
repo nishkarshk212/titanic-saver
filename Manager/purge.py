@@ -47,7 +47,7 @@ async def purge(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for plist in m_list:
             try:
                 await context.bot.delete_messages(chat.id, plist)
-                await asyncio.sleep(0.5)
+                await asyncio.sleep(0.2)
             except Exception as e:
                 if 'FloodWait' in str(type(e)):
                     await asyncio.sleep(int(str(e).split()[-1]))
@@ -89,7 +89,7 @@ async def spurge(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for plist in m_list:
             try:
                 await context.bot.delete_messages(chat.id, plist)
-                await asyncio.sleep(0.5)
+                await asyncio.sleep(0.2)
             except Exception as e:
                 if 'FloodWait' in str(type(e)):
                     await asyncio.sleep(int(str(e).split()[-1]))
@@ -247,15 +247,15 @@ async def purge_user_messages(update: Update, context: ContextTypes.DEFAULT_TYPE
             
             # Demote
             await context.bot.promote_chat_member(chat.id, target_user_id, can_change_info=False)
-            await asyncio.sleep(1)
+            await asyncio.sleep(0.3)
             
             # Ban with revoke
             await context.bot.ban_chat_member(chat.id, target_user_id, revoke_messages=True)
-            await asyncio.sleep(1)
+            await asyncio.sleep(0.3)
             
             # Unban
             await context.bot.unban_chat_member(chat.id, target_user_id)
-            await asyncio.sleep(1)
+            await asyncio.sleep(0.3)
             
             # Re-promote
             await context.bot.promote_chat_member(chat.id, target_user_id, **rights)

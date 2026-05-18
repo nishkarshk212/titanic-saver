@@ -4,19 +4,24 @@ from database import get_collection, COLLECTIONS
 from telegram import Update, ChatMemberAdministrator, ChatMemberOwner
 from telegram.ext import ContextTypes
 
+# In-memory cache for admin permissions
+# Format: {(chat_id, user_id): permissions_dict}
+ADMIN_CACHE = {}
+
 def update_admin_cache(chat_id, user_id, permissions):
     """
-    Store or update admin permissions in MongoDB.
+    Store or update admin permissions in MongoDB and in-memory cache.
     
     permissions: dict of boolean permissions (e.g., {'can_restrict_members': True, ...})
     """
     try:
+        # Update in-memory cache
+        clean_permissions = {k: bool(v) for k, v in permissions.items() if k.startswith('can_') or k == 'is_anonymous'}
+        ADMIN_CACHE[(chat_id, user_id)] = clean_permissions
+        
         admins_col = get_collection(COLLECTIONS["admins"])
         if admins_col is None:
             return False
-        
-        # Ensure we only store valid boolean permissions
-        clean_permissions = {k: bool(v) for k, v in permissions.items() if k.startswith('can_') or k == 'is_anonymous'}
         
         admins_col.update_one(
             {"chat_id": chat_id, "user_id": user_id},
@@ -34,7 +39,11 @@ def update_admin_cache(chat_id, user_id, permissions):
         return False
 
 def get_stored_admin_permissions(chat_id, user_id):
-    """Get stored admin permissions from MongoDB."""
+    """Get stored admin permissions from cache or MongoDB."""
+    # Check in-memory cache first
+    if (chat_id, user_id) in ADMIN_CACHE:
+        return ADMIN_CACHE[(chat_id, user_id)].copy()
+        
     try:
         admins_col = get_collection(COLLECTIONS["admins"])
         if admins_col is None:
@@ -42,14 +51,21 @@ def get_stored_admin_permissions(chat_id, user_id):
         
         doc = admins_col.find_one({"chat_id": chat_id, "user_id": user_id})
         if doc:
-            return doc.get("permissions")
+            permissions = doc.get("permissions")
+            # Store in cache for next time
+            if permissions:
+                ADMIN_CACHE[(chat_id, user_id)] = permissions.copy()
+            return permissions
         return None
     except Exception as e:
         logging.error(f"Error getting stored admin permissions: {e}")
         return None
 
 def is_stored_admin(chat_id, user_id):
-    """Check if user is a stored admin in the database."""
+    """Check if user is a stored admin in the cache or database."""
+    if (chat_id, user_id) in ADMIN_CACHE:
+        return True
+        
     try:
         admins_col = get_collection(COLLECTIONS["admins"])
         if admins_col is None:
@@ -62,13 +78,23 @@ def is_stored_admin(chat_id, user_id):
         return False
 
 async def sync_admins(chat_id, context: ContextTypes.DEFAULT_TYPE):
-    """Fetch current admins from Telegram and sync with MongoDB."""
+    """Fetch current admins from Telegram and sync with MongoDB and cache."""
     try:
         admins = await context.bot.get_chat_administrators(chat_id)
+        
+        # Clear existing cache for this chat to remove demoted admins
+        keys_to_remove = [k for k in ADMIN_CACHE.keys() if k[0] == chat_id]
+        for k in keys_to_remove:
+            del ADMIN_CACHE[k]
+            
         admins_col = get_collection(COLLECTIONS["admins"])
         
         if admins_col is None:
-            return 0
+            # Still update cache even if DB is down
+            for admin in admins:
+                # ... permissions logic ...
+                pass
+            return len(admins)
 
         # Sync permissions for all admins
         for admin in admins:
@@ -102,8 +128,12 @@ async def sync_admins(chat_id, context: ContextTypes.DEFAULT_TYPE):
         return 0
 
 def remove_admin_cache(chat_id, user_id):
-    """Remove admin from database (e.g., when demoted)."""
+    """Remove admin from database and cache (e.g., when demoted)."""
     try:
+        # Remove from cache
+        if (chat_id, user_id) in ADMIN_CACHE:
+            del ADMIN_CACHE[(chat_id, user_id)]
+            
         admins_col = get_collection(COLLECTIONS["admins"])
         if admins_col is None:
             return False

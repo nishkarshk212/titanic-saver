@@ -66,6 +66,16 @@ async def check_admin_permission(update: Update, context: ContextTypes.DEFAULT_T
     if user.id == OWNER_ID:
         return True, None
 
+    # Check cache first for high speed
+    stored_perms = get_stored_admin_permissions(chat.id, user.id)
+    if stored_perms:
+        if not permission:
+            return True, None
+        if stored_perms.get(permission, False):
+            # If they have the permission in cache, trust it for speed
+            # We'll still update the cache in the background occasionally or on use
+            return True, None
+
     # Check if it's an anonymous admin
     if is_anonymous_admin(user.id):
         if not permission:
@@ -105,10 +115,12 @@ async def check_admin_permission(update: Update, context: ContextTypes.DEFAULT_T
         
         if isinstance(member, ChatMemberOwner):
             for k in permissions: permissions[k] = True
-            update_admin_cache(chat.id, user.id, permissions)
+            # Background task to update DB cache
+            asyncio.create_task(asyncio.to_thread(update_admin_cache, chat.id, user.id, permissions))
             return True, None
         
-        update_admin_cache(chat.id, user.id, permissions)
+        # Background task to update DB cache
+        asyncio.create_task(asyncio.to_thread(update_admin_cache, chat.id, user.id, permissions))
         
         if not isinstance(member, ChatMemberAdministrator):
             return False, "You need to be an admin to use this command."

@@ -35,7 +35,10 @@ def connect_to_mongodb():
                     tls=True,
                     tlsCAFile=certifi.where(),
                     connectTimeoutMS=10000,
-                    socketTimeoutMS=10000
+                    socketTimeoutMS=10000,
+                    maxPoolSize=50,
+                    minPoolSize=10,
+                    maxIdleTimeMS=60000
                 )
                 client.admin.command('ping')
                 db = client[DATABASE_NAME]
