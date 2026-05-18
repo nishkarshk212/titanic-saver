@@ -445,6 +445,58 @@ async def close_moderation(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.message.delete()
     await query.answer()
 
+async def edit_protection_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Callback for edit protection warning buttons."""
+    query = update.callback_query
+    chat_id = update.effective_chat.id
+    admin_id = update.effective_user.id
+    data = query.data
+
+    if not await is_user_admin(chat_id, admin_id, context):
+        await query.answer("Only admins can use these buttons.", show_alert=True)
+        return
+
+    parts = data.split("_")
+    action = parts[1]
+    user_id = int(parts[-1])
+    
+    # Try to get user name for the response
+    try:
+        member = await context.bot.get_chat_member(chat_id, user_id)
+        user_name = member.user.mention_html()
+    except:
+        user_name = f"User {user_id}"
+
+    if action == "unmute":
+        try:
+            await context.bot.restrict_chat_member(chat_id, user_id, permissions=ChatPermissions(
+                can_send_messages=True, 
+                can_send_audios=True,
+                can_send_documents=True,
+                can_send_photos=True,
+                can_send_videos=True,
+                can_send_video_notes=True,
+                can_send_voice_notes=True,
+                can_send_polls=True, 
+                can_send_other_messages=True,
+                can_add_web_page_previews=True
+            ))
+            await query.answer(f"🔊 Unmuted {user_id}")
+            # Update message text to reflect status
+            await query.edit_message_text(f"🔊 {user_name} has been unmuted by an admin.", parse_mode='HTML')
+        except Exception as e:
+            await query.answer(f"Error: {e}", show_alert=True)
+
+    elif action == "warn":
+        if parts[2] == "add":
+            new_warns = add_warn(chat_id, user_id)
+            await query.answer(f"⚠️ Added warn to {user_id}. Total: {new_warns}")
+            # Optional: edit message to show new warn count if we were showing it
+        elif parts[2] == "reset":
+            reset_warns(chat_id, user_id)
+            await query.answer(f"🔄 Reset warns for {user_id}")
+            await query.edit_message_text(f"🔄 Warnings for {user_name} have been reset by an admin.", parse_mode='HTML')
+
 def get_moderation_handlers():
     return [
         CommandHandler("ban", ban_command),
@@ -457,5 +509,6 @@ def get_moderation_handlers():
         CommandHandler("unwarn", unwarn_command),
         CommandHandler("voicechatmgr", voicechatmgr_command),
         CommandHandler("unvoicechatmgr", unvoicechatmgr_command),
-        CallbackQueryHandler(close_moderation, pattern="^close_moderation$")
+        CallbackQueryHandler(close_moderation, pattern="^close_moderation$"),
+        CallbackQueryHandler(edit_protection_callback, pattern="^edit_(warn|unmute)_")
     ]

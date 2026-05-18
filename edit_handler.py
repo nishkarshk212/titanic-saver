@@ -1,12 +1,13 @@
 import logging
 import asyncio
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, MessageHandler, filters
 from settings_manager_mongo import get_chat_settings
 from moderation_manager_mongo import get_user_warns, add_warn, reset_warns
 from user_manager_mongo import is_user_admin
 from moderation import ban_user, mute_user, kick_user
 from telegram.error import BadRequest
+from config import delete_message_job
 
 async def edited_message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle edited messages."""
@@ -45,38 +46,54 @@ async def edited_message_handler(update: Update, context: ContextTypes.DEFAULT_T
         return
 
     user_name = update.effective_user.mention_html()
+    limit = settings.get("edit_checks_warn_limit", 3)
     
-    if penalty == "warn":
-        limit = settings.get("edit_checks_warn_limit", 3)
-        # Note: add_warn and reset_warns are sync in moderation_manager_mongo
-        current_warns = add_warn(chat_id, user_id)
+    # Always increment warn count for any penalty that isn't 'off'
+    current_warns = add_warn(chat_id, user_id)
+    
+    keyboard = [
+        [
+            InlineKeyboardButton("➕ Add Warn", callback_data=f"edit_warn_add_{user_id}"),
+            InlineKeyboardButton("🔄 Reset Warns", callback_data=f"edit_warn_reset_{user_id}")
+        ]
+    ]
+    
+    if current_warns >= limit:
+        # Reset warns after penalty
+        reset_warns(chat_id, user_id)
         
-        if current_warns >= limit:
-            reset_warns(chat_id, user_id)
+        if penalty == "mute" or penalty == "warn": # 'warn' defaults to mute in original code
             await mute_user(update, context, user_id, reason="Reached warn limit for editing messages")
-            await context.bot.send_message(
-                chat_id, 
-                f"🚫 {user_name} has been muted for reaching the warn limit (editing messages).",
-                parse_mode='HTML'
-            )
+            keyboard.insert(0, [InlineKeyboardButton("🔊 Unmute", callback_data=f"edit_unmute_{user_id}")])
+            msg_text = f"🚫 {user_name} has been muted for reaching the warn limit (editing messages)."
+        elif penalty == "kick":
+            await kick_user(update, context, user_id, reason="Reached warn limit for editing messages")
+            msg_text = f"👢 {user_name} has been kicked for reaching the warn limit (editing messages)."
+        elif penalty == "ban":
+            await ban_user(update, context, user_id, reason="Reached warn limit for editing messages")
+            msg_text = f"🔨 {user_name} has been banned for reaching the warn limit (editing messages)."
         else:
-            await context.bot.send_message(
-                chat_id,
-                f"⚠️ {user_name}, edited messages are not allowed here! ({current_warns}/{limit})",
-                parse_mode='HTML'
+            msg_text = f"⚠️ {user_name}, edited messages are not allowed! ({current_warns}/{limit})"
+    else:
+        msg_text = f"⚠️ {user_name}, edited messages are not allowed here! ({current_warns}/{limit})"
+
+    try:
+        sent_msg = await context.bot.send_message(
+            chat_id, 
+            msg_text,
+            parse_mode='HTML',
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        
+        # Auto delete warning message after 10 seconds
+        if context.job_queue:
+            context.job_queue.run_once(
+                delete_message_job,
+                10,
+                data={"chat_id": chat_id, "message_id": sent_msg.message_id}
             )
-            
-    elif penalty == "mute":
-        await mute_user(update, context, user_id, reason="Edited a message")
-        await context.bot.send_message(chat_id, f"🔇 {user_name} has been muted for editing a message.", parse_mode='HTML')
-        
-    elif penalty == "kick":
-        await kick_user(update, context, user_id, reason="Edited a message")
-        await context.bot.send_message(chat_id, f"👢 {user_name} has been kicked for editing a message.", parse_mode='HTML')
-        
-    elif penalty == "ban":
-        await ban_user(update, context, user_id, reason="Edited a message")
-        await context.bot.send_message(chat_id, f"🔨 {user_name} has been banned for editing a message.", parse_mode='HTML')
+    except Exception as e:
+        logging.error(f"Error sending edit protection warning: {e}")
 
 def get_edit_handlers():
     """Return edit handlers."""
