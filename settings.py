@@ -1606,19 +1606,23 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             update_chat_setting(chat_id, key, new_val)
             # Apply to group if possible
             try:
-                # If enabled, set reactions to empty list (blocked)
-                # If disabled, set reactions to None (all allowed)
-                reactions = [] if new_val else None
-                # Check if bot is admin and has can_change_info
-                bot_member = await context.bot.get_chat_member(chat_id, context.bot.id)
-                if bot_member.status in ['administrator', 'creator'] and getattr(bot_member, 'can_change_info', False):
-                    await context.bot.set_chat_available_reactions(chat_id, reactions=reactions)
-                    logging.info(f"Reactions for chat {chat_id} set to {reactions}")
+                # set_chat_available_reactions only works in supergroups and channels
+                if update.effective_chat.type not in ["supergroup", "channel"]:
+                    logging.info(f"Chat {chat_id} is not a supergroup. Relying on MessageReactionHandler for reaction blocking.")
                 else:
-                    await query.answer("Bot needs 'Change Group Info' permission to apply this setting!", show_alert=True)
+                    # Check if bot is admin and has can_change_info
+                    bot_member = await context.bot.get_chat_member(chat_id, context.bot.id)
+                    if bot_member.status in ['administrator', 'creator'] and getattr(bot_member, 'can_change_info', False):
+                        # If enabled, set reactions to empty list (blocked)
+                        # If disabled, set reactions to None (all allowed)
+                        reactions = [] if new_val else None
+                        await context.bot.set_chat_available_reactions(chat_id, reactions=reactions)
+                        logging.info(f"Reactions for chat {chat_id} set to {reactions}")
+                    else:
+                        await query.answer("Bot needs 'Change Group Info' permission to apply this setting chat-wide!", show_alert=True)
             except Exception as e:
                 logging.error(f"Failed to set available reactions for chat {chat_id}: {e}")
-                await query.answer(f"Failed to apply: {str(e)}", show_alert=True)
+                await query.answer(f"Failed to apply chat-wide: {str(e)}", show_alert=True)
         else:
             # Welcome, Clean and Auto Delete (specific types) settings enabled by default, others disabled by default
             default_val = True if "welcome_" in key or "media_enabled" in key or "button_enabled" in key or "clean_" in key or "vc_" in key or "auto_delete_text" in key or "auto_delete_stickers" in key or "auto_delete_media" in key else False

@@ -1,5 +1,5 @@
-from telegram import Update, MessageEntity, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler, MessageHandler, filters
+from telegram import Update, MessageEntity, InlineKeyboardButton, InlineKeyboardMarkup, ReactionTypeEmoji
+from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler, MessageHandler, MessageReactionHandler, filters
 from telegram.constants import ParseMode
 from datetime import datetime, timedelta
 import logging
@@ -685,6 +685,68 @@ async def list_freed_members(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     await query.edit_message_text(text, reply_markup=keyboard, parse_mode='HTML')
 
+async def handle_reaction_blocking(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Detects and warns about unauthorized reactions if blocking is enabled."""
+    reaction_update = update.message_reaction
+    if not reaction_update:
+        return
+
+    chat_id = reaction_update.chat.id
+    user = reaction_update.user
+    
+    # If it's an anonymous reaction or no user, we might not be able to identify
+    if not user:
+        return
+
+    settings = get_chat_settings(chat_id)
+    if not settings.get("blocking_enabled", True) or not settings.get("block_reactions", False):
+        return
+
+    # Admins are exempt
+    is_admin = await is_user_admin(chat_id, user.id, context)
+    if is_admin:
+        return
+
+    # Freed users are exempt
+    user_perms = settings.get("user_permissions", {}).get(str(user.id), {})
+    if user_perms.get("block_reactions", False):
+        return
+
+    # If we reached here, the reaction is unauthorized
+    # We can't remove the reaction, but we can notify the user
+    try:
+        # Use a random premium emoji for the warning
+        warning_emoji = get_random_premium_emoji()
+        user_mention = f'<a href="tg://user?id={user.id}">{user.first_name}</a>'
+        
+        text = (
+            f"{warning_emoji} <b>ʀᴇᴀᴄᴛɪᴏɴꜱ ʙʟᴏᴄᴋᴇᴅ</b>\n\n"
+            f"ʜᴇʏ {user_mention}, ʀᴇᴀᴄᴛɪᴏɴꜱ ᴀʀᴇ ᴅɪꜱᴀʙʟᴇᴅ ɪɴ ᴛʜɪꜱ ɢʀᴏᴜᴘ."
+        )
+        
+        warn_msg = await context.bot.send_message(
+            chat_id=chat_id,
+            text=text,
+            parse_mode=ParseMode.HTML
+        )
+        
+        # Auto-delete warning after 10 seconds
+        context.job_queue.run_once(
+            delete_message_job_local,
+            10,
+            data={"chat_id": chat_id, "message_id": warn_msg.message_id}
+        )
+    except Exception as e:
+        logging.error(f"Error sending reaction warning in {chat_id}: {e}")
+
+async def delete_message_job_local(context: ContextTypes.DEFAULT_TYPE):
+    """Job to delete a message."""
+    data = context.job.data
+    try:
+        await context.bot.delete_message(chat_id=data["chat_id"], message_id=data["message_id"])
+    except:
+        pass
+
 def get_blocking_handlers():
     """Return all blocking handlers."""
     return [
@@ -694,6 +756,7 @@ def get_blocking_handlers():
         CallbackQueryHandler(free_permission_toggle, pattern=r"^free_toggle_"),
         CallbackQueryHandler(free_permission_save, pattern=r"^free_save_"),
         CallbackQueryHandler(list_freed_members, pattern=r"^free_list_members$"),
+        MessageReactionHandler(handle_reaction_blocking),
         MessageHandler(filters.ALL & filters.ChatType.GROUPS, handle_message_blocking),
     ]
 
