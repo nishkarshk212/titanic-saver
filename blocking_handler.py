@@ -518,6 +518,7 @@ async def free_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "block_poll": "📊 Poll",
         "block_dice": "🎲 Dice",
         "block_game": "🎮 Game",
+        "block_reactions": "⚡ React",
     }
     
     user_name = getattr(target_user, 'first_name', f"User {target_user.id}")
@@ -647,6 +648,7 @@ async def list_freed_members(update: Update, context: ContextTypes.DEFAULT_TYPE)
         "block_poll": "📊",
         "block_dice": "🎲",
         "block_game": "🎮",
+        "block_reactions": "⚡",
     }
 
     from user_manager_mongo import resolve_username
@@ -736,6 +738,7 @@ def get_user_permission_keyboard(chat_id, user_id, settings):
         ("block_poll", "📊 Poll"),
         ("block_dice", "🎲 Dice"),
         ("block_game", "🎮 Game"),
+        ("block_reactions", "⚡ React"),
     ]
     
     keyboard = []
