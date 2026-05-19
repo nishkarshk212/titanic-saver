@@ -16,13 +16,15 @@ SUPPORTED_LANGUAGES = {
 }
 
 # Language detection based on Unicode ranges
-def detect_language(text: str) -> str:
+def detect_language(text: str) -> tuple[str, dict]:
     """
     Detect the language of the text.
-    Returns: 'en', 'hi', 'hinglish', 'other', or 'safe' (emojis/numbers only)
+    Returns: (lang_code, stats_dict)
+    lang_code: 'en', 'hi', 'hinglish', 'other', or 'safe'
+    stats_dict: {'emojis': int, 'total_alphabetic': int, 'punctuation': int, ...}
     """
     if not text:
-        return 'unknown'
+        return 'unknown', {}
     
     # Count characters in different categories
     hindi_chars = 0
@@ -65,9 +67,21 @@ def detect_language(text: str) -> str:
         else:  # Punctuation, special characters
             punctuation += 1
     
+    stats = {
+        'hindi_chars': hindi_chars,
+        'latin_chars': latin_chars,
+        'other_chars': other_chars,
+        'numbers': numbers,
+        'emojis': emojis,
+        'punctuation': punctuation,
+        'spaces': spaces,
+        'stylish_fonts': stylish_fonts,
+        'total_alphabetic': total_alphabetic
+    }
+
     # If no alphabetic characters, it's safe (emojis, numbers, punctuation only)
     if total_alphabetic == 0:
-        return 'safe'
+        return 'safe', stats
     
     # Check if Cyrillic/Greek chars are aesthetic (mixed with other stylish) or real Russian
     # Count Cyrillic/Greek that are in stylish_font range
@@ -94,19 +108,19 @@ def detect_language(text: str) -> str:
     
     # Detection logic
     if other_pct > 50:
-        return 'other'  # Mostly non-Hindi, non-English characters
+        return 'other', stats  # Mostly non-Hindi, non-English characters
     elif hindi_pct > 70:
-        return 'hi'  # Pure Hindi
+        return 'hi', stats  # Pure Hindi
     elif latin_pct > 70:
-        return 'en'  # Pure English
+        return 'en', stats  # Pure English
     elif hindi_pct > 20 and latin_pct > 20:
-        return 'hinglish'  # Mix of Hindi and English
+        return 'hinglish', stats  # Mix of Hindi and English
     elif hindi_pct > 50:
-        return 'hi'  # Mostly Hindi
+        return 'hi', stats  # Mostly Hindi
     elif latin_pct > 50:
-        return 'en'  # Mostly English
+        return 'en', stats  # Mostly English
     else:
-        return 'other'  # Mixed or other languages
+        return 'other', stats  # Mixed or other languages
 
 def is_emoji(char: str) -> bool:
     """Check if character is an emoji."""
@@ -191,10 +205,15 @@ async def check_language_filter(update: Update, context: ContextTypes.DEFAULT_TY
         return False  # Don't filter non-text messages
     
     # Detect language
-    detected_lang = detect_language(text)
+    detected_lang, stats = detect_language(text)
     
     # Handle safe messages (emojis, numbers, punctuation only)
     if detected_lang == 'safe':
+        emojis = stats.get('emojis', 0)
+        punctuation = stats.get('punctuation', 0)
+        total_alphabetic = stats.get('total_alphabetic', 0)
+        numbers = stats.get('numbers', 0)
+
         # Check if emoji blocking is enabled
         if emojis > 0 and settings.get('emoji_block_enabled', False):
             if settings.get('block_emoji_only', True) and total_alphabetic == 0:

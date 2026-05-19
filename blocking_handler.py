@@ -420,8 +420,13 @@ async def resolve_user(context, chat_id, arg=None, reply_to_message=None):
 
 async def free_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Command to exempt a user from specific blocking rules."""
+    if not update.effective_chat:
+        return
+        
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
+    
+    logging.info(f"[FREE] Command received from {user_id} in chat {chat_id}")
     
     # Only admins with specific permissions can use this command
     can_ban, error_msg = await can_user_ban(chat_id, user_id, context)
@@ -710,7 +715,13 @@ async def handle_reaction_blocking(update: Update, context: ContextTypes.DEFAULT
         logging.error(f"Error handling reaction blocking in {chat_id}: {e}")
 
 def get_blocking_handlers():
-    """Return all blocking handlers."""
+    """Return only the message blocking handler for Group 12."""
+    return [
+        MessageHandler(filters.ALL & filters.ChatType.GROUPS, handle_message_blocking),
+    ]
+
+def get_blocking_command_handlers():
+    """Return blocking command and callback handlers for Group 0."""
     return [
         CommandHandler("free", free_command),
         CommandHandler("unfree", unfree_command),
@@ -718,7 +729,6 @@ def get_blocking_handlers():
         CallbackQueryHandler(free_permission_toggle, pattern=r"^free_toggle_"),
         CallbackQueryHandler(free_permission_save, pattern=r"^free_save_"),
         CallbackQueryHandler(list_freed_members, pattern=r"^free_list_members$"),
-        MessageHandler(filters.ALL & filters.ChatType.GROUPS, handle_message_blocking),
     ]
 
 async def handle_message_blocking(update: Update, context: ContextTypes.DEFAULT_TYPE):

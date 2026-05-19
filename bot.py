@@ -21,7 +21,7 @@ from ai_chat import get_chatgpt_handlers
 from translator import get_translation_handlers
 from language_filter import get_language_handlers
 from sticker_manager import get_sticker_handlers
-from blocking_handler import get_blocking_handlers
+from blocking_handler import get_blocking_handlers, get_blocking_command_handlers
 from edit_handler import get_edit_handlers
 from bio_handler import get_bio_handlers
 from antiflood import get_antiflood_handlers
@@ -1006,6 +1006,10 @@ def main():
 
     # Add Admin handlers (Group 0)
     for handler in get_admin_handlers():
+        application.add_handler(handler)
+
+    # Add Blocking commands (Group 0)
+    for handler in get_blocking_command_handlers():
         application.add_handler(handler)
 
     # Add help handlers (Group 0)
