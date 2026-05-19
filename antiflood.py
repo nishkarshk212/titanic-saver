@@ -10,16 +10,17 @@ from settings_manager_mongo import get_chat_settings
 from user_manager_mongo import is_user_admin
 from config import OWNER_ID
 
-# In-memory storage for flood tracking: {chat_id: {user_id: [timestamps]}}
+# In-memory storage for flood tracking: {chat_id: {user_id: {"times": [timestamps], "msg_ids": [message_ids]}}}
 FLOOD_TRACKER = {}
 
 async def handle_antiflood(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handles anti-flood detection and penalties."""
-    if not update.effective_chat or not update.effective_user or update.effective_chat.type == "private":
+    if not update.effective_chat or not update.effective_user or not update.effective_message:
         return
 
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
+    message_id = update.effective_message.message_id
     
     # Skip admins and owner
     if user_id == OWNER_ID or await is_user_admin(chat_id, user_id, context):
@@ -39,29 +40,34 @@ async def handle_antiflood(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if chat_id not in FLOOD_TRACKER:
         FLOOD_TRACKER[chat_id] = {}
     
-    # Initialize user timestamps if not exists
+    # Initialize user data if not exists
     if user_id not in FLOOD_TRACKER[chat_id]:
-        FLOOD_TRACKER[chat_id][user_id] = []
+        FLOOD_TRACKER[chat_id][user_id] = {"times": [], "msg_ids": []}
     
-    # Add current timestamp
-    user_times = FLOOD_TRACKER[chat_id][user_id]
-    user_times.append(now)
+    user_data = FLOOD_TRACKER[chat_id][user_id]
+    user_data["times"].append(now)
+    user_data["msg_ids"].append(message_id)
     
-    # Remove timestamps outside the window
-    FLOOD_TRACKER[chat_id][user_id] = [t for t in user_times if now - t <= window]
+    # Remove old data outside the window
+    valid_indices = [i for i, t in enumerate(user_data["times"]) if now - t <= window]
+    user_data["times"] = [user_data["times"][i] for i in valid_indices]
+    user_data["msg_ids"] = [user_data["msg_ids"][i] for i in valid_indices]
     
     # Check if limit exceeded
-    if len(FLOOD_TRACKER[chat_id][user_id]) >= limit:
-        # Clear tracker for this user to avoid repeat penalties for the same flood
-        FLOOD_TRACKER[chat_id][user_id] = []
+    if len(user_data["times"]) >= limit:
+        # Collect all messages to delete
+        messages_to_delete = list(user_data["msg_ids"])
         
-        user_name = update.effective_user.first_name
-        mention = f"<a href='tg://user?id={user_id}'>{user_name}</a>"
+        # Clear tracker for this user to avoid repeat penalties for the same flood
+        FLOOD_TRACKER[chat_id][user_id] = {"times": [], "msg_ids": []}
+        
+        mention = f"User <code>{user_id}</code>"
         
         try:
-            # Apply penalty
+            # 1. Apply penalty
             if penalty == "warn":
-                await update.effective_message.reply_text(
+                await context.bot.send_message(
+                    chat_id,
                     f"⚠️ {mention}, please stop flooding! You are sending messages too fast.",
                     parse_mode='HTML'
                 )
@@ -92,8 +98,12 @@ async def handle_antiflood(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     parse_mode='HTML'
                 )
             
-            # Delete the flooding message
-            await update.effective_message.delete()
+            # 2. Delete ALL flooding messages
+            for m_id in messages_to_delete:
+                try:
+                    await context.bot.delete_message(chat_id, m_id)
+                except:
+                    pass
             
         except Exception as e:
             logging.error(f"Error applying antiflood penalty: {e}")
