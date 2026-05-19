@@ -293,13 +293,37 @@ async def delete_admin_title_command(update: Update, context: ContextTypes.DEFAU
         await send_bot_response(update, context, f"❌ An error occurred: {str(e)}")
 
 def get_promotion_keyboard(user_id, current_perms, back_to_info=False):
-    """Generate the keyboard with toggle buttons in a single column layout (Old Style)."""
+    """Generate the keyboard with toggle buttons in a grid layout (rows and columns)."""
     keyboard = []
     
-    # Create single column for permissions using full labels
-    for key, label in PERMISSIONS_MAP.items():
-        status = "✅" if current_perms.get(key) else "❌"
-        keyboard.append([InlineKeyboardButton(f"{label}: {status}", callback_data=f"toggle_{user_id}_{key}")])
+    # Define mobile-optimized labels for the grid
+    grid_labels = {
+        "can_change_info": "Info",
+        "can_delete_messages": "Delete",
+        "can_restrict_members": "Ban",
+        "can_invite_users": "Invite",
+        "can_pin_messages": "Pin",
+        "can_post_stories": "Stories",
+        "can_edit_stories": "Edit Str",
+        "can_delete_stories": "Del Str",
+        "can_manage_video_chats": "Video",
+        "is_anonymous": "Anon",
+        "can_promote_members": "Admins"
+    }
+    
+    # Create grid with 2 columns
+    keys = list(grid_labels.keys())
+    for i in range(0, len(keys), 2):
+        row = []
+        key1 = keys[i]
+        status1 = "✅" if current_perms.get(key1) else "❌"
+        row.append(InlineKeyboardButton(f"{grid_labels[key1]} {status1}", callback_data=f"toggle_{user_id}_{key1}"))
+        
+        if i + 1 < len(keys):
+            key2 = keys[i+1]
+            status2 = "✅" if current_perms.get(key2) else "❌"
+            row.append(InlineKeyboardButton(f"{grid_labels[key2]} {status2}", callback_data=f"toggle_{user_id}_{key2}"))
+        keyboard.append(row)
     
     keyboard.append([InlineKeyboardButton("Confirm Promotion", callback_data=f"confirm_{user_id}")])
     
