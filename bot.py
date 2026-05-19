@@ -64,10 +64,10 @@ async def start(update, context):
             ], resize_keyboard=True, one_time_keyboard=True)
             
             await update.message.reply_text(
-                "🌍 <b>Time Zone Configuration</b>\n\n"
+                "🌍 <b>Time Zone</b>\n"
                 "Now <b>send your position</b> in order to auto detect Time Zone to be set in the group.\n\n"
-                "You can send it using the button in the keyboard or touching 📎 Attach, so 📍 Position.\n\n"
-                "Alternatively you can <b>write the name of your city</b> directly (e.g., <code>Kolkata</code>, <code>London</code>).\n\n"
+                "You can send it using the button in the keyboard or touching 📎 Attach, so 📍 Position (with this second way you can chose a specific position also different from yours).\n\n"
+                "Alternatively you can <b>write the name of your city</b> directly.\n\n"
                 "<i>Your position will not be saved, we will save only the Time Zone detected.</i>",
                 parse_mode='HTML',
                 reply_markup=keyboard

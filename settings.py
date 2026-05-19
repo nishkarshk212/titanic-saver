@@ -836,7 +836,7 @@ def get_nightmode_settings_keyboard(settings):
         [InlineKeyboardButton(f"📣 Start&End advises {advise_status}", callback_data="set_toggle_nightmode_advise_enabled")],
         [
             InlineKeyboardButton("⬅️ Back", callback_data="set_view_main"),
-            InlineKeyboardButton("🌍 Time Zone", callback_data="set_view_nightmode_timezone_menu")
+            InlineKeyboardButton("🌍 Time Zone", callback_data="set_config_nightmode_timezone_private")
         ]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -854,22 +854,6 @@ def get_nightmode_hour_grid(user_id, is_start=True):
         keyboard.append(row)
         
     keyboard.append([InlineKeyboardButton("⬅️ Back", callback_data="set_view_nightmode")])
-    return InlineKeyboardMarkup(keyboard)
-
-def get_nightmode_timezone_keyboard(chat_id, bot_username):
-    """Time Zone sub-menu based on images."""
-    keyboard = [
-        [InlineKeyboardButton("✍️ Set", callback_data="set_config_nightmode_timezone_private")],
-        [InlineKeyboardButton("⬅️ Back", callback_data="set_view_nightmode")]
-    ]
-    return InlineKeyboardMarkup(keyboard)
-
-def get_nightmode_private_timezone_keyboard():
-    """Private chat keyboard for timezone setting."""
-    keyboard = [
-        [InlineKeyboardButton("📍 Open in Private Chat", url="tg://settings")] # This is a placeholder, handled in logic
-        [InlineKeyboardButton("⬅️ Back", callback_data="set_view_nightmode")]
-    ]
     return InlineKeyboardMarkup(keyboard)
 
 def get_vc_settings_keyboard(settings):
@@ -1246,56 +1230,46 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await settings_callback(update, context)
         return
 
-    if data == "set_view_nightmode_timezone_menu":
-        settings = get_chat_settings(chat_id)
-        from datetime import datetime
-        import pytz
-        tz_str = settings.get("nightmode_timezone", "UTC")
-        try: tz = pytz.timezone(tz_str)
-        except: tz = pytz.UTC
-        now_str = datetime.now(tz).strftime("%d %b %Y, %H:%M")
-        
-        try:
-            await query.edit_message_text(
-                f"🌍 <b>Time Zone</b>\n\n"
-                f"From this menu you can set the group Time Zone.\n"
-                f"Bot need it to send correctly the messages with dates.\n\n"
-                f"<b>Actual:</b> {tz_str} ({now_str})",
-                reply_markup=get_nightmode_timezone_keyboard(chat_id, context.bot.username),
-                parse_mode='HTML'
-            )
-        except BadRequest: pass
-        await query.answer()
-        return
-
     if data == "set_config_nightmode_timezone_private":
         bot_info = await context.bot.get_me()
         bot_username = bot_info.username
         
         # Check if we are already in private
         if update.effective_chat.type == "private":
+            from telegram import KeyboardButton, ReplyKeyboardMarkup
+            keyboard = ReplyKeyboardMarkup([
+                [KeyboardButton("📍 Send the position", request_location=True)],
+                [KeyboardButton("❌ Cancel")]
+            ], resize_keyboard=True, one_time_keyboard=True)
+            
             try:
-                await query.edit_message_text(
-                    "🌍 <b>Time Zone</b>\n"
-                    "Now <b>send your position</b> in order to auto detect Time Zone to be set in the group.\n\n"
-                    "You can send it using the button in the keyboard or touching 📎 Attach, so 📍 Position.\n\n"
-                    "Alternatively you can <b>write the name of your city</b> directly.\n\n"
-                    "<i>Your position will not be saved, we will save only the Time Zone detected.</i>",
+                # Delete the settings message first to avoid clutter
+                await query.message.delete()
+                
+                await context.bot.send_message(
+                    chat_id=update.effective_chat.id,
+                    text="🌍 <b>Time Zone</b>\n"
+                         "Now <b>send your position</b> in order to auto detect Time Zone to be set in the group.\n\n"
+                         "You can send it using the button in the keyboard or touching 📎 Attach, so 📍 Position (with this second way you can chose a specific position also different from yours).\n\n"
+                         "Alternatively you can <b>write the name of your city</b> directly.\n\n"
+                         "<i>Your position will not be saved, we will save only the Time Zone detected.</i>",
                     parse_mode='HTML',
-                    reply_markup=ForceReply(selective=True)
+                    reply_markup=keyboard
                 )
                 context.user_data['config_state'] = ('nightmode_timezone', chat_id)
-            except BadRequest: pass
+            except Exception as e:
+                logging.error(f"Error in private timezone setup: {e}")
         else:
             # In group, prompt to go private
             keyboard = InlineKeyboardMarkup([
                 [InlineKeyboardButton("👤 Open in Private Chat", url=f"https://t.me/{bot_username}?start=tz_{chat_id}")],
-                [InlineKeyboardButton("⬅️ Back", callback_data="set_view_nightmode_timezone_menu")]
+                [InlineKeyboardButton("⬅️ Back", callback_data="set_view_nightmode")]
             ])
             try:
                 await query.edit_message_text(
-                    "Time Zone can be set only using settings in private chat with the Bot",
-                    reply_markup=keyboard
+                    "<b>Time Zone</b> can be set only using settings in private chat with the Bot.",
+                    reply_markup=keyboard,
+                    parse_mode='HTML'
                 )
             except BadRequest: pass
         await query.answer()
