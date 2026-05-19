@@ -48,41 +48,31 @@ async def is_admin(chat, user_id):
 
 async def check_admin_permission(update: Update, context: ContextTypes.DEFAULT_TYPE, permission: str = None):
     """
-    Check if the user has the required administrative permission.
-    Handles both regular and anonymous admins.
+    Check if a user has administrative permissions.
     
     Args:
         update: The Telegram update
         context: The bot context
         permission: The permission key to check (e.g., 'can_restrict_members')
-                   If None, just checks if user is an admin.
-    
+        
     Returns:
         tuple: (has_permission, error_message)
     """
     user = update.effective_user
     chat = update.effective_chat
     
+    if not user or not chat:
+        return False, "Error identifying user or chat."
+
+    # Owner always has permission
     if user.id == OWNER_ID:
         return True, None
-
-    # Check cache first for high speed
-    stored_perms = get_stored_admin_permissions(chat.id, user.id)
-    if stored_perms:
-        if not permission:
-            return True, None
-        if stored_perms.get(permission, False):
-            # If they have the permission in cache, trust it for speed
-            # We'll still update the cache in the background occasionally or on use
-            return True, None
 
     # Check if it's an anonymous admin
     if is_anonymous_admin(user.id):
         if not permission:
-            # For general admin check, if they are anonymous, they are an admin
             return True, None
         
-        # Mapping permission strings to anonymous admin check functions
         anon_checks = {
             'can_restrict_members': check_anonymous_admin_ban_permission,
             'can_promote_members': check_anonymous_admin_promote_permission,
@@ -96,12 +86,12 @@ async def check_admin_permission(update: Update, context: ContextTypes.DEFAULT_T
             return await anon_checks[permission](chat.id, context)
         return False, f"❌ Unsupported permission check: {permission}"
     
-    # Regular admin check
+    # Try Telegram API first for accurate real-time permissions
     try:
         member = await chat.get_member(user.id)
         status = member.status
         
-        # Save permissions to database
+        # Build permissions dict to update cache
         permissions = {
             "can_change_info": getattr(member, "can_change_info", False),
             "can_delete_messages": getattr(member, "can_delete_messages", False),
@@ -114,28 +104,26 @@ async def check_admin_permission(update: Update, context: ContextTypes.DEFAULT_T
             "is_anonymous": getattr(member, "is_anonymous", False),
         }
         
-        if status == ChatMemberStatus.OWNER:
-            for k in permissions: permissions[k] = True
-            # Background task to update DB cache
-            asyncio.create_task(asyncio.to_thread(update_admin_cache, chat.id, user.id, permissions))
-            return True, None
-        
-        # Background task to update DB cache
+        # Update cache in background
         asyncio.create_task(asyncio.to_thread(update_admin_cache, chat.id, user.id, permissions))
-        
+
+        if status == ChatMemberStatus.OWNER:
+            return True, None
+            
         if status != ChatMemberStatus.ADMINISTRATOR:
-            return False, "You need to be an admin to use this command."
+            # If not admin on Telegram, remove from cache and deny
+            from admin_manager_mongo import remove_admin_cache
+            asyncio.create_task(asyncio.to_thread(remove_admin_cache, chat.id, user.id))
+            return False, "❌ You need to be an administrator to use this command."
         
         if not permission:
             return True, None
         
-        # Check specific permission for regular admin
-        # Using getattr and explicitly checking for True/None
+        # Check specific right
         has_right = getattr(member, permission, False)
         if has_right is True:
             return True, None
-        
-        # Friendly error messages for specific permissions
+            
         perm_names = {
             'can_restrict_members': "Ban Users",
             'can_promote_members': "Add New Admins",
@@ -146,11 +134,10 @@ async def check_admin_permission(update: Update, context: ContextTypes.DEFAULT_T
         }
         perm_name = perm_names.get(permission, permission)
         return False, f"❌ You don't have the '{perm_name}' permission."
-        
+
     except Exception as e:
-        logging.error(f"Error checking admin permission (falling back to DB): {e}")
-        
-        # Fallback to database
+        logging.warning(f"Telegram API check failed for admin {user.id}, falling back to DB: {e}")
+        # Fallback to DB if API is down
         stored_perms = get_stored_admin_permissions(chat.id, user.id)
         if stored_perms:
             if not permission:
@@ -167,9 +154,9 @@ async def check_admin_permission(update: Update, context: ContextTypes.DEFAULT_T
                 'can_change_info': "Change Group Info",
             }
             perm_name = perm_names.get(permission, permission)
-            return False, f"❌ You don't have the '{perm_name}' permission (cached)."
+            return False, f"❌ You don't have the '{perm_name}' permission."
             
-        return False, "Error checking permissions."
+        return False, "❌ Access denied. (Could not verify permissions)"
 
 async def check_bot_permission(update: Update, context: ContextTypes.DEFAULT_TYPE, permission: str):
     """

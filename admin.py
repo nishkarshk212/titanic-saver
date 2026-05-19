@@ -43,15 +43,16 @@ DEFAULT_PERMISSIONS = {
     "can_promote_members": False
 }
 
-async def promote_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Start the promotion process for a user."""
-    # Permission check
+async def promote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Start the interactive promotion process."""
+    # Permission check for the admin performing the promotion
     has_perm, error_msg = await check_admin_permission(update, context, 'can_promote_members')
     if not has_perm:
         await send_bot_response(update, context, error_msg)
         return
 
     chat_id = update.effective_chat.id
+    sender_id = update.effective_user.id
     # Bot permission check
     has_bot_perm, bot_error_msg = await check_bot_permission(update, context, 'can_promote_members')
     if not has_bot_perm:
@@ -395,6 +396,18 @@ async def confirm_promotion(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Update database cache
         update_admin_cache(chat_id, user_id, final_perms)
         
+        # Build summary message
+        summary = []
+        for key, label in PERMISSIONS_MAP.items():
+            status = "✅" if final_perms.get(key) else "❌"
+            summary.append(f"• {label}: {status}")
+        
+        summary_text = "\n".join(summary)
+        success_msg = (
+            f"✅ <b>Successfully promoted user to administrator!</b>\n\n"
+            f"<b>Permissions Summary:</b>\n{summary_text}"
+        )
+
         if requested_perms.get("back_to_info"):
             await query.answer("Successfully promoted user.")
             query.data = f"info_roles_{user_id}"
@@ -403,7 +416,7 @@ async def confirm_promotion(update: Update, context: ContextTypes.DEFAULT_TYPE):
             del context.user_data[promote_key]
             return
 
-        await edit_bot_response(query, context, f"Successfully promoted user to administrator.")
+        await edit_bot_response(query, context, success_msg, parse_mode='HTML')
         
         # Log to channel
         await log_to_channel(context, 
@@ -597,7 +610,7 @@ async def unpin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def get_admin_handlers():
     return [
-        CommandHandler("promote", promote_command),
+        CommandHandler("promote", promote_user),
         CommandHandler("demote", demote_command),
         CommandHandler("reload", reload_command),
         CommandHandler("pin", pin_command),
