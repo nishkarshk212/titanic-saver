@@ -128,8 +128,36 @@ async def handle_nightmode_config_input(update: Update, context: ContextTypes.DE
         if timezone_str:
             from settings_manager_mongo import update_chat_setting
             update_chat_setting(chat_id, "nightmode_timezone", timezone_str)
-            from telegram import ReplyKeyboardRemove
-            await update.message.reply_text(f"✅ Time Zone set to: <b>{timezone_str}</b>", parse_mode='HTML', reply_markup=ReplyKeyboardRemove())
+            
+            from telegram import ReplyKeyboardRemove, InlineKeyboardMarkup, InlineKeyboardButton
+            # Calculate current time in that timezone
+            try:
+                tz = pytz.timezone(timezone_str)
+                now = datetime.now(tz).strftime("%d/%m/%Y %H:%M")
+            except:
+                now = "Unknown"
+
+            success_text = (
+                f"Time Zone set to <b>{timezone_str}</b>\n"
+                f"Current time: <b>{now}</b>"
+            )
+            
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔙 Back", callback_data="set_view_nightmode")]
+            ])
+            
+            await update.message.reply_text(
+                success_text, 
+                parse_mode='HTML', 
+                reply_markup=ReplyKeyboardRemove()
+            )
+            # Send the inline keyboard separately since ReplyKeyboardRemove is a different type
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text="<i>Use the button below to return to settings:</i>",
+                parse_mode='HTML',
+                reply_markup=keyboard
+            )
             context.user_data['config_state'] = None
         else:
             await update.message.reply_text("❌ Could not detect Time Zone. Please enter a valid name like <code>Asia/Kolkata</code> or send your location.", parse_mode='HTML')
@@ -160,7 +188,26 @@ async def handle_nightmode_config_input(update: Update, context: ContextTypes.DE
             pytz.timezone(text)
             from settings_manager_mongo import update_chat_setting
             update_chat_setting(chat_id, "nightmode_timezone", text)
-            await update.message.reply_text(f"✅ Night Mode time zone set to: <b>{text}</b>", parse_mode='HTML')
+            
+            from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+            # Calculate current time in that timezone
+            try:
+                tz = pytz.timezone(text)
+                now = datetime.now(tz).strftime("%d/%m/%Y %H:%M")
+            except:
+                now = "Unknown"
+
+            success_text = (
+                f"Time Zone set to <b>{text}</b>\n"
+                f"Current time: <b>{now}</b>"
+            )
+            
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔙 Back", callback_data="set_view_nightmode")]
+            ])
+            
+            await update.message.reply_text(success_text, parse_mode='HTML', reply_markup=keyboard)
+            return True
         except:
             await update.message.reply_text("❌ Invalid timezone. Examples: <code>Asia/Kolkata</code>, <code>UTC</code>, <code>Europe/London</code>.", parse_mode='HTML')
             return True
