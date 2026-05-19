@@ -89,69 +89,16 @@ async def promote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     promote_key = f"promote_{user_id}"
     context.user_data[promote_key] = current_perms
     
-    # Generate permission summary for the initial message
-    summary = []
-    # Using grid_labels logic for consistency in summary
-    grid_labels = {
-        "can_change_info": "Info",
-        "can_delete_messages": "Delete",
-        "can_restrict_members": "Ban",
-        "can_invite_users": "Invite",
-        "can_pin_messages": "Pin",
-        "can_post_stories": "Stories",
-        "can_edit_stories": "Edit Str",
-        "can_delete_stories": "Del Str",
-        "can_manage_video_chats": "Video",
-        "is_anonymous": "Anon",
-        "can_promote_members": "Admins"
-    }
-    
-    for key, label in grid_labels.items():
-        status = "✅" if current_perms.get(key) else "❌"
-        summary.append(f"• {label}: {status}")
-    
-    summary_text = "\n".join(summary)
-    
-    # Show initial permission button
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🛡 Permissions", callback_data=f"promote_perms_{user_id}")]
-    ])
+    # Show the full permission panel directly (Old Style)
+    keyboard = get_promotion_keyboard(user_id, current_perms)
     
     status_text = "Updating permissions for" if is_already_admin else "Promoting"
     await send_bot_response(
         update, context,
-        f"{status_text} <b>{user_name}</b> (<code>{user_id}</code>)\n\n"
-        f"<b>📊 Current Permissions:</b>\n{summary_text}\n\n"
-        f"💡 Click below to manage rights:",
+        f"{status_text} <b>{user_name}</b> (<code>{user_id}</code>). Select permissions:",
         reply_markup=keyboard,
         parse_mode='HTML'
     )
-
-async def promote_perms_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Show the permissions grid when the button is clicked."""
-    query = update.callback_query
-    user_id = int(query.data.split("_")[-1])
-    
-    promote_key = f"promote_{user_id}"
-    if promote_key not in context.user_data:
-        # Try to fetch fresh if expired
-        chat_id = update.effective_chat.id
-        current_perms = DEFAULT_PERMISSIONS.copy()
-        try:
-            member = await context.bot.get_chat_member(chat_id, user_id)
-            if member.status in ['administrator', 'creator']:
-                for key in DEFAULT_PERMISSIONS.keys():
-                    current_perms[key] = getattr(member, key, False)
-        except: pass
-        context.user_data[promote_key] = current_perms
-        
-    keyboard = get_promotion_keyboard(user_id, context.user_data[promote_key])
-    
-    try:
-        await query.edit_message_reply_markup(reply_markup=keyboard)
-    except BadRequest:
-        pass
-    await query.answer()
 
 async def set_admin_title_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Set a custom admin title for a user."""
@@ -346,37 +293,13 @@ async def delete_admin_title_command(update: Update, context: ContextTypes.DEFAU
         await send_bot_response(update, context, f"❌ An error occurred: {str(e)}")
 
 def get_promotion_keyboard(user_id, current_perms, back_to_info=False):
-    """Generate the keyboard with toggle buttons in a grid layout (rows and columns)."""
+    """Generate the keyboard with toggle buttons in a single column layout (Old Style)."""
     keyboard = []
     
-    # Define mobile-optimized labels for the grid
-    grid_labels = {
-        "can_change_info": "Info",
-        "can_delete_messages": "Delete",
-        "can_restrict_members": "Ban",
-        "can_invite_users": "Invite",
-        "can_pin_messages": "Pin",
-        "can_post_stories": "Stories",
-        "can_edit_stories": "Edit Str",
-        "can_delete_stories": "Del Str",
-        "can_manage_video_chats": "Video",
-        "is_anonymous": "Anon",
-        "can_promote_members": "Admins"
-    }
-    
-    # Create grid with 2 columns
-    keys = list(grid_labels.keys())
-    for i in range(0, len(keys), 2):
-        row = []
-        key1 = keys[i]
-        status1 = "✅" if current_perms.get(key1) else "❌"
-        row.append(InlineKeyboardButton(f"{grid_labels[key1]} {status1}", callback_data=f"toggle_{user_id}_{key1}"))
-        
-        if i + 1 < len(keys):
-            key2 = keys[i+1]
-            status2 = "✅" if current_perms.get(key2) else "❌"
-            row.append(InlineKeyboardButton(f"{grid_labels[key2]} {status2}", callback_data=f"toggle_{user_id}_{key2}"))
-        keyboard.append(row)
+    # Create single column for permissions using full labels
+    for key, label in PERMISSIONS_MAP.items():
+        status = "✅" if current_perms.get(key) else "❌"
+        keyboard.append([InlineKeyboardButton(f"{label}: {status}", callback_data=f"toggle_{user_id}_{key}")])
     
     keyboard.append([InlineKeyboardButton("Confirm Promotion", callback_data=f"confirm_{user_id}")])
     
@@ -720,7 +643,6 @@ def get_admin_handlers():
         CommandHandler("unpin", unpin_command),
         CommandHandler("setadmintitle", set_admin_title_command),
         CommandHandler("deladmintitle", delete_admin_title_command),
-        CallbackQueryHandler(promote_perms_callback, pattern="^promote_perms_"),
         CallbackQueryHandler(toggle_permission, pattern="^toggle_"),
         CallbackQueryHandler(confirm_promotion, pattern="^confirm_"),
         CallbackQueryHandler(cancel_promotion, pattern="^cancel_")
