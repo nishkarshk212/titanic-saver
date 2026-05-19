@@ -236,6 +236,7 @@ def get_nightmode_handlers():
     from telegram.ext import MessageHandler, filters
     return [
         # Catch location and text in private chat if config_state is active
+        # MUST BE IN GROUP 0 or a low group to catch before other handlers
         MessageHandler((filters.LOCATION | filters.TEXT) & filters.ChatType.PRIVATE, handle_nightmode_config_input),
         MessageHandler(filters.ALL & ~filters.COMMAND & filters.ChatType.GROUPS, handle_nightmode)
     ]

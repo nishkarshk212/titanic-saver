@@ -1127,10 +1127,15 @@ def main():
     for handler in get_antiflood_handlers():
         application.add_handler(handler, group=15)
 
-    # Night Mode handlers (Group 17)
+    # Night Mode handlers
     for handler in get_nightmode_handlers():
-        if isinstance(handler, MessageHandler) and not isinstance(handler, CommandHandler) and handler.filters == (filters.ALL & ~filters.COMMAND & filters.ChatType.GROUPS):
-            application.add_handler(handler, group=17)
+        if isinstance(handler, MessageHandler) and not isinstance(handler, CommandHandler):
+            if handler.filters == (filters.ALL & ~filters.COMMAND & filters.ChatType.GROUPS):
+                # Group filter goes to Group 17
+                application.add_handler(handler, group=17)
+            else:
+                # Private chat config handler goes to Group 0 to catch location/text reliably
+                application.add_handler(handler, group=0)
         else:
             application.add_handler(handler)
 
