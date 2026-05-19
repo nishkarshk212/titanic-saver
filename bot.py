@@ -25,6 +25,7 @@ from blocking_handler import get_blocking_handlers
 from edit_handler import get_edit_handlers
 from bio_handler import get_bio_handlers
 from antiflood import get_antiflood_handlers
+from nightmode import get_nightmode_handlers
 from font_normalizer import normalize_text
 from recurring import get_recurring_handlers, check_recurring_messages, count_recurring_messages
 from Manager import get_manager_handlers
@@ -1090,6 +1091,13 @@ def main():
     # Anti-Flood handlers (Group 15)
     for handler in get_antiflood_handlers():
         application.add_handler(handler, group=15)
+
+    # Night Mode handlers (Group 17)
+    for handler in get_nightmode_handlers():
+        if isinstance(handler, MessageHandler) and not isinstance(handler, CommandHandler) and handler.filters == (filters.ALL & ~filters.COMMAND & filters.ChatType.GROUPS):
+            application.add_handler(handler, group=17)
+        else:
+            application.add_handler(handler)
 
     # Add Manager handlers (Group 0) - Group management commands
     for handler in get_manager_handlers():

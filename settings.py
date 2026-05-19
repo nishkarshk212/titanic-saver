@@ -255,15 +255,16 @@ def get_main_settings_keyboard(chat_id=None):
          InlineKeyboardButton("🌐 Language Filter", callback_data="set_view_language_filter")],
         [InlineKeyboardButton("🕒 Recurring Msg", callback_data="set_view_recurring"),
          InlineKeyboardButton("🌊 Anti-Flood", callback_data="set_view_antiflood")],
-        [InlineKeyboardButton("🔗 Group Link", callback_data="set_view_group_link"),
+        [InlineKeyboardButton("🌙 Night Mode", callback_data="set_view_nightmode"),
          InlineKeyboardButton("🚫 Banned Words", callback_data="set_view_banned_words")],
-        [InlineKeyboardButton("📜 Regulations", callback_data="set_view_regulations"),
-         InlineKeyboardButton("👥 Members Mgmt", callback_data="set_view_members_mgmt")],
-        [InlineKeyboardButton("🎙 Voice Chat", callback_data="set_view_vc"),
-         InlineKeyboardButton("🗑️ Deleting Messages", callback_data="set_view_deleting")],
-        [InlineKeyboardButton("👥 Manager", callback_data="set_view_manager"),
-         InlineKeyboardButton("📋 Freed Members", callback_data="free_list_members")],
-        [InlineKeyboardButton("❌ Close Menu", callback_data="set_close")]
+        [InlineKeyboardButton("🔗 Group Link", callback_data="set_view_group_link"),
+         InlineKeyboardButton("📜 Regulations", callback_data="set_view_regulations")],
+        [InlineKeyboardButton("👥 Members Mgmt", callback_data="set_view_members_mgmt"),
+         InlineKeyboardButton("🎙 Voice Chat", callback_data="set_view_vc")],
+        [InlineKeyboardButton("🗑️ Deleting Messages", callback_data="set_view_deleting"),
+         InlineKeyboardButton("👥 Manager", callback_data="set_view_manager")],
+        [InlineKeyboardButton("📋 Freed Members", callback_data="free_list_members"),
+         InlineKeyboardButton("❌ Close Menu", callback_data="set_close")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -816,6 +817,32 @@ def get_antiflood_settings_keyboard(settings):
     ]
     return InlineKeyboardMarkup(keyboard)
 
+def get_nightmode_settings_keyboard(settings):
+    """Get Night Mode settings keyboard based on user provided UI."""
+    status = "✅ On" if settings.get("nightmode_enabled", False) else "❌ Off"
+    media_status = "✅" if settings.get("nightmode_restrict_media", False) else "❌"
+    silence_status = "✅" if settings.get("nightmode_global_silence", False) else "❌"
+    advise_status = "✅" if settings.get("nightmode_advise_enabled", True) else "❌"
+    
+    start = settings.get("nightmode_start", 23)
+    end = settings.get("nightmode_end", 9)
+    timezone = settings.get("nightmode_timezone", "UTC")
+    
+    keyboard = [
+        [InlineKeyboardButton(f"{status}", callback_data="set_toggle_nightmode_enabled")],
+        [
+            InlineKeyboardButton(f"📸 Delete medias {media_status}", callback_data="set_toggle_nightmode_restrict_media"),
+            InlineKeyboardButton(f"🤫 Global Silence {silence_status}", callback_data="set_toggle_nightmode_global_silence")
+        ],
+        [InlineKeyboardButton("🕒 Set time slot", callback_data="set_config_nightmode_time")],
+        [InlineKeyboardButton(f"📣 Start&End advises {advise_status}", callback_data="set_toggle_nightmode_advise_enabled")],
+        [
+            InlineKeyboardButton("⬅️ Back", callback_data="set_view_main"),
+            InlineKeyboardButton("🌍 Time Zone", callback_data="set_config_nightmode_timezone")
+        ]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
 def get_vc_settings_keyboard(settings):
     """Get Voice Chat settings keyboard."""
     vc_user_join_status = "✅" if settings.get("vc_user_join_enabled", True) else "❌"
@@ -1147,6 +1174,52 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "• <b>Window:</b> Time window for the limit\n"
                 "• <b>Penalty:</b> Action taken when limit is reached",
                 reply_markup=get_antiflood_settings_keyboard(settings),
+                parse_mode='HTML'
+            )
+        except BadRequest: pass
+        await query.answer()
+        return
+
+    if data == "set_view_nightmode":
+        settings = get_chat_settings(chat_id)
+        from datetime import datetime
+        import pytz
+        
+        timezone_str = settings.get("nightmode_timezone", "UTC")
+        try:
+            tz = pytz.timezone(timezone_str)
+        except:
+            tz = pytz.UTC
+        
+        now = datetime.now(tz)
+        current_time_str = now.strftime("%d %b %Y, %H:%M")
+        
+        status_text = "❌ Off"
+        if settings.get("nightmode_enabled", False):
+            active_actions = []
+            if settings.get("nightmode_restrict_media", False): active_actions.append("📸 Delete medias")
+            if settings.get("nightmode_global_silence", False): active_actions.append("🤫 Global Silence")
+            
+            status_text = "\n".join(active_actions) if active_actions else "✅ Active (No restrictions set)"
+        
+        start = settings.get("nightmode_start", 23)
+        end = settings.get("nightmode_end", 9)
+        advise = "✅" if settings.get("nightmode_advise_enabled", True) else "❌"
+        
+        text = (
+            f"🌙 <b>Night mode</b>\n"
+            f"Select the actions you want to limit every night.\n\n"
+            f"<b>Status:</b> {status_text}\n"
+            f" ├ Active from hour <b>{start} to {end}</b>\n"
+            f" └ Start&End advises: {advise}\n\n"
+            f"<b>Current time:</b> {current_time_str}"
+        )
+        
+        try:
+            await edit_bot_response(
+                query, context,
+                text,
+                reply_markup=get_nightmode_settings_keyboard(settings),
                 parse_mode='HTML'
             )
         except BadRequest: pass
@@ -1657,6 +1730,18 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # We no longer call set_chat_available_reactions to ensure the block is silent
             # and handled exclusively by the MessageReactionHandler in blocking_handler.py.
             logging.info(f"Reaction blocking for chat {chat_id} toggled to {new_val}. Silent deletion enabled.")
+        elif key == "nightmode_enabled":
+            new_val = not settings.get(key, False)
+            update_chat_setting(chat_id, key, new_val)
+        elif key == "nightmode_restrict_media":
+            new_val = not settings.get(key, False)
+            update_chat_setting(chat_id, key, new_val)
+        elif key == "nightmode_global_silence":
+            new_val = not settings.get(key, False)
+            update_chat_setting(chat_id, key, new_val)
+        elif key == "nightmode_advise_enabled":
+            new_val = not settings.get(key, False)
+            update_chat_setting(chat_id, key, new_val)
         else:
             # Welcome, Clean and Auto Delete (specific types) settings enabled by default, others disabled by default
             default_val = True if "welcome_" in key or "media_enabled" in key or "button_enabled" in key or "clean_" in key or "vc_" in key or "auto_delete_text" in key or "auto_delete_stickers" in key or "auto_delete_media" in key else False
@@ -1705,6 +1790,32 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await query.edit_message_reply_markup(reply_markup=get_banned_words_keyboard(new_settings))
             elif "antiflood" in key:
                 await query.edit_message_reply_markup(reply_markup=get_antiflood_settings_keyboard(new_settings))
+            elif "nightmode" in key:
+                from datetime import datetime
+                import pytz
+                timezone_str = new_settings.get("nightmode_timezone", "UTC")
+                try: tz = pytz.timezone(timezone_str)
+                except: tz = pytz.UTC
+                now = datetime.now(tz)
+                current_time_str = now.strftime("%d %b %Y, %H:%M")
+                status_text = "❌ Off"
+                if new_settings.get("nightmode_enabled", False):
+                    active_actions = []
+                    if new_settings.get("nightmode_restrict_media", False): active_actions.append("📸 Delete medias")
+                    if new_settings.get("nightmode_global_silence", False): active_actions.append("🤫 Global Silence")
+                    status_text = "\n".join(active_actions) if active_actions else "✅ Active (No restrictions set)"
+                start = new_settings.get("nightmode_start", 23)
+                end = new_settings.get("nightmode_end", 9)
+                advise = "✅" if new_settings.get("nightmode_advise_enabled", True) else "❌"
+                text = (
+                    f"🌙 <b>Night mode</b>\n"
+                    f"Select the actions you want to limit every night.\n\n"
+                    f"<b>Status:</b> {status_text}\n"
+                    f" ├ Active from hour <b>{start} to {end}</b>\n"
+                    f" └ Start&End advises: {advise}\n\n"
+                    f"<b>Current time:</b> {current_time_str}"
+                )
+                await query.edit_message_text(text, reply_markup=get_nightmode_settings_keyboard(new_settings), parse_mode='HTML')
             elif key.startswith("block_") or key == "blocking_enabled":
                 await query.edit_message_reply_markup(reply_markup=get_blocking_settings_keyboard(new_settings))
             elif key.startswith("manager_"):
@@ -1827,6 +1938,30 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_reply_markup(reply_markup=get_banned_words_keyboard(new_settings))
         except BadRequest: pass
         await query.answer(f"Warning deletion time set to {new_time}s")
+        return
+
+    if data == "set_config_nightmode_time":
+        await query.answer()
+        await context.bot.send_message(
+            chat_id=interaction_chat_id,
+            text="🕒 <b>Set Night Mode Time Slot</b>\n\n"
+                 "Please reply to this message with the start and end hours in 24h format (e.g., <code>23 9</code>).",
+            parse_mode='HTML',
+            reply_markup=ForceReply(selective=True)
+        )
+        context.user_data['config_state'] = ('nightmode_time', chat_id)
+        return
+
+    if data == "set_config_nightmode_timezone":
+        await query.answer()
+        await context.bot.send_message(
+            chat_id=interaction_chat_id,
+            text="🌍 <b>Set Night Mode Time Zone</b>\n\n"
+                 "Please reply to this message with your timezone (e.g., <code>Asia/Kolkata</code>, <code>UTC</code>, <code>Europe/London</code>).",
+            parse_mode='HTML',
+            reply_markup=ForceReply(selective=True)
+        )
+        context.user_data['config_state'] = ('nightmode_timezone', chat_id)
         return
 
     # Handle Anti-Flood adjustment buttons
