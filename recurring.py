@@ -224,7 +224,7 @@ async def recurring_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 async def handle_recurring_config_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     state = context.user_data.get('config_state')
-    if not state or not state.startswith('awaiting_recurring_'):
+    if not isinstance(state, str) or not state.startswith('awaiting_recurring_'):
         return False
     
     if update.message and update.message.text == "/cancel":

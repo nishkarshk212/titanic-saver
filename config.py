@@ -55,6 +55,7 @@ async def send_bot_response(update, context, text, **kwargs):
     logging.info(f"[RESPONSE] Sending response to chat {update.effective_chat.id if update.effective_chat else 'Unknown'}")
     # Convert text to small caps
     formatted_text = to_small_caps(text)
+    logging.info(f"[RESPONSE] Formatted text: {formatted_text[:50]}...")
     
     # Send message - Try replying first, fallback to normal message if original is gone
     try:
