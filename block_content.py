@@ -6,7 +6,7 @@ from config import OWNER_ID, send_bot_response, log_to_channel
 from settings_manager_mongo import get_chat_settings
 from moderation_manager_mongo import add_warn, reset_warns
 from user_manager_mongo import is_user_admin, get_user_id
-from block_content_manager_mongo import add_blocked_content, remove_blocked_content, is_content_blocked, get_blocked_content
+from block_content_manager_mongo import add_blocked_content, remove_blocked_content, is_content_blocked, get_blocked_content, clear_all_blocked_content
 
 async def block_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Command to block a specific content (text, media, etc.)."""
@@ -51,21 +51,21 @@ async def block_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # If no media, check for text
         if reply.text:
             if add_blocked_content(chat_id, "text", reply.text):
-                await send_bot_response(update, context, f"✅ Blocked the text: '{reply.text[:50]}...'")
+                await send_bot_response(update, context, f"✅ Blocked the word: '{reply.text[:50]}...'")
             else:
-                await send_bot_response(update, context, "ℹ️ This text is already blocked.")
+                await send_bot_response(update, context, "ℹ️ This word is already blocked.")
             return
 
     # 2. Handle arguments (words or sentences)
     if context.args:
         text_to_block = " ".join(context.args)
         if add_blocked_content(chat_id, "text", text_to_block):
-            await send_bot_response(update, context, f"✅ Blocked the content: '{text_to_block}'")
+            await send_bot_response(update, context, f"✅ Blocked the word: '{text_to_block}'")
         else:
-            await send_bot_response(update, context, "ℹ️ This content is already blocked.")
+            await send_bot_response(update, context, "ℹ️ This word is already blocked.")
         return
 
-    await send_bot_response(update, context, "Usage: Reply to a message with /block or use `/block <text>` to block content.")
+    await send_bot_response(update, context, "Usage: Reply to a message with /block or use `/block <word>` to block content.")
 
 async def unblock_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Command to unblock content."""
@@ -96,7 +96,7 @@ async def unblock_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if remove_blocked_content(chat_id, "text", reply.text):
                 await send_bot_response(update, context, f"✅ Unblocked: '{reply.text[:50]}...'")
             else:
-                await send_bot_response(update, context, "❌ This text is not in the block list.")
+                await send_bot_response(update, context, "❌ This word is not in the block list.")
             return
 
     # Handle arguments
@@ -105,10 +105,10 @@ async def unblock_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if remove_blocked_content(chat_id, "text", text_to_unblock):
             await send_bot_response(update, context, f"✅ Unblocked: '{text_to_unblock}'")
         else:
-            await send_bot_response(update, context, "❌ This content is not in the block list.")
+            await send_bot_response(update, context, "❌ This word is not in the block list.")
         return
 
-    await send_bot_response(update, context, "Usage: Reply to a message with /unblock or use `/unblock <text>`.")
+    await send_bot_response(update, context, "Usage: Reply to a message with /unblock or use `/unblock <word>`.")
 
 async def list_blocked_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Lists all blocked text content in the chat."""
@@ -122,14 +122,27 @@ async def list_blocked_command(update: Update, context: ContextTypes.DEFAULT_TYP
     text_list = blocked.get("text", [])
     
     if not text_list:
-        await send_bot_response(update, context, "No text content is blocked in this group.")
+        await send_bot_response(update, context, "No words are blocked in this group.")
         return
         
-    response = "🚫 **Blocked Content List:**\n\n"
+    response = "🚫 **Blocked Words List:**\n\n"
     for i, item in enumerate(text_list, 1):
         response += f"{i}. `{item}`\n"
     
     await send_bot_response(update, context, response, parse_mode=ParseMode.MARKDOWN)
+
+async def unblock_all_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Command to unblock all content in the chat."""
+    chat_id = update.effective_chat.id
+    user_id = update.effective_user.id
+    
+    if user_id != OWNER_ID and not await is_user_admin(chat_id, user_id, context):
+        return
+
+    if clear_all_blocked_content(chat_id):
+        await send_bot_response(update, context, "✅ All blocked words and media have been cleared.")
+    else:
+        await send_bot_response(update, context, "❌ No blocked content found to clear.")
 
 async def check_blocked_content_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """MessageHandler to check every message for blocked content."""
@@ -203,6 +216,7 @@ def get_block_content_handlers():
     return [
         CommandHandler("block", block_command),
         CommandHandler("unblock", unblock_command),
+        CommandHandler("unblockall", unblock_all_command),
         CommandHandler("listblock", list_blocked_command),
         # MessageHandler to catch all messages (text and media)
         MessageHandler(filters.ALL & ~filters.COMMAND & filters.ChatType.GROUPS, check_blocked_content_handler)

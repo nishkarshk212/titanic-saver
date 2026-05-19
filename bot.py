@@ -934,97 +934,6 @@ async def adminlist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logging.error(f"Error in adminlist command: {e}")
         await send_bot_response(update, context, "❌ Failed to retrieve admin list.")
 
-async def check_banned_words(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Check for banned words in messages."""
-    if not update.effective_chat or not update.message or not update.message.text:
-        return
-        
-    chat_id = update.effective_chat.id
-    user_id = update.effective_user.id
-    settings = get_chat_settings(chat_id)
-    
-    # Check target (members vs everyone)
-    target = settings.get("banned_words_target", "members")
-    if target == "members":
-        # Skip admins if target is members
-        if await is_user_admin(chat_id, user_id, context):
-            return
-    # If target is everyone, we check even for admins
-        
-    banned_words = settings.get("banned_words", [])
-    if not banned_words:
-        return
-        
-    original_text = update.message.text.lower()
-    normalized_text_val = normalize_text(update.message.text)
-    
-    found_words = []
-    for word in banned_words:
-        word_lower = word.lower()
-        if word_lower in original_text or word_lower in normalized_text_val:
-            found_words.append(word)
-    
-    if found_words:
-        # Delete message if enabled
-        if settings.get("banned_words_deletion", True):
-            try:
-                await update.message.delete()
-            except: pass
-            
-        # Apply penalty
-        penalty = settings.get("banned_words_penalty", "off").lower()
-        
-        from moderation import warn_command, ban_command, mute_command, kick_command
-        
-        # We need a custom way to send response for banned words so it can be deleted
-        warn_delete_time = settings.get("banned_words_warning_delete_time", 30)
-        
-        async def send_temp_warning(text):
-            msg = await context.bot.send_message(chat_id, text, parse_mode=ParseMode.HTML)
-            if warn_delete_time > 0 and context.job_queue:
-                from config import delete_message_job
-                context.job_queue.run_once(delete_message_job, warn_delete_time, data={"chat_id": chat_id, "message_id": msg.message_id})
-
-        user_name = update.effective_user.first_name
-        
-        if penalty == "warn":
-            from moderation_manager_mongo import add_warn, reset_warns
-            limit = settings.get("warn_limit", 3)
-            warn_penalty = settings.get("warn_penalty", "ban")
-            
-            current_warns = add_warn(chat_id, user_id)
-            if current_warns >= limit:
-                reset_warns(chat_id, user_id)
-                if warn_penalty == "ban":
-                    await context.bot.ban_chat_member(chat_id, user_id)
-                    await send_temp_warning(f"⛔ {user_name} reached warn limit ({limit}/{limit}) for using banned words and was banned.")
-                elif warn_penalty == "mute":
-                    await context.bot.restrict_chat_member(chat_id, user_id, permissions=ChatPermissions(can_send_messages=False))
-                    await send_temp_warning(f"⛔ {user_name} reached warn limit ({limit}/{limit}) for using banned words and was muted.")
-                elif warn_penalty == "kick":
-                    await context.bot.ban_chat_member(chat_id, user_id)
-                    await context.bot.unban_chat_member(chat_id, user_id)
-                    await send_temp_warning(f"⛔ {user_name} reached warn limit ({limit}/{limit}) for using banned words and was kicked.")
-            else:
-                await send_temp_warning(f"⚠️ {user_name}, banned words are not allowed here! Warned ({current_warns}/{limit})")
-                
-        elif penalty == "ban":
-            try:
-                await context.bot.ban_chat_member(chat_id, user_id)
-                await send_temp_warning(f"🔨 {user_name} was banned for using banned words.")
-            except: pass
-        elif penalty == "mute":
-            try:
-                await context.bot.restrict_chat_member(chat_id, user_id, permissions=ChatPermissions(can_send_messages=False))
-                await send_temp_warning(f"🔇 {user_name} was muted for using banned words.")
-            except: pass
-        elif penalty == "kick":
-            try:
-                await context.bot.ban_chat_member(chat_id, user_id)
-                await context.bot.unban_chat_member(chat_id, user_id)
-                await send_temp_warning(f"👢 {user_name} was kicked for using banned words.")
-            except: pass
-
 def main():
     """Main function to run the bot."""
     if not BOT_TOKEN:
@@ -1173,9 +1082,6 @@ def main():
     if application.job_queue:
         application.job_queue.run_repeating(check_recurring_messages, interval=60, first=10)
     
-    # Banned words check (Group 15)
-    application.add_handler(MessageHandler(filters.TEXT & (filters.ChatType.GROUPS | filters.ChatType.SUPERGROUP) & ~filters.COMMAND, check_banned_words), group=15)
-
     # Edit Checks (Group 16)
     for handler in get_edit_handlers():
         application.add_handler(handler, group=16)
