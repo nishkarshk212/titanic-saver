@@ -56,6 +56,11 @@ DEFAULT_BLOCKING_SETTINGS = {
     "clean_pinned": False,
 }
 
+def get_random_premium_emoji():
+    """Returns a random premium-looking emoji for UI enhancement."""
+    emojis = ["💎", "✨", "🌟", "🛡️", "🔥", "👑", "⚡", "🎯", "🚀", "🌈", "✅"]
+    return random.choice(emojis)
+
 async def is_admin_or_creator(context, chat_id, user_id, message=None):
     """Check if user is admin/creator, including anonymous admin support."""
     # Anonymous admin proxy ID (1087968824)
