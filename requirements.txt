@@ -5,3 +5,4 @@ telethon
 pytz
 httpx
 apscheduler
+timezonefinder

@@ -103,6 +103,36 @@ async def handle_nightmode_config_input(update: Update, context: ContextTypes.DE
         return True
 
     text = update.message.text
+    
+    # Handle Location for TimeZone
+    if state == 'nightmode_timezone' and (update.message.location or text):
+        import pytz
+        from timezonefinder import TimezoneFinder
+        tf = TimezoneFinder()
+        
+        timezone_str = None
+        if update.message.location:
+            lat = update.message.location.latitude
+            lng = update.message.location.longitude
+            timezone_str = tf.timezone_at(lng=lng, lat=lat)
+        elif text:
+            # Simple city name search (could be enhanced with geopy)
+            # For now we'll just check if it's a valid timezone name
+            try:
+                pytz.timezone(text)
+                timezone_str = text
+            except:
+                pass
+
+        if timezone_str:
+            from settings_manager_mongo import update_chat_setting
+            update_chat_setting(chat_id, "nightmode_timezone", timezone_str)
+            await update.message.reply_text(f"✅ Time Zone set to: <b>{timezone_str}</b>", parse_mode='HTML')
+            context.user_data['config_state'] = None
+        else:
+            await update.message.reply_text("❌ Could not detect Time Zone. Please enter a valid name like <code>Asia/Kolkata</code> or send your location.", parse_mode='HTML')
+        return True
+
     if not text:
         return False
 
