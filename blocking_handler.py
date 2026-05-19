@@ -714,7 +714,7 @@ def get_blocking_handlers():
     return [
         CommandHandler("free", free_command),
         CommandHandler("unfree", unfree_command),
-        CallbackQueryHandler(free_permission_callback, pattern=r"^free_perm"),
+        CallbackQueryHandler(free_permission_callback, pattern=r"^free_perms_"),
         CallbackQueryHandler(free_permission_toggle, pattern=r"^free_toggle_"),
         CallbackQueryHandler(free_permission_save, pattern=r"^free_save_"),
         CallbackQueryHandler(list_freed_members, pattern=r"^free_list_members$"),
