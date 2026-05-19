@@ -1044,6 +1044,8 @@ def main():
     application = ApplicationBuilder().token(BOT_TOKEN).concurrent_updates(True).build()
 
     # Add general handlers (Group 0)
+    from blocking_handler import handle_reaction_blocking
+    application.add_handler(MessageReactionHandler(handle_reaction_blocking), group=0)
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("id", get_id_command))
     application.add_handler(CommandHandler("link", get_link_command))

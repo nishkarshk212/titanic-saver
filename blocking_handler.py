@@ -694,6 +694,8 @@ async def handle_reaction_blocking(update: Update, context: ContextTypes.DEFAULT
     chat_id = reaction_update.chat.id
     user = reaction_update.user
     
+    logging.info(f"[REACTION] Received reaction update in {chat_id} from {user.id if user else 'Unknown'}")
+
     # If it's an anonymous reaction or no user, we might not be able to identify
     if not user:
         return
@@ -702,31 +704,47 @@ async def handle_reaction_blocking(update: Update, context: ContextTypes.DEFAULT
     if not settings.get("blocking_enabled", True) or not settings.get("block_reactions", False):
         return
 
+    logging.info(f"[REACTION] Reaction blocking is ENABLED in {chat_id}")
+
     # Admins are exempt
     is_admin = await is_user_admin(chat_id, user.id, context)
     if is_admin:
+        logging.info(f"[REACTION] User {user.id} is admin, exempt.")
         return
 
     # Freed users are exempt
     user_perms = settings.get("user_permissions", {}).get(str(user.id), {})
     if user_perms.get("block_reactions", False):
+        logging.info(f"[REACTION] User {user.id} is freed, exempt.")
         return
 
     # If we reached here, the reaction is unauthorized
+    logging.info(f"[REACTION] Attempting to delete unauthorized reaction from {user.id} in {chat_id}")
     try:
         # 1. Attempt to DELETE the reaction (Bot API 7.0+)
-        # This requires the bot to have 'can_delete_messages' right
         try:
-            await context.bot.delete_message_reaction(
-                chat_id=chat_id,
-                message_id=reaction_update.message_id,
-                user_id=user.id
+            # We use the raw request if the method is not in the library yet
+            await context.bot.request.post(
+                "deleteMessageReaction",
+                {
+                    "chat_id": chat_id,
+                    "message_id": reaction_update.message_id,
+                    "user_id": user.id
+                }
             )
-            logging.info(f"✅ Successfully deleted reaction from user {user.id} in chat {chat_id}")
+            logging.info(f"✅ Successfully deleted reaction from user {user.id} in chat {chat_id} via raw request")
         except Exception as e:
-            logging.warning(f"Failed to delete reaction directly: {e}")
-            # If direct deletion fails, we still send the warning
-        
+            logging.warning(f"Failed to delete reaction via raw request: {e}")
+            # Try the library method just in case I missed it
+            try:
+                if hasattr(context.bot, 'delete_message_reaction'):
+                    await context.bot.delete_message_reaction(
+                        chat_id=chat_id,
+                        message_id=reaction_update.message_id,
+                        user_id=user.id
+                    )
+                    logging.info(f"✅ Successfully deleted reaction via library method")
+            except: pass
         # 2. Use a random premium emoji for the warning
         warning_emoji = get_random_premium_emoji()
         user_mention = f'<a href="tg://user?id={user.id}">{user.first_name}</a>'
@@ -768,7 +786,6 @@ def get_blocking_handlers():
         CallbackQueryHandler(free_permission_toggle, pattern=r"^free_toggle_"),
         CallbackQueryHandler(free_permission_save, pattern=r"^free_save_"),
         CallbackQueryHandler(list_freed_members, pattern=r"^free_list_members$"),
-        MessageReactionHandler(handle_reaction_blocking),
         MessageHandler(filters.ALL & filters.ChatType.GROUPS, handle_message_blocking),
     ]
 
