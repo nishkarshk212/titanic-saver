@@ -633,7 +633,7 @@ async def list_freed_members(update: Update, context: ContextTypes.DEFAULT_TYPE)
             active_exemptions = [blocking_labels[k] for k, v in perms.items() if v and k in blocking_labels]
             exempt_str = " ".join(active_exemptions) if active_exemptions else "None"
             
-            keyboard_buttons.append([InlineKeyboardButton(f"👤 {user_name} ({len(active_exemptions)})", callback_data=f"free_permission_{uid}")])
+            keyboard_buttons.append([InlineKeyboardButton(f"👤 {user_name} ({len(active_exemptions)})", callback_data=f"free_perms_{chat_id}_{uid}")])
             text += f"• <b>{user_name}</b> (<code>{uid}</code>)\n  └ ᴇxᴇᴍᴘᴛ: {exempt_str}\n\n"
         except:
             continue

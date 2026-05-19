@@ -2309,6 +2309,5 @@ def get_settings_handlers():
         CallbackQueryHandler(settings_callback, pattern="^set_"),
         CallbackQueryHandler(settings_callback, pattern="^settings_"),
         CallbackQueryHandler(settings_callback, pattern="^mgmt_"),
-        CallbackQueryHandler(settings_callback, pattern="^free_"),
         MessageHandler(filters.ALL & ~filters.COMMAND, handle_setting_input)
     ]

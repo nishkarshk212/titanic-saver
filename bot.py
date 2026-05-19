@@ -43,16 +43,36 @@ logging.basicConfig(
 async def start(update, context):
     """Start command handler."""
     # Check if this is a deep link for settings
-    if context.args and context.args[0].startswith('settings_'):
-        group_chat_id = int(context.args[0].split('_')[1])
-        
-        # Store the group chat_id in user_data
-        context.user_data['settings_chat_id'] = group_chat_id
-        
-        # Import and call the settings panel
-        from settings import show_settings_panel
-        await show_settings_panel(update, context, group_chat_id, is_private=True)
-        return
+    if context.args:
+        arg = context.args[0]
+        if arg.startswith('settings_'):
+            group_chat_id = int(arg.split('_')[1])
+            context.user_data['settings_chat_id'] = group_chat_id
+            from settings import show_settings_panel
+            await show_settings_panel(update, context, group_chat_id, is_private=True)
+            return
+        elif arg.startswith('tz_'):
+            group_chat_id = int(arg.split('_')[1])
+            context.user_data['settings_chat_id'] = group_chat_id
+            context.user_data['config_state'] = ('nightmode_timezone', group_chat_id)
+            
+            # Add keyboard with location request button
+            from telegram import KeyboardButton, ReplyKeyboardMarkup
+            keyboard = ReplyKeyboardMarkup([
+                [KeyboardButton("📍 Send the position", request_location=True)],
+                [KeyboardButton("❌ Cancel")]
+            ], resize_keyboard=True, one_time_keyboard=True)
+            
+            await update.message.reply_text(
+                "🌍 <b>Time Zone Configuration</b>\n\n"
+                "Now <b>send your position</b> in order to auto detect Time Zone to be set in the group.\n\n"
+                "You can send it using the button in the keyboard or touching 📎 Attach, so 📍 Position.\n\n"
+                "Alternatively you can <b>write the name of your city</b> directly (e.g., <code>Kolkata</code>, <code>London</code>).\n\n"
+                "<i>Your position will not be saved, we will save only the Time Zone detected.</i>",
+                parse_mode='HTML',
+                reply_markup=keyboard
+            )
+            return
     
     bot_info = await context.bot.get_me()
     bot_name = bot_info.first_name

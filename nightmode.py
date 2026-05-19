@@ -97,9 +97,10 @@ async def handle_nightmode_config_input(update: Update, context: ContextTypes.DE
     
     state, chat_id = state_data
     
-    if update.message and update.message.text == "/cancel":
+    if update.message and (update.message.text == "/cancel" or update.message.text == "❌ Cancel"):
         context.user_data['config_state'] = None
-        await update.message.reply_text("❌ Configuration cancelled.")
+        from telegram import ReplyKeyboardRemove
+        await update.message.reply_text("❌ Configuration cancelled.", reply_markup=ReplyKeyboardRemove())
         return True
 
     text = update.message.text
@@ -127,7 +128,8 @@ async def handle_nightmode_config_input(update: Update, context: ContextTypes.DE
         if timezone_str:
             from settings_manager_mongo import update_chat_setting
             update_chat_setting(chat_id, "nightmode_timezone", timezone_str)
-            await update.message.reply_text(f"✅ Time Zone set to: <b>{timezone_str}</b>", parse_mode='HTML')
+            from telegram import ReplyKeyboardRemove
+            await update.message.reply_text(f"✅ Time Zone set to: <b>{timezone_str}</b>", parse_mode='HTML', reply_markup=ReplyKeyboardRemove())
             context.user_data['config_state'] = None
         else:
             await update.message.reply_text("❌ Could not detect Time Zone. Please enter a valid name like <code>Asia/Kolkata</code> or send your location.", parse_mode='HTML')
@@ -174,6 +176,7 @@ def get_nightmode_handlers():
     """Returns nightmode message handlers."""
     from telegram.ext import MessageHandler, filters
     return [
-        MessageHandler(filters.REPLY & filters.ChatType.PRIVATE, handle_nightmode_config_input),
+        # Catch location and text in private chat if config_state is active
+        MessageHandler((filters.LOCATION | filters.TEXT) & filters.ChatType.PRIVATE, handle_nightmode_config_input),
         MessageHandler(filters.ALL & ~filters.COMMAND & filters.ChatType.GROUPS, handle_nightmode)
     ]
