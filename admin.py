@@ -10,7 +10,7 @@ from anonymous_admin import (
     check_anonymous_admin_pin_permission, 
     check_anonymous_admin_change_info_permission
 )
-from Manager.actions import check_admin_permission
+from Manager.actions import check_admin_permission, check_bot_permission
 from admin_manager_mongo import sync_admins, update_admin_cache, remove_admin_cache
 
 # Permission names to display

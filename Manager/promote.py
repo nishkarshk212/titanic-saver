@@ -346,8 +346,8 @@ async def tempadmin(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def get_promote_handlers():
     """Return promote handlers."""
     return [
-        CommandHandler("promote", promote_user),
+        CommandHandler("spromote", promote_user),
         CommandHandler("fullpromote", fullpromote_user),
-        CommandHandler("demote", demote_user),
+        CommandHandler("sdemote", demote_user),
         CommandHandler("tempadmin", tempadmin),
     ]

@@ -51,7 +51,6 @@ def _cache_user_db(user_id, username, first_name):
                 "$set": update_data,
                 "$setOnInsert": {
                     "joined_date": now,
-                    "msg_count": 0,
                     "created_at": datetime.datetime.now()
                 },
                 "$inc": {"msg_count": 1} # Also increment msg count here
