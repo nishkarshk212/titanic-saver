@@ -713,9 +713,21 @@ async def handle_reaction_blocking(update: Update, context: ContextTypes.DEFAULT
         return
 
     # If we reached here, the reaction is unauthorized
-    # We can't remove the reaction, but we can notify the user
     try:
-        # Use a random premium emoji for the warning
+        # 1. Attempt to DELETE the reaction (Bot API 7.0+)
+        # This requires the bot to have 'can_delete_messages' right
+        try:
+            await context.bot.delete_message_reaction(
+                chat_id=chat_id,
+                message_id=reaction_update.message_id,
+                user_id=user.id
+            )
+            logging.info(f"✅ Successfully deleted reaction from user {user.id} in chat {chat_id}")
+        except Exception as e:
+            logging.warning(f"Failed to delete reaction directly: {e}")
+            # If direct deletion fails, we still send the warning
+        
+        # 2. Use a random premium emoji for the warning
         warning_emoji = get_random_premium_emoji()
         user_mention = f'<a href="tg://user?id={user.id}">{user.first_name}</a>'
         
@@ -737,7 +749,7 @@ async def handle_reaction_blocking(update: Update, context: ContextTypes.DEFAULT
             data={"chat_id": chat_id, "message_id": warn_msg.message_id}
         )
     except Exception as e:
-        logging.error(f"Error sending reaction warning in {chat_id}: {e}")
+        logging.error(f"Error handling reaction blocking in {chat_id}: {e}")
 
 async def delete_message_job_local(context: ContextTypes.DEFAULT_TYPE):
     """Job to delete a message."""
