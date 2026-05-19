@@ -1745,11 +1745,14 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif key == "nightmode_restrict_media":
             new_val = not settings.get(key, False)
             update_chat_setting(chat_id, key, new_val)
+        elif key == "nightmode_restrict_media":
+            new_val = not settings.get(key, False)
+            update_chat_setting(chat_id, key, new_val)
         elif key == "nightmode_global_silence":
             new_val = not settings.get(key, False)
             update_chat_setting(chat_id, key, new_val)
         elif key == "nightmode_advise_enabled":
-            new_val = not settings.get(key, False)
+            new_val = not settings.get(key, True)
             update_chat_setting(chat_id, key, new_val)
         else:
             # Welcome, Clean and Auto Delete (specific types) settings enabled by default, others disabled by default
@@ -1951,26 +1954,32 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if data == "set_config_nightmode_time":
         await query.answer()
-        await context.bot.send_message(
-            chat_id=interaction_chat_id,
-            text="🕒 <b>Set Night Mode Time Slot</b>\n\n"
-                 "Please reply to this message with the start and end hours in 24h format (e.g., <code>23 9</code>).",
-            parse_mode='HTML',
-            reply_markup=ForceReply(selective=True)
-        )
-        context.user_data['config_state'] = ('nightmode_time', chat_id)
+        try:
+            await context.bot.send_message(
+                chat_id=interaction_chat_id,
+                text="🕒 <b>Set Night Mode Time Slot</b>\n\n"
+                     "Please reply to this message with the start and end hours in 24h format (e.g., <code>23 9</code>).",
+                parse_mode='HTML',
+                reply_markup=ForceReply(selective=True)
+            )
+            context.user_data['config_state'] = ('nightmode_time', chat_id)
+        except Exception as e:
+            logging.error(f"Error sending nightmode time message: {e}")
         return
 
     if data == "set_config_nightmode_timezone":
         await query.answer()
-        await context.bot.send_message(
-            chat_id=interaction_chat_id,
-            text="🌍 <b>Set Night Mode Time Zone</b>\n\n"
-                 "Please reply to this message with your timezone (e.g., <code>Asia/Kolkata</code>, <code>UTC</code>, <code>Europe/London</code>).",
-            parse_mode='HTML',
-            reply_markup=ForceReply(selective=True)
-        )
-        context.user_data['config_state'] = ('nightmode_timezone', chat_id)
+        try:
+            await context.bot.send_message(
+                chat_id=interaction_chat_id,
+                text="🌍 <b>Set Night Mode Time Zone</b>\n\n"
+                     "Please reply to this message with your timezone (e.g., <code>Asia/Kolkata</code>, <code>UTC</code>, <code>Europe/London</code>).",
+                parse_mode='HTML',
+                reply_markup=ForceReply(selective=True)
+            )
+            context.user_data['config_state'] = ('nightmode_timezone', chat_id)
+        except Exception as e:
+            logging.error(f"Error sending nightmode timezone message: {e}")
         return
 
     # Handle Anti-Flood adjustment buttons
