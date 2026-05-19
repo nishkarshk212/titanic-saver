@@ -294,6 +294,13 @@ def get_promotion_keyboard(user_id, current_perms, back_to_info=False):
 async def toggle_permission(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle permission toggle buttons."""
     query = update.callback_query
+    
+    # Permission check for the admin performing the promotion
+    has_perm, error_msg = await check_admin_permission(update, context, 'can_promote_members')
+    if not has_perm:
+        await query.answer(error_msg, show_alert=True)
+        return
+
     data = query.data.split("_")
     
     # Format: toggle_user_id_permission_key
@@ -326,7 +333,14 @@ async def confirm_promotion(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     user_id = int(query.data.split("_")[1])
     chat_id = update.effective_chat.id
+    sender_id = query.from_user.id
     
+    # Permission check for the admin performing the promotion
+    has_perm, error_msg = await check_admin_permission(update, context, 'can_promote_members')
+    if not has_perm:
+        await query.answer(error_msg, show_alert=True)
+        return
+
     promote_key = f"promote_{user_id}"
     if promote_key not in context.user_data:
         await query.answer("Promotion session expired.")

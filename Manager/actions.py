@@ -99,6 +99,7 @@ async def check_admin_permission(update: Update, context: ContextTypes.DEFAULT_T
     # Regular admin check
     try:
         member = await chat.get_member(user.id)
+        status = member.status
         
         # Save permissions to database
         permissions = {
@@ -113,7 +114,7 @@ async def check_admin_permission(update: Update, context: ContextTypes.DEFAULT_T
             "is_anonymous": getattr(member, "is_anonymous", False),
         }
         
-        if isinstance(member, ChatMemberOwner):
+        if status == ChatMemberStatus.OWNER:
             for k in permissions: permissions[k] = True
             # Background task to update DB cache
             asyncio.create_task(asyncio.to_thread(update_admin_cache, chat.id, user.id, permissions))
@@ -122,14 +123,16 @@ async def check_admin_permission(update: Update, context: ContextTypes.DEFAULT_T
         # Background task to update DB cache
         asyncio.create_task(asyncio.to_thread(update_admin_cache, chat.id, user.id, permissions))
         
-        if not isinstance(member, ChatMemberAdministrator):
+        if status != ChatMemberStatus.ADMINISTRATOR:
             return False, "You need to be an admin to use this command."
         
         if not permission:
             return True, None
         
         # Check specific permission for regular admin
-        if getattr(member, permission, False):
+        # Using getattr and explicitly checking for True/None
+        has_right = getattr(member, permission, False)
+        if has_right is True:
             return True, None
         
         # Friendly error messages for specific permissions
