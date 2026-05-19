@@ -336,16 +336,16 @@ async def warn_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reset_warns(chat_id, user_id)
         if penalty == "ban":
             await context.bot.ban_chat_member(chat_id, user_id)
-            await send_bot_response(update, context, f"⛔ {user_name} reached warn limit ({limit}/{limit}) and was banned.")
+            await send_bot_response(update, context, f"⛔ User <code>{user_id}</code> reached warn limit ({limit}/{limit}) and was banned.", parse_mode=ParseMode.HTML)
         elif penalty == "mute":
             await context.bot.restrict_chat_member(chat_id, user_id, permissions=ChatPermissions(can_send_messages=False))
-            await send_bot_response(update, context, f"⛔ {user_name} reached warn limit ({limit}/{limit}) and was muted.")
+            await send_bot_response(update, context, f"⛔ User <code>{user_id}</code> reached warn limit ({limit}/{limit}) and was muted.", parse_mode=ParseMode.HTML)
         elif penalty == "kick":
             await context.bot.ban_chat_member(chat_id, user_id)
             await context.bot.unban_chat_member(chat_id, user_id)
-            await send_bot_response(update, context, f"⛔ {user_name} reached warn limit ({limit}/{limit}) and was kicked.")
+            await send_bot_response(update, context, f"⛔ User <code>{user_id}</code> reached warn limit ({limit}/{limit}) and was kicked.", parse_mode=ParseMode.HTML)
     else:
-        await send_bot_response(update, context, f"⚠️ Warned {user_name}. ({current_warns}/{limit})")
+        await send_bot_response(update, context, f"⚠️ User <code>{user_id}</code> has been warned. ({current_warns}/{limit})", parse_mode=ParseMode.HTML)
 
 async def unwarn_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id

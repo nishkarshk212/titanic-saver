@@ -183,20 +183,20 @@ async def check_blocked_content_handler(update: Update, context: ContextTypes.DE
         elif penalty == "mute":
             try:
                 await context.bot.restrict_chat_member(chat_id, user_id, permissions=ChatPermissions(can_send_messages=False))
-                await context.bot.send_message(chat_id, f"🔇 {user_name} has been muted for using blocked content.")
+                await context.bot.send_message(chat_id, f"🔇 User <code>{user_id}</code> has been muted for using blocked content.", parse_mode=ParseMode.HTML)
             except Exception as e:
                 logging.error(f"Failed to mute user: {e}")
         elif penalty == "ban":
             try:
                 await context.bot.ban_chat_member(chat_id, user_id)
-                await context.bot.send_message(chat_id, f"🚫 {user_name} has been banned for using blocked content.")
+                await context.bot.send_message(chat_id, f"🚫 User <code>{user_id}</code> has been banned for using blocked content.", parse_mode=ParseMode.HTML)
             except Exception as e:
                 logging.error(f"Failed to ban user: {e}")
         elif penalty == "kick":
             try:
                 await context.bot.ban_chat_member(chat_id, user_id)
                 await context.bot.unban_chat_member(chat_id, user_id)
-                await context.bot.send_message(chat_id, f"👞 {user_name} has been kicked for using blocked content.")
+                await context.bot.send_message(chat_id, f"👞 User <code>{user_id}</code> has been kicked for using blocked content.", parse_mode=ParseMode.HTML)
             except Exception as e:
                 logging.error(f"Failed to kick user: {e}")
         return

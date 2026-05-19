@@ -57,7 +57,8 @@ async def check_link_spam(update: Update, context: ContextTypes.DEFAULT_TYPE):
             from config import send_bot_response
             await send_bot_response(
                 update, context,
-                f"⚠️ {update.effective_user.first_name}, links are not allowed in this group."
+                f"⚠️ User <code>{update.effective_user.id}</code>, links are not allowed in this group.",
+                parse_mode='HTML'
             )
         except Exception as e:
             logging.error(f"Link Spam Protection: Failed to delete message from user {user_id} in chat {chat_id}: {e}")

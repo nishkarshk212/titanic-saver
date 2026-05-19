@@ -56,7 +56,8 @@ async def check_forwarded_messages(update: Update, context: ContextTypes.DEFAULT
             from config import send_bot_response
             await send_bot_response(
                 update, context,
-                f"⚠️ {update.effective_user.first_name}, forwarded messages are not allowed in this group."
+                f"⚠️ User <code>{update.effective_user.id}</code>, forwarded messages are not allowed in this group.",
+                parse_mode='HTML'
             )
         except Exception as e:
             logging.error(f"Forward Protection: Failed to delete forwarded message from user {user_id} in chat {chat_id}: {e}")
