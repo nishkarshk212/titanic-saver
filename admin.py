@@ -78,9 +78,14 @@ async def promote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     is_already_admin = False
     try:
         member = await context.bot.get_chat_member(chat_id, user_id)
-        if member.status in ['administrator', 'creator']:
+        if member.status == 'creator':
             is_already_admin = True
             for key in DEFAULT_PERMISSIONS.keys():
+                current_perms[key] = True
+        elif member.status == 'administrator':
+            is_already_admin = True
+            for key in DEFAULT_PERMISSIONS.keys():
+                # ChatMemberAdministrator has these as attributes
                 current_perms[key] = getattr(member, key, False)
     except Exception as e:
         logging.warning(f"Could not fetch current perms for {user_id}: {e}")
@@ -89,7 +94,7 @@ async def promote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     promote_key = f"promote_{user_id}"
     context.user_data[promote_key] = current_perms
     
-    # Show the full permission panel directly (Old Style)
+    # Show the full permission panel directly (Grid Style)
     keyboard = get_promotion_keyboard(user_id, current_perms)
     
     status_text = "Updating permissions for" if is_already_admin else "Promoting"
