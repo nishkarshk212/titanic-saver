@@ -152,65 +152,57 @@ async def check_blocked_content_handler(update: Update, context: ContextTypes.DE
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
     
-    # Skip admins and owner
-    if user_id == OWNER_ID or await is_user_admin(chat_id, user_id, context):
-        return
-
+    # Check if content is blocked (applies to EVERYONE including admins/owner)
     is_blocked, reason = is_content_blocked(chat_id, update.message)
     
     if is_blocked:
-        settings = get_chat_settings(chat_id)
-        
-        # Action settings
-        limit = settings.get("block_warn_limit", 3)
-        penalty = settings.get("block_warn_penalty", "warn") # warn, mute, ban, kick
-        
-        # Delete the message first
+        # 1. Always delete the message first
         try:
             await update.message.delete()
         except Exception as e:
             logging.error(f"Failed to delete blocked content: {e}")
 
-        # Apply penalty
+        # 2. Skip penalties for admins and owner
+        if user_id == OWNER_ID or await is_user_admin(chat_id, user_id, context):
+            logging.info(f"Blocked content deleted from admin/owner {user_id} in {chat_id}. Skipping penalties.")
+            return
+
+        # 3. Apply penalties for regular members
+        settings = get_chat_settings(chat_id)
+        limit = settings.get("block_warn_limit", 3)
+        penalty = settings.get("block_warn_penalty", "warn") # warn, mute, ban, kick
+        
+        user_name = update.effective_user.first_name
+        
         if penalty == "warn":
             await context.bot.send_message(
                 chat_id, 
-                f"⚠️ {update.effective_user.first_name}, that content is blocked in this group. Please avoid using it."
+                f"⚠️ {user_name}, that content is blocked in this group. Please avoid using it."
             )
         elif penalty == "mute":
             try:
                 await context.bot.restrict_chat_member(chat_id, user_id, permissions=ChatPermissions(can_send_messages=False))
-                await context.bot.send_message(chat_id, f"🔇 {update.effective_user.first_name} has been muted for using blocked content.")
+                await context.bot.send_message(chat_id, f"🔇 {user_name} has been muted for using blocked content.")
             except Exception as e:
                 logging.error(f"Failed to mute user: {e}")
         elif penalty == "ban":
             try:
                 await context.bot.ban_chat_member(chat_id, user_id)
-                await context.bot.send_message(chat_id, f"🚫 {update.effective_user.first_name} has been banned for using blocked content.")
+                await context.bot.send_message(chat_id, f"🚫 {user_name} has been banned for using blocked content.")
             except Exception as e:
                 logging.error(f"Failed to ban user: {e}")
         elif penalty == "kick":
             try:
                 await context.bot.ban_chat_member(chat_id, user_id)
                 await context.bot.unban_chat_member(chat_id, user_id)
-                await context.bot.send_message(chat_id, f"👞 {update.effective_user.first_name} has been kicked for using blocked content.")
+                await context.bot.send_message(chat_id, f"👞 {user_name} has been kicked for using blocked content.")
             except Exception as e:
                 logging.error(f"Failed to kick user: {e}")
         return
 
-    # Check message length
-    settings = get_chat_settings(chat_id)
-    length_limit = settings.get("msg_length_limit", 0)
-    if length_limit > 0 and update.message.text:
-        if len(update.message.text) > length_limit:
-            try:
-                await update.message.delete()
-                await context.bot.send_message(
-                    chat_id,
-                    f"📏 {update.effective_user.first_name}, your message is too long (>{length_limit} chars) and was deleted."
-                )
-            except Exception as e:
-                logging.error(f"Failed to delete long message: {e}")
+    # Check message length (admins/owner are exempt from length limits usually, keeping it that way)
+    if user_id == OWNER_ID or await is_user_admin(chat_id, user_id, context):
+        return
 
 def get_block_content_handlers():
     return [
