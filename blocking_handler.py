@@ -5,6 +5,9 @@ from datetime import datetime, timedelta
 import logging
 import copy
 import random
+import asyncio
+import re
+import httpx
 
 # List of premium emojis for random selection
 PREMIUM_EMOJIS = [
@@ -722,29 +725,27 @@ async def handle_reaction_blocking(update: Update, context: ContextTypes.DEFAULT
     logging.info(f"[REACTION] Attempting to delete unauthorized reaction from {user.id} in {chat_id}")
     try:
         # 1. Attempt to DELETE the reaction (Bot API 7.0+)
-        try:
-            # We use the raw request if the method is not in the library yet
-            await context.bot.request.post(
-                "deleteMessageReaction",
-                {
-                    "chat_id": chat_id,
-                    "message_id": reaction_update.message_id,
-                    "user_id": user.id
-                }
-            )
-            logging.info(f"✅ Successfully deleted reaction from user {user.id} in chat {chat_id} via raw request")
-        except Exception as e:
-            logging.warning(f"Failed to delete reaction via raw request: {e}")
-            # Try the library method just in case I missed it
+        # We use a direct HTTP request since the library method might be missing or named differently
+        import httpx
+        from config import BOT_TOKEN
+        
+        async with httpx.AsyncClient() as client:
+            url = f"https://api.telegram.org/bot{BOT_TOKEN}/deleteMessageReaction"
+            params = {
+                "chat_id": chat_id,
+                "message_id": reaction_update.message_id,
+                "user_id": user.id
+            }
             try:
-                if hasattr(context.bot, 'delete_message_reaction'):
-                    await context.bot.delete_message_reaction(
-                        chat_id=chat_id,
-                        message_id=reaction_update.message_id,
-                        user_id=user.id
-                    )
-                    logging.info(f"✅ Successfully deleted reaction via library method")
-            except: pass
+                resp = await client.post(url, json=params)
+                result = resp.json()
+                if result.get("ok"):
+                    logging.info(f"✅ Successfully deleted reaction from user {user.id} in chat {chat_id} via direct API")
+                else:
+                    logging.warning(f"Failed to delete reaction via direct API: {result.get('description')}")
+            except Exception as e:
+                logging.error(f"Error calling deleteMessageReaction: {e}")
+        
         # 2. Use a random premium emoji for the warning
         warning_emoji = get_random_premium_emoji()
         user_mention = f'<a href="tg://user?id={user.id}">{user.first_name}</a>'
