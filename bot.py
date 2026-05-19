@@ -956,6 +956,14 @@ async def adminlist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logging.error(f"Error in adminlist command: {e}")
         await send_bot_response(update, context, "❌ Failed to retrieve admin list.")
 
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Log the error and send a telegram message to notify the developer."""
+    logging.error(f"Exception while handling an update: {context.error}")
+    import traceback
+    tb_list = traceback.format_exception(None, context.error, context.error.__traceback__)
+    tb_string = "".join(tb_list)
+    logging.error(tb_string)
+
 def main():
     """Main function to run the bot."""
     if not BOT_TOKEN:
@@ -973,6 +981,9 @@ def main():
 
     # Initialize the bot application with optimization
     application = ApplicationBuilder().token(BOT_TOKEN).concurrent_updates(True).build()
+
+    # Add error handler
+    application.add_error_handler(error_handler)
 
     # Add general handlers (Group 0)
     from blocking_handler import handle_reaction_blocking
