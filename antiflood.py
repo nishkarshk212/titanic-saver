@@ -22,12 +22,18 @@ async def handle_antiflood(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     message_id = update.effective_message.message_id
     
-    # Skip admins and owner
-    if user_id == OWNER_ID or await is_user_admin(chat_id, user_id, context):
-        return
-
     settings = get_chat_settings(chat_id)
     if not settings.get("antiflood_enabled", False):
+        return
+
+    # Check "Apply On" setting
+    apply_on = settings.get("antiflood_apply_on", "members")
+    if apply_on == "members":
+        # Skip admins and owner if apply_on is members
+        if user_id == OWNER_ID or await is_user_admin(chat_id, user_id, context):
+            return
+    # If apply_on is everyone, we don't skip (except for the bot itself)
+    if user_id == context.bot.id:
         return
 
     limit = settings.get("antiflood_limit", 5)

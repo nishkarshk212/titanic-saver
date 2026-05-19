@@ -181,7 +181,8 @@ DEFAULT_CHAT_SETTINGS = {
     "antiflood_enabled": False,
     "antiflood_limit": 5,
     "antiflood_window": 3,
-    "antiflood_penalty": "mute" # warn, mute, ban, kick
+    "antiflood_penalty": "mute", # warn, mute, ban, kick
+    "antiflood_apply_on": "members" # members, everyone
 }
 
 def get_chat_settings(chat_id):

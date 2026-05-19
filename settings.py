@@ -798,6 +798,7 @@ def get_antiflood_settings_keyboard(settings):
     limit = settings.get("antiflood_limit", 5)
     window = settings.get("antiflood_window", 3)
     penalty = settings.get("antiflood_penalty", "mute").title()
+    apply_on = settings.get("antiflood_apply_on", "members").title()
     
     keyboard = [
         [InlineKeyboardButton(f"Anti-Flood: {status}", callback_data="set_toggle_antiflood_enabled")],
@@ -812,6 +813,7 @@ def get_antiflood_settings_keyboard(settings):
             InlineKeyboardButton("+", callback_data="set_antiflood_window_add")
         ],
         [InlineKeyboardButton(f"Penalty: {penalty}", callback_data="set_toggle_antiflood_penalty")],
+        [InlineKeyboardButton(f"Apply On: {apply_on}", callback_data="set_toggle_antiflood_apply_on")],
         [InlineKeyboardButton("ℹ️ Protects against fast messaging", callback_data="set_none")],
         [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
     ]
@@ -1724,6 +1726,13 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             next_idx = (penalties.index(current) + 1) % len(penalties)
             new_val = penalties[next_idx]
             update_chat_setting(chat_id, "antiflood_penalty", new_val)
+        elif key == "antiflood_apply_on":
+            # Rotate: members -> everyone -> members
+            options = ["members", "everyone"]
+            current = settings.get("antiflood_apply_on", "members")
+            next_idx = (options.index(current) + 1) % len(options)
+            new_val = options[next_idx]
+            update_chat_setting(chat_id, "antiflood_apply_on", new_val)
         elif key == "block_reactions":
             new_val = not settings.get(key, False)
             update_chat_setting(chat_id, key, new_val)
