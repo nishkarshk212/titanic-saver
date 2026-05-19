@@ -177,7 +177,8 @@ async def check_blocked_content_handler(update: Update, context: ContextTypes.DE
         if penalty == "warn":
             await context.bot.send_message(
                 chat_id, 
-                f"⚠️ {user_name}, that content is blocked in this group. Please avoid using it."
+                f"⚠️ User <code>{user_id}</code>, that content is blocked in this group. Please avoid using it.",
+                parse_mode=ParseMode.HTML
             )
         elif penalty == "mute":
             try:
