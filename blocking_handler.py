@@ -431,10 +431,11 @@ async def free_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
     
-    logging.info(f"[FREE] Command received from {user_id} in chat {chat_id}")
+    logging.info(f"[FREE] Processing command for chat {chat_id}, user {user_id}")
     
     # Only admins with specific permissions can use this command
     can_ban, error_msg = await can_user_ban(chat_id, user_id, context)
+    logging.info(f"[FREE] Permission check result: {can_ban}, error: {error_msg}")
     if not can_ban:
         await send_bot_response(update, context, error_msg or "Only admins with 'Ban Users' permission can use the /free command.")
         return
