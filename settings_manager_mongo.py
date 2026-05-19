@@ -176,7 +176,12 @@ DEFAULT_CHAT_SETTINGS = {
     "msg_length_delete": False,
     "msg_length_penalty": "off",
     # User permissions for blocking exemptions
-    "user_permissions": {}
+    "user_permissions": {},
+    # Anti-Flood settings
+    "antiflood_enabled": False,
+    "antiflood_limit": 5,
+    "antiflood_window": 3,
+    "antiflood_penalty": "mute" # warn, mute, ban, kick
 }
 
 def get_chat_settings(chat_id):

@@ -254,15 +254,16 @@ def get_main_settings_keyboard(chat_id=None):
         [InlineKeyboardButton("🎛️ Command Perms", callback_data="set_view_command_permissions"),
          InlineKeyboardButton("🌐 Language Filter", callback_data="set_view_language_filter")],
         [InlineKeyboardButton("🕒 Recurring Msg", callback_data="set_view_recurring"),
-         InlineKeyboardButton("🔗 Group Link", callback_data="set_view_group_link")],
-        [InlineKeyboardButton("🚫 Banned Words", callback_data="set_view_banned_words"),
-         InlineKeyboardButton("📜 Regulations", callback_data="set_view_regulations")],
-        [InlineKeyboardButton("👥 Members Mgmt", callback_data="set_view_members_mgmt"),
-         InlineKeyboardButton("🎙 Voice Chat", callback_data="set_view_vc")],
-        [InlineKeyboardButton("🗑️ Deleting Messages", callback_data="set_view_deleting"),
-         InlineKeyboardButton("👥 Manager", callback_data="set_view_manager")],
-        [InlineKeyboardButton("📋 Freed Members", callback_data="free_list_members"),
-         InlineKeyboardButton("❌ Close Menu", callback_data="set_close")]
+         InlineKeyboardButton("🌊 Anti-Flood", callback_data="set_view_antiflood")],
+        [InlineKeyboardButton("🔗 Group Link", callback_data="set_view_group_link"),
+         InlineKeyboardButton("🚫 Banned Words", callback_data="set_view_banned_words")],
+        [InlineKeyboardButton("📜 Regulations", callback_data="set_view_regulations"),
+         InlineKeyboardButton("👥 Members Mgmt", callback_data="set_view_members_mgmt")],
+        [InlineKeyboardButton("🎙 Voice Chat", callback_data="set_view_vc"),
+         InlineKeyboardButton("🗑️ Deleting Messages", callback_data="set_view_deleting")],
+        [InlineKeyboardButton("👥 Manager", callback_data="set_view_manager"),
+         InlineKeyboardButton("📋 Freed Members", callback_data="free_list_members")],
+        [InlineKeyboardButton("❌ Close Menu", callback_data="set_close")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -790,6 +791,31 @@ def get_blocking_settings_keyboard(settings):
     ]
     return InlineKeyboardMarkup(keyboard)
 
+def get_antiflood_settings_keyboard(settings):
+    """Get Anti-Flood settings keyboard."""
+    status = "✅" if settings.get("antiflood_enabled", False) else "❌"
+    limit = settings.get("antiflood_limit", 5)
+    window = settings.get("antiflood_window", 3)
+    penalty = settings.get("antiflood_penalty", "mute").title()
+    
+    keyboard = [
+        [InlineKeyboardButton(f"Anti-Flood: {status}", callback_data="set_toggle_antiflood_enabled")],
+        [
+            InlineKeyboardButton("-", callback_data="set_antiflood_limit_sub"),
+            InlineKeyboardButton(f"Limit: {limit} msgs", callback_data="set_none"),
+            InlineKeyboardButton("+", callback_data="set_antiflood_limit_add")
+        ],
+        [
+            InlineKeyboardButton("-", callback_data="set_antiflood_window_sub"),
+            InlineKeyboardButton(f"Window: {window}s", callback_data="set_none"),
+            InlineKeyboardButton("+", callback_data="set_antiflood_window_add")
+        ],
+        [InlineKeyboardButton(f"Penalty: {penalty}", callback_data="set_toggle_antiflood_penalty")],
+        [InlineKeyboardButton("ℹ️ Protects against fast messaging", callback_data="set_none")],
+        [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
 def get_vc_settings_keyboard(settings):
     """Get Voice Chat settings keyboard."""
     vc_user_join_status = "✅" if settings.get("vc_user_join_enabled", True) else "❌"
@@ -1105,6 +1131,23 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 query, context,
                 "🌐 Language Filter Settings\n\nAutomatically delete messages in languages other than allowed ones.\n\nAllowed: English, Hindi, Hinglish\n\nEmoji & Symbol Blocking Options:",
                 reply_markup=get_language_filter_settings_keyboard(settings)
+            )
+        except BadRequest: pass
+        await query.answer()
+        return
+
+    if data == "set_view_antiflood":
+        settings = get_chat_settings(chat_id)
+        try:
+            await edit_bot_response(
+                query, context,
+                "🌊 <b>Anti-Flood Settings</b>\n\n"
+                "Protect your group from fast messaging and spamming.\n\n"
+                "• <b>Limit:</b> Number of messages allowed\n"
+                "• <b>Window:</b> Time window for the limit\n"
+                "• <b>Penalty:</b> Action taken when limit is reached",
+                reply_markup=get_antiflood_settings_keyboard(settings),
+                parse_mode='HTML'
             )
         except BadRequest: pass
         await query.answer()
@@ -1601,6 +1644,13 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             next_idx = (penalties.index(current) + 1) % len(penalties)
             new_val = penalties[next_idx]
             update_chat_setting(chat_id, "bio_link_penalty", new_val)
+        elif key == "antiflood_penalty":
+            # Rotate: warn -> mute -> kick -> ban -> warn
+            penalties = ["warn", "mute", "kick", "ban"]
+            current = settings.get("antiflood_penalty", "mute")
+            next_idx = (penalties.index(current) + 1) % len(penalties)
+            new_val = penalties[next_idx]
+            update_chat_setting(chat_id, "antiflood_penalty", new_val)
         elif key == "block_reactions":
             new_val = not settings.get(key, False)
             update_chat_setting(chat_id, key, new_val)
@@ -1653,6 +1703,8 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await query.edit_message_reply_markup(reply_markup=get_command_access_keyboard(new_settings))
             elif "banned_words" in key:
                 await query.edit_message_reply_markup(reply_markup=get_banned_words_keyboard(new_settings))
+            elif "antiflood" in key:
+                await query.edit_message_reply_markup(reply_markup=get_antiflood_settings_keyboard(new_settings))
             elif key.startswith("block_") or key == "blocking_enabled":
                 await query.edit_message_reply_markup(reply_markup=get_blocking_settings_keyboard(new_settings))
             elif key.startswith("manager_"):
@@ -1775,6 +1827,33 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_reply_markup(reply_markup=get_banned_words_keyboard(new_settings))
         except BadRequest: pass
         await query.answer(f"Warning deletion time set to {new_time}s")
+        return
+
+    # Handle Anti-Flood adjustment buttons
+    if data.startswith("set_antiflood_limit_"):
+        action = data.replace("set_antiflood_limit_", "")
+        settings = get_chat_settings(chat_id)
+        current = settings.get("antiflood_limit", 5)
+        new_val = current + 1 if action == "add" else max(1, current - 1)
+        update_chat_setting(chat_id, "antiflood_limit", new_val)
+        new_settings = get_chat_settings(chat_id)
+        try:
+            await query.edit_message_reply_markup(reply_markup=get_antiflood_settings_keyboard(new_settings))
+        except BadRequest: pass
+        await query.answer(f"Flood limit set to {new_val}")
+        return
+
+    if data.startswith("set_antiflood_window_"):
+        action = data.replace("set_antiflood_window_", "")
+        settings = get_chat_settings(chat_id)
+        current = settings.get("antiflood_window", 3)
+        new_val = current + 1 if action == "add" else max(1, current - 1)
+        update_chat_setting(chat_id, "antiflood_window", new_val)
+        new_settings = get_chat_settings(chat_id)
+        try:
+            await query.edit_message_reply_markup(reply_markup=get_antiflood_settings_keyboard(new_settings))
+        except BadRequest: pass
+        await query.answer(f"Flood window set to {new_val}s")
         return
 
     # Handle Goodbye Time adjustment buttons

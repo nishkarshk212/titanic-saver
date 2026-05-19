@@ -24,6 +24,7 @@ from sticker_manager import get_sticker_handlers
 from blocking_handler import get_blocking_handlers
 from edit_handler import get_edit_handlers
 from bio_handler import get_bio_handlers
+from antiflood import get_antiflood_handlers
 from font_normalizer import normalize_text
 from recurring import get_recurring_handlers, check_recurring_messages, count_recurring_messages
 from Manager import get_manager_handlers
@@ -1085,6 +1086,10 @@ def main():
     # Edit Checks (Group 16)
     for handler in get_edit_handlers():
         application.add_handler(handler, group=16)
+
+    # Anti-Flood handlers (Group 15)
+    for handler in get_antiflood_handlers():
+        application.add_handler(handler, group=15)
 
     # Add Manager handlers (Group 0) - Group management commands
     for handler in get_manager_handlers():
