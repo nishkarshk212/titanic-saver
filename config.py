@@ -23,7 +23,7 @@ async def log_to_channel(context, message):
             logging.error(f"Failed to log to channel: {e}")
 
 async def delete_admin_command(update, context):
-    """Helper function to delete an admin's command message if enabled."""
+    """Helper function to delete an admin's command message."""
     if update.message and update.message.text and update.message.text.startswith('/'):
         from user_manager_mongo import is_user_admin
         chat_id = update.effective_chat.id
@@ -33,22 +33,19 @@ async def delete_admin_command(update, context):
         if update.effective_chat.type == "private":
             return
             
-        settings = get_chat_settings(chat_id)
-        
-        if settings.get("command_deletion", False):
-            # Check if user is admin/owner
-            if await is_user_admin(chat_id, user_id, context):
-                try:
-                    # We use a job to delete it slightly later to ensure the command 
-                    # handler has received the message and started processing
-                    if context.job_queue:
-                        context.job_queue.run_once(
-                            delete_message_job,
-                            1, # 1 second delay
-                            data={"chat_id": chat_id, "message_id": update.message.message_id}
-                        )
-                except Exception:
-                    pass
+        # Check if user is admin/owner
+        if await is_user_admin(chat_id, user_id, context):
+            try:
+                # We use a job to delete it slightly later to ensure the command 
+                # handler has received the message and started processing
+                if context.job_queue:
+                    context.job_queue.run_once(
+                        delete_message_job,
+                        1, # 1 second delay
+                        data={"chat_id": chat_id, "message_id": update.message.message_id}
+                    )
+            except Exception:
+                pass
 
 async def send_bot_response(update, context, text, **kwargs):
     """Sends a bot response formatted with small caps and schedules deletion in 30s."""
