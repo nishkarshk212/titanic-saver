@@ -758,6 +758,7 @@ def get_blocking_settings_keyboard(settings):
     poll_status = "✅" if settings.get("block_poll", False) else "❌"
     dice_status = "✅" if settings.get("block_dice", False) else "❌"
     game_status = "✅" if settings.get("block_game", False) else "❌"
+    reaction_status = "✅" if settings.get("block_reactions", False) else "❌"
     
     keyboard = [
         [InlineKeyboardButton(f"Master Blocking: {master_status}", callback_data="set_toggle_blocking_enabled")],
@@ -783,6 +784,7 @@ def get_blocking_settings_keyboard(settings):
         [InlineKeyboardButton(f"Block Poll: {poll_status}", callback_data="set_toggle_block_poll")],
         [InlineKeyboardButton(f"Block Dice: {dice_status}", callback_data="set_toggle_block_dice")],
         [InlineKeyboardButton(f"Block Game: {game_status}", callback_data="set_toggle_block_game")],
+        [InlineKeyboardButton(f"Block Reactions: {reaction_status}", callback_data="set_toggle_block_reactions")],
         [InlineKeyboardButton("ℹ️ Toggle to block content instantly", callback_data="set_none")],
         [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
     ]
@@ -1599,6 +1601,20 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             next_idx = (penalties.index(current) + 1) % len(penalties)
             new_val = penalties[next_idx]
             update_chat_setting(chat_id, "bio_link_penalty", new_val)
+        elif key == "block_reactions":
+            new_val = not settings.get(key, False)
+            update_chat_setting(chat_id, key, new_val)
+            # Apply to group if possible
+            try:
+                # If enabled, set reactions to empty list (blocked)
+                # If disabled, set reactions to None (all allowed)
+                reactions = [] if new_val else None
+                # We need can_change_info permission for this
+                await context.bot.set_chat_available_reactions(chat_id, reactions=reactions)
+                logging.info(f"Reactions for chat {chat_id} set to {reactions}")
+            except Exception as e:
+                logging.error(f"Failed to set available reactions for chat {chat_id}: {e}")
+                await query.answer(f"Updated setting, but failed to apply to group: {str(e)}", show_alert=True)
         else:
             # Welcome, Clean and Auto Delete (specific types) settings enabled by default, others disabled by default
             default_val = True if "welcome_" in key or "media_enabled" in key or "button_enabled" in key or "clean_" in key or "vc_" in key or "auto_delete_text" in key or "auto_delete_stickers" in key or "auto_delete_media" in key else False

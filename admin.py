@@ -535,7 +535,15 @@ async def reload_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # This is useful for groups where admins have changed recently
         admin_count = await sync_admins(chat_id, context)
         
-        # 3. Success message (Green themed)
+        # 3. Refresh group settings (like reaction blocking)
+        from settings_manager_mongo import get_chat_settings
+        settings = get_chat_settings(chat_id)
+        if settings.get("block_reactions", False):
+            try:
+                await context.bot.set_chat_available_reactions(chat_id, reactions=[])
+            except: pass
+        
+        # 4. Success message (Green themed)
         reload_msg = (
             f"✅ **Group Reloaded Successfully!**\n\n"
             f"• **Admin List:** Updated ({admin_count} admins found)\n"

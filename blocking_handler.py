@@ -76,6 +76,7 @@ DEFAULT_BLOCKING_SETTINGS = {
     "block_poll": False,
     "block_dice": False,
     "block_game": False,
+    "block_reactions": False,
     "msg_length_min": 0,
     "msg_length_max": 2000,
     "msg_length_delete": False,

@@ -302,6 +302,13 @@ async def on_chat_member_update(update: Update, context: ContextTypes.DEFAULT_TY
             from admin_manager_mongo import sync_admins
             await sync_admins(chat_id, context)
             logging.info(f"Bot joined or refreshed in chat {chat_id}, synced admins.")
+            
+            # Apply group settings like reaction blocking
+            if settings.get("block_reactions", False):
+                try:
+                    await context.bot.set_chat_available_reactions(chat_id, reactions=[])
+                    logging.info(f"Reactions for chat {chat_id} blocked on bot join.")
+                except: pass
     
     # Active statuses that should receive a welcome message
     active_statuses = ['member', 'administrator', 'restricted']
