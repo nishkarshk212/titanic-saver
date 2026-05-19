@@ -73,39 +73,32 @@ async def promote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await send_bot_response(update, context, "Please reply to a user's message or provide a username/ID to promote them.")
         return
 
-    # Initialize permissions if not present
+    # Fetch current permissions if user is already an admin
+    current_perms = DEFAULT_PERMISSIONS.copy()
+    is_already_admin = False
+    try:
+        member = await context.bot.get_chat_member(chat_id, user_id)
+        if member.status in ['administrator', 'creator']:
+            is_already_admin = True
+            for key in DEFAULT_PERMISSIONS.keys():
+                current_perms[key] = getattr(member, key, False)
+    except Exception as e:
+        logging.warning(f"Could not fetch current perms for {user_id}: {e}")
+
+    # Initialize permissions in user_data
     promote_key = f"promote_{user_id}"
-    if promote_key not in context.user_data:
-        context.user_data[promote_key] = DEFAULT_PERMISSIONS.copy()
+    context.user_data[promote_key] = current_perms
     
-    # Show initial permission button as requested
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🛡 Permissions", callback_data=f"promote_perms_{user_id}")]
-    ])
+    # Directly show the permissions grid keyboard
+    keyboard = get_promotion_keyboard(user_id, current_perms)
     
+    status_text = "Updating permissions for" if is_already_admin else "Promoting"
     await send_bot_response(
         update, context,
-        f"Promoting <b>{user_name}</b> (<code>{user_id}</code>). Click below to configure rights:",
+        f"{status_text} <b>{user_name}</b> (<code>{user_id}</code>). Select permissions:",
         reply_markup=keyboard,
         parse_mode='HTML'
     )
-
-async def promote_perms_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Show the permissions grid when the button is clicked."""
-    query = update.callback_query
-    user_id = int(query.data.split("_")[-1])
-    
-    promote_key = f"promote_{user_id}"
-    if promote_key not in context.user_data:
-        context.user_data[promote_key] = DEFAULT_PERMISSIONS.copy()
-        
-    keyboard = get_promotion_keyboard(user_id, context.user_data[promote_key])
-    
-    try:
-        await query.edit_message_reply_markup(reply_markup=keyboard)
-    except BadRequest:
-        pass
-    await query.answer()
 
 async def set_admin_title_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Set a custom admin title for a user."""
@@ -674,7 +667,6 @@ def get_admin_handlers():
         CommandHandler("unpin", unpin_command),
         CommandHandler("setadmintitle", set_admin_title_command),
         CommandHandler("deladmintitle", delete_admin_title_command),
-        CallbackQueryHandler(promote_perms_callback, pattern="^promote_perms_"),
         CallbackQueryHandler(toggle_permission, pattern="^toggle_"),
         CallbackQueryHandler(confirm_promotion, pattern="^confirm_"),
         CallbackQueryHandler(cancel_promotion, pattern="^cancel_")
