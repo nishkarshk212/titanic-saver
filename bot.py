@@ -3,7 +3,7 @@ import os
 import html
 import random
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, ChatPermissions
-from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
+from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes, MessageReactionHandler
 from telegram.constants import ParseMode
 from admin import get_admin_handlers
 from welcome import get_welcome_handlers
