@@ -52,19 +52,23 @@ async def delete_admin_command(update, context):
 
 async def send_bot_response(update, context, text, **kwargs):
     """Sends a bot response formatted with small caps and schedules deletion in 30s."""
+    logging.info(f"[RESPONSE] Sending response to chat {update.effective_chat.id if update.effective_chat else 'Unknown'}")
     # Convert text to small caps
     formatted_text = to_small_caps(text)
     
     # Send message - Try replying first, fallback to normal message if original is gone
     try:
         msg = await update.message.reply_text(formatted_text, **kwargs)
-    except Exception:
+        logging.info(f"[RESPONSE] Sent via reply_text")
+    except Exception as e:
         # If reply fails (e.g. original message deleted), send to chat normally
+        logging.info(f"[RESPONSE] reply_text failed: {e}, falling back to send_message")
         msg = await context.bot.send_message(
             chat_id=update.effective_chat.id,
             text=formatted_text,
             **kwargs
         )
+        logging.info(f"[RESPONSE] Sent via send_message")
     
     # Handle command deletion if enabled for admins (after sending response)
     await delete_admin_command(update, context)
