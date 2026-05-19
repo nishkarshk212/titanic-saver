@@ -1280,11 +1280,11 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         from datetime import datetime
         import pytz
         
-        timezone_str = settings.get("nightmode_timezone", "UTC")
+        timezone_str = settings.get("nightmode_timezone", "Asia/Kolkata")
         try:
             tz = pytz.timezone(timezone_str)
         except:
-            tz = pytz.UTC
+            tz = pytz.timezone("Asia/Kolkata")
         
         now = datetime.now(tz)
         current_time_str = now.strftime("%d %b %Y, %H:%M")
@@ -1898,9 +1898,9 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             elif "nightmode" in key:
                 from datetime import datetime
                 import pytz
-                timezone_str = new_settings.get("nightmode_timezone", "UTC")
+                timezone_str = new_settings.get("nightmode_timezone", "Asia/Kolkata")
                 try: tz = pytz.timezone(timezone_str)
-                except: tz = pytz.UTC
+                except: tz = pytz.timezone("Asia/Kolkata")
                 now = datetime.now(tz)
                 current_time_str = now.strftime("%d %b %Y, %H:%M")
                 status_text = "❌ Off"

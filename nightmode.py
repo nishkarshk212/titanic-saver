@@ -19,12 +19,12 @@ def is_night_time(chat_id):
 
     start_hour = settings.get("nightmode_start", 23)
     end_hour = settings.get("nightmode_end", 9)
-    timezone_str = settings.get("nightmode_timezone", "UTC")
+    timezone_str = settings.get("nightmode_timezone", "Asia/Kolkata")
 
     try:
         tz = pytz.timezone(timezone_str)
     except Exception:
-        tz = pytz.UTC
+        tz = pytz.timezone("Asia/Kolkata")
 
     now = datetime.now(tz)
     current_hour = now.hour
@@ -92,6 +92,8 @@ async def handle_nightmode(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_nightmode_config_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handles configuration input for night mode settings."""
     state_data = context.user_data.get('config_state')
+    logging.info(f"[NIGHTMODE_CONFIG] State data: {state_data}")
+    
     if not state_data or not isinstance(state_data, tuple) or state_data[0] not in ['nightmode_time', 'nightmode_timezone']:
         return False
     
@@ -103,10 +105,8 @@ async def handle_nightmode_config_input(update: Update, context: ContextTypes.DE
         await update.message.reply_text("❌ Configuration cancelled.", reply_markup=ReplyKeyboardRemove())
         return True
 
-    text = update.message.text
-    
     # Handle Location for TimeZone
-    if state == 'nightmode_timezone' and (update.message.location or text):
+    if state == 'nightmode_timezone':
         import pytz
         from timezonefinder import TimezoneFinder
         tf = TimezoneFinder()
@@ -115,14 +115,18 @@ async def handle_nightmode_config_input(update: Update, context: ContextTypes.DE
         if update.message.location:
             lat = update.message.location.latitude
             lng = update.message.location.longitude
+            logging.info(f"[NIGHTMODE_CONFIG] Received location: {lat}, {lng}")
             timezone_str = tf.timezone_at(lng=lng, lat=lat)
-        elif text:
-            # Simple city name search (could be enhanced with geopy)
-            # For now we'll just check if it's a valid timezone name
+            logging.info(f"[NIGHTMODE_CONFIG] Detected timezone: {timezone_str}")
+        elif update.message.text:
+            text = update.message.text
+            logging.info(f"[NIGHTMODE_CONFIG] Received text: {text}")
+            # Check if it's a valid timezone name
             try:
                 pytz.timezone(text)
                 timezone_str = text
             except:
+                # Try to search for it? For now just fail
                 pass
 
         if timezone_str:
@@ -146,23 +150,31 @@ async def handle_nightmode_config_input(update: Update, context: ContextTypes.DE
                 [InlineKeyboardButton("🔙 Back", callback_data="set_view_nightmode")]
             ])
             
+            # Reset state
+            context.user_data['config_state'] = None
+            
             await update.message.reply_text(
                 success_text, 
                 parse_mode='HTML', 
                 reply_markup=ReplyKeyboardRemove()
             )
-            # Send the inline keyboard separately since ReplyKeyboardRemove is a different type
+            # Send the inline keyboard separately
             await context.bot.send_message(
                 chat_id=update.effective_chat.id,
                 text="<i>Use the button below to return to settings:</i>",
                 parse_mode='HTML',
                 reply_markup=keyboard
             )
-            context.user_data['config_state'] = None
+            return True
         else:
-            await update.message.reply_text("❌ Could not detect Time Zone. Please enter a valid name like <code>Asia/Kolkata</code> or send your location.", parse_mode='HTML')
-        return True
+            # If we are in this state but couldn't detect TZ, don't return False
+            # instead inform user and stay in state
+            if update.message.location or update.message.text:
+                await update.message.reply_text("❌ Could not detect Time Zone. Please enter a valid name like <code>Asia/Kolkata</code> or send your location.", parse_mode='HTML')
+                return True
+            return False
 
+    text = update.message.text
     if not text:
         return False
 
