@@ -35,9 +35,11 @@ async def check_link_spam(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Get settings
     settings = get_chat_settings(chat_id)
+    enabled = settings.get("link_spam_protection_enabled", False)
+    logging.info(f"[LINK_SPAM] Checking chat {chat_id}, user {user_id}. enabled={enabled}")
     
     # Check if link spam protection is enabled
-    if not settings.get("link_spam_protection_enabled", False):
+    if not enabled:
         return
 
     # Check "Apply On" setting
