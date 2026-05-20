@@ -82,6 +82,7 @@ async def handle_nightmode(update: Update, context: ContextTypes.DEFAULT_TYPE):
         entities = (message.entities or []) + (message.caption_entities or [])
         if any(e.type in ['url', 'text_link'] for e in entities):
             should_delete = True
+            logging.info(f"[NIGHTMODE] Link detected in chat {chat_id} from user {user_id}. apply_on={apply_on}, is_admin={is_admin}")
     elif settings.get("nightmode_restrict_text", False) and message.text:
         should_delete = True
     elif settings.get("nightmode_restrict_media", False) and (

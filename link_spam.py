@@ -61,6 +61,7 @@ async def check_link_spam(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message_text = update.message.text or update.message.caption or ""
     
     if contains_link(message_text):
+        logging.info(f"[LINK_SPAM] Link detected in chat {chat_id} from user {user_id}. apply_on={apply_on}, is_admin={is_admin}")
         try:
             # Delete the message with link
             await update.message.delete()
