@@ -83,7 +83,7 @@ def get_link_spam_handlers():
     """Returns the handlers for link spam protection."""
     return [
         MessageHandler(
-            (filters.ChatType.GROUPS | filters.ChatType.SUPERGROUP) & ~filters.COMMAND,
+            filters.ALL & ~filters.COMMAND,
             check_link_spam
         )
     ]
