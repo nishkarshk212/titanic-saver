@@ -1085,9 +1085,9 @@ def main():
     for handler in get_bot_protection_handlers():
         application.add_handler(handler, group=5)
 
-    # Add link spam protection handlers (Group 6)
+    # Add link spam protection handlers (Group 0)
     for handler in get_link_spam_handlers():
-        application.add_handler(handler, group=6)
+        application.add_handler(handler)
 
     # Add forward protection handlers (Group 7)
     for handler in get_forward_protection_handlers():
