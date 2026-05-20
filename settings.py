@@ -700,9 +700,10 @@ def get_link_spam_settings_keyboard(settings):
 
 def get_forward_protection_settings_keyboard(settings):
     status = "✅" if settings.get("forward_protection_enabled", False) else "❌"
+    apply_on = settings.get("forward_protection_apply_on", "members").capitalize()
     keyboard = [
         [InlineKeyboardButton(f"Forward Protection: {status}", callback_data="set_toggle_forward_protection_enabled")],
-        [InlineKeyboardButton("ℹ️ Only affects members (not admins)", callback_data="set_none")],
+        [InlineKeyboardButton(f"Apply On: {apply_on}", callback_data="set_toggle_forward_protection_apply_on")],
         [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -1826,6 +1827,13 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             next_idx = (options.index(current) + 1) % len(options)
             new_val = options[next_idx]
             update_chat_setting(chat_id, "antiflood_apply_on", new_val)
+        elif key == "forward_protection_apply_on":
+            # Rotate: members -> admins -> everyone -> members
+            options = ["members", "admins", "everyone"]
+            current = settings.get("forward_protection_apply_on", "members")
+            next_idx = (options.index(current) + 1) % len(options)
+            new_val = options[next_idx]
+            update_chat_setting(chat_id, "forward_protection_apply_on", new_val)
         elif key == "block_reactions":
             new_val = not settings.get(key, False)
             update_chat_setting(chat_id, key, new_val)

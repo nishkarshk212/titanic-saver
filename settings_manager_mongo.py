@@ -46,6 +46,7 @@ DEFAULT_CHAT_SETTINGS = {
     "bot_protection_enabled": False,
     "link_spam_protection_enabled": False,
     "forward_protection_enabled": False,
+    "forward_protection_apply_on": "members", # members, admins, everyone
     # Language filter settings
     "language_filter_enabled": False,
     "allowed_languages": ["en", "hi", "hinglish"],
