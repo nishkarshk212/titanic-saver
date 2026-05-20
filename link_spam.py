@@ -33,16 +33,29 @@ async def check_link_spam(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type == "private":
         return
     
-    # Skip admins and owner - protection only works on members
-    if user_id == OWNER_ID or await is_user_admin(chat_id, user_id, context):
-        return
-    
     # Get settings
     settings = get_chat_settings(chat_id)
     
     # Check if link spam protection is enabled
     if not settings.get("link_spam_protection_enabled", False):
         return
+
+    # Check "Apply On" setting
+    apply_on = settings.get("link_spam_apply_on", "members")
+    is_admin = user_id == OWNER_ID or await is_user_admin(chat_id, user_id, context)
+    
+    # Logic for "Apply On"
+    if apply_on == "members":
+        if is_admin:
+            return # Skip admins and owner
+    elif apply_on == "admins":
+        if not is_admin:
+            return # Skip regular members
+        if user_id == OWNER_ID:
+            return # Still skip owner
+    elif apply_on == "everyone":
+        if user_id == OWNER_ID:
+            return # Still skip owner
     
     # Check if message contains a link
     message_text = update.message.text or update.message.caption or ""

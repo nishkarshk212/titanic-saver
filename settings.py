@@ -691,9 +691,10 @@ def get_bot_protection_settings_keyboard(settings):
 
 def get_link_spam_settings_keyboard(settings):
     status = "✅" if settings.get("link_spam_protection_enabled", False) else "❌"
+    apply_on = settings.get("link_spam_apply_on", "members").capitalize()
     keyboard = [
         [InlineKeyboardButton(f"Link Spam Protection: {status}", callback_data="set_toggle_link_spam_protection_enabled")],
-        [InlineKeyboardButton("ℹ️ Only affects members (not admins)", callback_data="set_none")],
+        [InlineKeyboardButton(f"Apply On: {apply_on}", callback_data="set_toggle_link_spam_apply_on")],
         [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -828,6 +829,7 @@ def get_nightmode_settings_keyboard(settings):
     link_status = "✅" if settings.get("nightmode_restrict_links", False) else "❌"
     silence_status = "✅" if settings.get("nightmode_global_silence", False) else "❌"
     advise_status = "✅" if settings.get("nightmode_advise_enabled", True) else "❌"
+    apply_on = settings.get("nightmode_apply_on", "members").capitalize()
     
     keyboard = [
         [InlineKeyboardButton(f"{status}", callback_data="set_toggle_nightmode_enabled")],
@@ -839,6 +841,7 @@ def get_nightmode_settings_keyboard(settings):
             InlineKeyboardButton(f"🔗 Links {link_status}", callback_data="set_toggle_nightmode_restrict_links"),
             InlineKeyboardButton(f"🤫 Silence {silence_status}", callback_data="set_toggle_nightmode_global_silence")
         ],
+        [InlineKeyboardButton(f"Apply On: {apply_on}", callback_data="set_toggle_nightmode_apply_on")],
         [InlineKeyboardButton("🕒 Set time slot", callback_data="set_view_nightmode_start_grid")],
         [InlineKeyboardButton(f"📣 Start&End advises {advise_status}", callback_data="set_toggle_nightmode_advise_enabled")],
         [
@@ -1833,6 +1836,13 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             next_idx = (options.index(current) + 1) % len(options)
             new_val = options[next_idx]
             update_chat_setting(chat_id, "antiflood_apply_on", new_val)
+        elif key == "link_spam_apply_on":
+            # Rotate: members -> admins -> everyone -> members
+            options = ["members", "admins", "everyone"]
+            current = settings.get("link_spam_apply_on", "members")
+            next_idx = (options.index(current) + 1) % len(options)
+            new_val = options[next_idx]
+            update_chat_setting(chat_id, "link_spam_apply_on", new_val)
         elif key == "forward_protection_apply_on":
             # Rotate: members -> admins -> everyone -> members
             options = ["members", "admins", "everyone"]
@@ -1864,6 +1874,13 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif key == "nightmode_advise_enabled":
             new_val = not settings.get(key, True)
             update_chat_setting(chat_id, key, new_val)
+        elif key == "nightmode_apply_on":
+            # Rotate: members -> admins -> everyone -> members
+            options = ["members", "admins", "everyone"]
+            current = settings.get("nightmode_apply_on", "members")
+            next_idx = (options.index(current) + 1) % len(options)
+            new_val = options[next_idx]
+            update_chat_setting(chat_id, "nightmode_apply_on", new_val)
         else:
             # Welcome, Clean and Auto Delete (specific types) settings enabled by default, others disabled by default
             default_val = True if "welcome_" in key or "media_enabled" in key or "button_enabled" in key or "clean_" in key or "vc_" in key or "auto_delete_text" in key or "auto_delete_stickers" in key or "auto_delete_media" in key else False
@@ -1931,12 +1948,14 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 start = new_settings.get("nightmode_start", 23)
                 end = new_settings.get("nightmode_end", 9)
                 advise = "✅" if new_settings.get("nightmode_advise_enabled", True) else "❌"
+                apply_on_text = new_settings.get("nightmode_apply_on", "members").capitalize()
                 text = (
                     f"🌙 <b>Night mode</b>\n"
                     f"Select the actions you want to limit every night.\n\n"
                     f"<b>Status:</b> {status_text}\n"
                     f" ├ Active from hour <b>{start} to {end}</b>\n"
-                    f" └ Start&End advises: {advise}\n\n"
+                    f" ├ Start&End advises: {advise}\n"
+                    f" └ Apply on: <b>{apply_on_text}</b>\n\n"
                     f"<b>Current time:</b> {current_time_str}"
                 )
                 await query.edit_message_text(text, reply_markup=get_nightmode_settings_keyboard(new_settings), parse_mode='HTML')

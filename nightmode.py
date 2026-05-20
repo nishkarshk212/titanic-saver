@@ -44,16 +44,30 @@ async def handle_nightmode(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
 
-    # Skip admins and owner
-    if user_id == OWNER_ID or await is_user_admin(chat_id, user_id, context):
-        return
-
     if not is_night_time(chat_id):
         return
 
+    # Get settings
     settings = get_chat_settings(chat_id)
     message = update.effective_message
     
+    # Check "Apply On" setting
+    apply_on = settings.get("nightmode_apply_on", "members")
+    is_admin = user_id == OWNER_ID or await is_user_admin(chat_id, user_id, context)
+    
+    # Logic for "Apply On"
+    if apply_on == "members":
+        if is_admin:
+            return # Skip admins and owner
+    elif apply_on == "admins":
+        if not is_admin:
+            return # Skip regular members
+        if user_id == OWNER_ID:
+            return # Still skip owner
+    elif apply_on == "everyone":
+        if user_id == OWNER_ID:
+            return # Still skip owner
+
     # Debug logging (optional, can be removed after verification)
     # logging.info(f"[NIGHTMODE] Checking message from {user_id} in chat {chat_id}. Night time: {is_night_time(chat_id)}")
 

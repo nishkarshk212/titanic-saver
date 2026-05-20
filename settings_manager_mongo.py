@@ -45,8 +45,12 @@ DEFAULT_CHAT_SETTINGS = {
     "command_access": "all",
     "bot_protection_enabled": False,
     "link_spam_protection_enabled": False,
+    "link_spam_apply_on": "members", # members, admins, everyone
     "forward_protection_enabled": False,
     "forward_protection_apply_on": "members", # members, admins, everyone
+    "nightmode_restrict_links": False,
+    "nightmode_apply_on": "members", # members, admins, everyone
+    "nightmode_global_silence": False,
     # Language filter settings
     "language_filter_enabled": False,
     "allowed_languages": ["en", "hi", "hinglish"],
