@@ -1846,9 +1846,6 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif key == "nightmode_restrict_media":
             new_val = not settings.get(key, False)
             update_chat_setting(chat_id, key, new_val)
-        elif key == "nightmode_restrict_media":
-            new_val = not settings.get(key, False)
-            update_chat_setting(chat_id, key, new_val)
         elif key == "nightmode_global_silence":
             new_val = not settings.get(key, False)
             update_chat_setting(chat_id, key, new_val)

@@ -53,22 +53,30 @@ async def handle_nightmode(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     settings = get_chat_settings(chat_id)
     message = update.effective_message
+    
+    # Debug logging (optional, can be removed after verification)
+    # logging.info(f"[NIGHTMODE] Checking message from {user_id} in chat {chat_id}. Night time: {is_night_time(chat_id)}")
 
     should_delete = False
     
     # Check restrictions
-    if settings.get("nightmode_restrict_text", False) and message.text and not message.text.startswith('/'):
+    if settings.get("nightmode_global_silence", False):
+        # Global silence blocks everything except commands (already filtered by the handler filter)
         should_delete = True
-    elif settings.get("nightmode_restrict_media", False) and (message.photo or message.video or message.audio or message.document or message.animation):
+    elif settings.get("nightmode_restrict_text", False) and message.text:
+        should_delete = True
+    elif settings.get("nightmode_restrict_media", False) and (
+        message.photo or message.video or message.audio or message.document or 
+        message.animation or message.sticker or message.voice or message.video_note
+    ):
         should_delete = True
     elif settings.get("nightmode_restrict_stickers", False) and message.sticker:
-        should_delete = True
-    elif settings.get("nightmode_global_silence", False): # If everything is silenced
         should_delete = True
 
     if should_delete:
         try:
             await message.delete()
+            logging.info(f"[NIGHTMODE] Deleted message from {user_id} in chat {chat_id}")
             # Optional: Send a temporary warning if advised
             if settings.get("nightmode_advise_enabled", True):
                 # We can use a job to avoid spamming warnings
