@@ -63,11 +63,16 @@ async def handle_nightmode(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if settings.get("nightmode_global_silence", False):
         # Global silence blocks everything except commands (already filtered by the handler filter)
         should_delete = True
+    elif settings.get("nightmode_restrict_links", False) and (message.entities or message.caption_entities):
+        # Check if any entity is a link
+        entities = (message.entities or []) + (message.caption_entities or [])
+        if any(e.type in ['url', 'text_link'] for e in entities):
+            should_delete = True
     elif settings.get("nightmode_restrict_text", False) and message.text:
         should_delete = True
     elif settings.get("nightmode_restrict_media", False) and (
         message.photo or message.video or message.audio or message.document or 
-        message.animation or message.sticker or message.voice or message.video_note
+        message.animation or message.voice or message.video_note
     ):
         should_delete = True
     elif settings.get("nightmode_restrict_stickers", False) and message.sticker:

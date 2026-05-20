@@ -824,14 +824,20 @@ def get_nightmode_settings_keyboard(settings):
     """Get Night Mode settings keyboard based on user provided UI."""
     status = "✅ On" if settings.get("nightmode_enabled", False) else "❌ Off"
     media_status = "✅" if settings.get("nightmode_restrict_media", False) else "❌"
+    sticker_status = "✅" if settings.get("nightmode_restrict_stickers", False) else "❌"
+    link_status = "✅" if settings.get("nightmode_restrict_links", False) else "❌"
     silence_status = "✅" if settings.get("nightmode_global_silence", False) else "❌"
     advise_status = "✅" if settings.get("nightmode_advise_enabled", True) else "❌"
     
     keyboard = [
         [InlineKeyboardButton(f"{status}", callback_data="set_toggle_nightmode_enabled")],
         [
-            InlineKeyboardButton(f"📸 Delete medias {media_status}", callback_data="set_toggle_nightmode_restrict_media"),
-            InlineKeyboardButton(f"🤫 Global Silence {silence_status}", callback_data="set_toggle_nightmode_global_silence")
+            InlineKeyboardButton(f"📸 Medias {media_status}", callback_data="set_toggle_nightmode_restrict_media"),
+            InlineKeyboardButton(f"🗑 Stickers {sticker_status}", callback_data="set_toggle_nightmode_restrict_stickers")
+        ],
+        [
+            InlineKeyboardButton(f"🔗 Links {link_status}", callback_data="set_toggle_nightmode_restrict_links"),
+            InlineKeyboardButton(f"🤫 Silence {silence_status}", callback_data="set_toggle_nightmode_global_silence")
         ],
         [InlineKeyboardButton("🕒 Set time slot", callback_data="set_view_nightmode_start_grid")],
         [InlineKeyboardButton(f"📣 Start&End advises {advise_status}", callback_data="set_toggle_nightmode_advise_enabled")],
@@ -1846,6 +1852,12 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif key == "nightmode_restrict_media":
             new_val = not settings.get(key, False)
             update_chat_setting(chat_id, key, new_val)
+        elif key == "nightmode_restrict_stickers":
+            new_val = not settings.get(key, False)
+            update_chat_setting(chat_id, key, new_val)
+        elif key == "nightmode_restrict_links":
+            new_val = not settings.get(key, False)
+            update_chat_setting(chat_id, key, new_val)
         elif key == "nightmode_global_silence":
             new_val = not settings.get(key, False)
             update_chat_setting(chat_id, key, new_val)
@@ -1911,8 +1923,10 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 status_text = "❌ Off"
                 if new_settings.get("nightmode_enabled", False):
                     active_actions = []
-                    if new_settings.get("nightmode_restrict_media", False): active_actions.append("📸 Delete medias")
-                    if new_settings.get("nightmode_global_silence", False): active_actions.append("🤫 Global Silence")
+                    if new_settings.get("nightmode_restrict_media", False): active_actions.append("📸 Medias")
+                    if new_settings.get("nightmode_restrict_stickers", False): active_actions.append("🗑 Stickers")
+                    if new_settings.get("nightmode_restrict_links", False): active_actions.append("🔗 Links")
+                    if new_settings.get("nightmode_global_silence", False): active_actions.append("🤫 Silence")
                     status_text = "\n".join(active_actions) if active_actions else "✅ Active (No restrictions set)"
                 start = new_settings.get("nightmode_start", 23)
                 end = new_settings.get("nightmode_end", 9)
