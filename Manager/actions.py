@@ -6,8 +6,8 @@ Ported from AnnieXMusic to python-telegram-bot
 import asyncio
 import logging
 from datetime import datetime, timedelta
-from telegram import Update, ChatPermissions, ChatMemberAdministrator, ChatMemberOwner, ChatMemberBanned, ChatMemberRestricted, ReplyParameters
-from telegram.ext import ContextTypes, CommandHandler, MessageHandler, filters
+from telegram import Update, ChatPermissions, ChatMemberAdministrator, ChatMemberOwner, ChatMemberBanned, ChatMemberRestricted, ReplyParameters, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ContextTypes, CommandHandler, MessageHandler, filters, CallbackQueryHandler
 from telegram.constants import ChatMemberStatus
 from settings_manager_mongo import get_chat_settings
 from anonymous_admin import (
@@ -40,7 +40,6 @@ from user_manager_mongo import get_user_id
 from voice_chat import remove_user_from_vc
 from database import get_collection, COLLECTIONS
 import uuid
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, CallbackQueryHandler
 
 async def is_admin(chat, user_id):
     """Check if user is admin."""
