@@ -308,6 +308,8 @@ async def send_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # target that original message instead.
         target_message_id = reply.reply_to_message.message_id if reply.reply_to_message else reply.message_id
         
+        logging.info(f"Send command: reply_id={reply.message_id}, target_id={target_message_id}, has_original={bool(reply.reply_to_message)}")
+        
         try:
             # If command has text, send that text as a reply to the target message
             if context.args:
