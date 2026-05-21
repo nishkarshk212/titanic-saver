@@ -7,7 +7,7 @@ import asyncio
 import logging
 from datetime import datetime, timedelta
 from telegram import Update, ChatPermissions, ChatMemberAdministrator, ChatMemberOwner, ChatMemberBanned, ChatMemberRestricted
-from telegram.ext import ContextTypes, CommandHandler
+from telegram.ext import ContextTypes, CommandHandler, MessageHandler, filters
 from telegram.constants import ChatMemberStatus
 from settings_manager_mongo import get_chat_settings
 from anonymous_admin import (
@@ -300,15 +300,43 @@ async def send_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         return new_text, new_entities
 
-    # 1. Handle reply on media or sticker
+    # 1. Handle reply
     if update.message.reply_to_message:
         reply = update.message.reply_to_message
         
+        # If the reply is to a user's message (not media/sticker) and no args,
+        # enter interactive mode.
+        if not context.args and not (reply.sticker or reply.photo or reply.video or reply.animation or reply.document or reply.audio or reply.voice or reply.video_note):
+            # Save target in chat_data
+            target_id = reply.message_id
+            admin_id = update.effective_user.id
+            
+            if 'send_targets' not in context.chat_data:
+                context.chat_data['send_targets'] = {}
+            
+            prompt = await update.message.reply_text(
+                "✅ <b>Target Locked.</b>\n\n"
+                "Now <b>reply to this message</b> with the sticker, media, or text you want the bot to send.",
+                parse_mode='HTML'
+            )
+            
+            context.chat_data['send_targets'][prompt.message_id] = {
+                'target_id': target_id,
+                'admin_id': admin_id
+            }
+            
+            # Delete the /send command
+            try: await update.message.delete()
+            except: pass
+            return
+
         # Double-reply logic: If the replied message is itself a reply to something else,
         # target that original message instead.
         target_message_id = reply.message_id
         if reply.reply_to_message:
             target_message_id = reply.reply_to_message.message_id
+        elif hasattr(reply, 'reply_to_message_id') and reply.reply_to_message_id: # Some versions of PTB/Telegram provide this
+            target_message_id = reply.reply_to_message_id
             
         logging.info(f"Send command DEBUG: reply_msg_id={reply.message_id}, target_msg_id={target_message_id}")
         if reply.reply_to_message:
@@ -376,6 +404,64 @@ async def send_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
     await update.message.reply_text("Usage: /send <message> or reply to media/sticker with /send")
+
+
+async def handle_interactive_send(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle the media/sticker reply in interactive send mode."""
+    if not update.message.reply_to_message:
+        return
+        
+    # Security: Must be a reply to the bot's own prompt
+    if update.message.reply_to_message.from_user.id != context.bot.id:
+        return
+        
+    chat_id = update.effective_chat.id
+    prompt_id = update.message.reply_to_message.message_id
+    
+    if 'send_targets' not in context.chat_data or prompt_id not in context.chat_data['send_targets']:
+        return
+        
+    target_info = context.chat_data['send_targets'][prompt_id]
+    
+    # Security: Only the admin who initiated the /send can complete it
+    if update.effective_user.id != target_info['admin_id']:
+        return
+        
+    target_id = target_info['target_id']
+    msg = update.message
+    
+    try:
+        if msg.sticker:
+            await context.bot.send_sticker(chat_id=chat_id, sticker=msg.sticker.file_id, reply_to_message_id=target_id)
+        elif msg.photo:
+            await context.bot.send_photo(chat_id=chat_id, photo=msg.photo[-1].file_id, caption=msg.caption, caption_entities=msg.caption_entities, reply_to_message_id=target_id)
+        elif msg.video:
+            await context.bot.send_video(chat_id=chat_id, video=msg.video.file_id, caption=msg.caption, caption_entities=msg.caption_entities, reply_to_message_id=target_id)
+        elif msg.animation:
+            await context.bot.send_animation(chat_id=chat_id, animation=msg.animation.file_id, caption=msg.caption, caption_entities=msg.caption_entities, reply_to_message_id=target_id)
+        elif msg.document:
+            await context.bot.send_document(chat_id=chat_id, document=msg.document.file_id, caption=msg.caption, caption_entities=msg.caption_entities, reply_to_message_id=target_id)
+        elif msg.audio:
+            await context.bot.send_audio(chat_id=chat_id, audio=msg.audio.file_id, caption=msg.caption, caption_entities=msg.caption_entities, reply_to_message_id=target_id)
+        elif msg.voice:
+            await context.bot.send_voice(chat_id=chat_id, voice=msg.voice.file_id, caption=msg.caption, caption_entities=msg.caption_entities, reply_to_message_id=target_id)
+        elif msg.video_note:
+            await context.bot.send_video_note(chat_id=chat_id, video_note=msg.video_note.file_id, reply_to_message_id=target_id)
+        elif msg.text:
+            await context.bot.send_message(chat_id=chat_id, text=msg.text, entities=msg.entities, reply_to_message_id=target_id)
+            
+        # Cleanup
+        try:
+            await msg.delete() # Delete the admin's sticker/media
+            await update.message.reply_to_message.delete() # Delete the bot's prompt
+        except: pass
+        
+        # Remove from targets
+        del context.chat_data['send_targets'][prompt_id]
+        
+    except Exception as e:
+        logging.error(f"Error in handle_interactive_send: {e}")
+        # Don't show error to user to avoid spam, just log it
 
     
     # Check if command is enabled
@@ -793,4 +879,5 @@ def get_manager_actions_handlers():
         CommandHandler("kickme", kickme),
         CommandHandler("tban", tban_user),
         CommandHandler("send", send_command),
+        MessageHandler(filters.REPLY & filters.ChatType.GROUPS & ~filters.COMMAND, handle_interactive_send),
     ]
