@@ -646,6 +646,7 @@ def get_command_permissions_keyboard(settings):
             ("Unpin", "cmd_access_unpin"),
             ("Promote", "cmd_access_promote"),
             ("Demote", "cmd_access_demote"),
+            ("Send", "cmd_access_send"),
         ]),
         ("📋 Info & Utilities", [
             ("Staff", "cmd_access_staff"),

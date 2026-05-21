@@ -252,6 +252,69 @@ async def unban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Unban a user from the group."""
     chat = update.effective_chat
     user = update.effective_user
+
+async def send_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Send a message, media, or sticker through the bot."""
+    chat = update.effective_chat
+    if not chat or chat.type == 'private':
+        return
+
+    # Permission check: Admin who has permission to ban (can_restrict_members)
+    has_perm, error_msg = await check_admin_permission(update, context, 'can_restrict_members')
+    if not has_perm:
+        return await update.message.reply_text(error_msg)
+
+    # 1. Handle reply on media or sticker
+    if update.message.reply_to_message:
+        reply = update.message.reply_to_message
+        
+        try:
+            if reply.sticker:
+                await context.bot.send_sticker(chat_id=chat.id, sticker=reply.sticker.file_id)
+            elif reply.photo:
+                await context.bot.send_photo(chat_id=chat.id, photo=reply.photo[-1].file_id, caption=reply.caption)
+            elif reply.video:
+                await context.bot.send_video(chat_id=chat.id, video=reply.video.file_id, caption=reply.caption)
+            elif reply.animation:
+                await context.bot.send_animation(chat_id=chat.id, animation=reply.animation.file_id, caption=reply.caption)
+            elif reply.document:
+                await context.bot.send_document(chat_id=chat.id, document=reply.document.file_id, caption=reply.caption)
+            elif reply.audio:
+                await context.bot.send_audio(chat_id=chat.id, audio=reply.audio.file_id, caption=reply.caption)
+            elif reply.voice:
+                await context.bot.send_voice(chat_id=chat.id, voice=reply.voice.file_id, caption=reply.caption)
+            elif reply.video_note:
+                await context.bot.send_video_note(chat_id=chat.id, video_note=reply.video_note.file_id)
+            elif reply.text:
+                await context.bot.send_message(chat_id=chat.id, text=reply.text)
+            else:
+                return await update.message.reply_text("❌ Unsupported media type in reply.")
+            
+            # Delete the /send command message
+            try:
+                await update.message.delete()
+            except: pass
+            return
+        except Exception as e:
+            logging.error(f"Error in send_command (reply): {e}")
+            return await update.message.reply_text(f"❌ Failed to send: {str(e)}")
+
+    # 2. Handle arguments (text message)
+    if context.args:
+        text_to_send = update.message.text.split(None, 1)[1]
+        try:
+            await context.bot.send_message(chat_id=chat.id, text=text_to_send)
+            # Delete the /send command message
+            try:
+                await update.message.delete()
+            except: pass
+        except Exception as e:
+            logging.error(f"Error in send_command (text): {e}")
+            return await update.message.reply_text(f"❌ Failed to send message: {str(e)}")
+        return
+
+    await update.message.reply_text("Usage: /send <message> or reply to media/sticker with /send")
+
     
     # Check if command is enabled
     settings = get_chat_settings(chat.id)
@@ -667,4 +730,5 @@ def get_manager_actions_handlers():
         CommandHandler("sban", sban_user),
         CommandHandler("kickme", kickme),
         CommandHandler("tban", tban_user),
+        CommandHandler("send", send_command),
     ]
