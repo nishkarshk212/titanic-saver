@@ -338,10 +338,6 @@ async def send_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif hasattr(reply, 'reply_to_message_id') and reply.reply_to_message_id: # Some versions of PTB/Telegram provide this
             target_message_id = reply.reply_to_message_id
             
-        logging.info(f"Send command DEBUG: reply_msg_id={reply.message_id}, target_msg_id={target_message_id}")
-        if reply.reply_to_message:
-            logging.info(f"Send command DEBUG: original_msg_id={reply.reply_to_message.message_id}, original_text={reply.reply_to_message.text[:20] if reply.reply_to_message.text else 'None'}")
-        
         try:
             # If command has text, send that text as a reply to the target message
             if context.args:
