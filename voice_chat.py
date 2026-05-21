@@ -56,6 +56,12 @@ async def start_voice_chat_monitor(application: Application):
         await telethon_client.start()
         logger.info("✅ Telethon client started successfully!")
         
+        # Manually trigger handler registration in case it was missed
+        handlers = get_voice_chat_handlers()
+        for handler in handlers:
+            ptb_application.add_handler(handler)
+        logger.info(f"✅ Voice Chat handlers registered: {[type(h) for h in handlers]}")
+        
         # Start automatic ghost cleaner
         asyncio.create_task(auto_ghost_cleaner_task())
     except Exception as e:
