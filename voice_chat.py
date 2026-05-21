@@ -481,6 +481,7 @@ async def remove_user_from_vc(chat_id, user_id):
 
 async def vcclean_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Admin command to clean ghost participants."""
+    logger.info(f"vcclean_command triggered by {update.effective_user.id} in chat {update.effective_chat.id}")
     if not update.effective_chat or update.effective_chat.type == 'private':
         return
         
@@ -489,9 +490,12 @@ async def vcclean_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
     status_msg = await update.message.reply_text("🔍 Scanning voice chat for ghost participants...")
     
-    success, result = await clean_ghost_participants(update.effective_chat.id)
-    
-    await status_msg.edit_text(result)
+    try:
+        success, result = await clean_ghost_participants(update.effective_chat.id)
+        await status_msg.edit_text(result)
+    except Exception as e:
+        logger.error(f"Error executing vcclean: {e}")
+        await status_msg.edit_text(f"❌ Error: {str(e)}")
 
 def get_voice_chat_handlers():
     """Returns handlers for voice chat events."""
