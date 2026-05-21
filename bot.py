@@ -1215,6 +1215,8 @@ def main():
             BotCommand("staff", "Show group staff"),
             BotCommand("me", "Show your info"),
             BotCommand("info", "Show chat info"),
+            BotCommand("send", "Send message through bot"),
+            BotCommand("psend", "Send protected message"),
             BotCommand("report", "Report a message to admins"),
             BotCommand("settings", "Bot settings (Admins only)"),
             BotCommand("free", "Exempt a user (Admins only)"),
