@@ -271,35 +271,36 @@ async def send_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             # If command has text, send that text as a reply to the original message
             if context.args:
-                text_to_send = update.message.text.split(None, 1)[1]
+                # Use text_html to preserve mentions and formatting
+                full_text_html = update.message.text_html
+                text_to_send = full_text_html.split(None, 1)[1] if " " in full_text_html else ""
+                
                 await context.bot.send_message(
                     chat_id=chat.id, 
                     text=text_to_send,
-                    reply_to_message_id=reply.message_id
+                    reply_to_message_id=reply.message_id,
+                    parse_mode='HTML'
                 )
             # If no text, send the replied media/sticker back as a reply to itself (or just send it)
-            # Actually, the user said "when use /send text message to reply an user then bot reply this message to user's reply"
-            # This implies if it's a reply AND there's text, it should be a reply.
-            # What if it's a reply and NO text? It should probably still be a reply to the original message.
             else:
                 if reply.sticker:
                     await context.bot.send_sticker(chat_id=chat.id, sticker=reply.sticker.file_id, reply_to_message_id=reply.message_id)
                 elif reply.photo:
-                    await context.bot.send_photo(chat_id=chat.id, photo=reply.photo[-1].file_id, caption=reply.caption, reply_to_message_id=reply.message_id)
+                    await context.bot.send_photo(chat_id=chat.id, photo=reply.photo[-1].file_id, caption=reply.caption_html, reply_to_message_id=reply.message_id, parse_mode='HTML')
                 elif reply.video:
-                    await context.bot.send_video(chat_id=chat.id, video=reply.video.file_id, caption=reply.caption, reply_to_message_id=reply.message_id)
+                    await context.bot.send_video(chat_id=chat.id, video=reply.video.file_id, caption=reply.caption_html, reply_to_message_id=reply.message_id, parse_mode='HTML')
                 elif reply.animation:
-                    await context.bot.send_animation(chat_id=chat.id, animation=reply.animation.file_id, caption=reply.caption, reply_to_message_id=reply.message_id)
+                    await context.bot.send_animation(chat_id=chat.id, animation=reply.animation.file_id, caption=reply.caption_html, reply_to_message_id=reply.message_id, parse_mode='HTML')
                 elif reply.document:
-                    await context.bot.send_document(chat_id=chat.id, document=reply.document.file_id, caption=reply.caption, reply_to_message_id=reply.message_id)
+                    await context.bot.send_document(chat_id=chat.id, document=reply.document.file_id, caption=reply.caption_html, reply_to_message_id=reply.message_id, parse_mode='HTML')
                 elif reply.audio:
-                    await context.bot.send_audio(chat_id=chat.id, audio=reply.audio.file_id, caption=reply.caption, reply_to_message_id=reply.message_id)
+                    await context.bot.send_audio(chat_id=chat.id, audio=reply.audio.file_id, caption=reply.caption_html, reply_to_message_id=reply.message_id, parse_mode='HTML')
                 elif reply.voice:
-                    await context.bot.send_voice(chat_id=chat.id, voice=reply.voice.file_id, caption=reply.caption, reply_to_message_id=reply.message_id)
+                    await context.bot.send_voice(chat_id=chat.id, voice=reply.voice.file_id, caption=reply.caption_html, reply_to_message_id=reply.message_id, parse_mode='HTML')
                 elif reply.video_note:
                     await context.bot.send_video_note(chat_id=chat.id, video_note=reply.video_note.file_id, reply_to_message_id=reply.message_id)
                 elif reply.text:
-                    await context.bot.send_message(chat_id=chat.id, text=reply.text, reply_to_message_id=reply.message_id)
+                    await context.bot.send_message(chat_id=chat.id, text=reply.text_html, reply_to_message_id=reply.message_id, parse_mode='HTML')
                 else:
                     return await update.message.reply_text("❌ Unsupported media type in reply.")
             
@@ -314,9 +315,10 @@ async def send_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # 2. Handle arguments (text message) without reply
     if context.args:
-        text_to_send = update.message.text.split(None, 1)[1]
+        full_text_html = update.message.text_html
+        text_to_send = full_text_html.split(None, 1)[1] if " " in full_text_html else ""
         try:
-            await context.bot.send_message(chat_id=chat.id, text=text_to_send)
+            await context.bot.send_message(chat_id=chat.id, text=text_to_send, parse_mode='HTML')
             # Delete the /send command message
             try:
                 await update.message.delete()
