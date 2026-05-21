@@ -320,6 +320,11 @@ async def cache_user_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Sangmata feature: Show name history of a user."""
+    if update.effective_chat and update.effective_chat.type != 'private':
+        from settings_manager_mongo import check_command_access
+        if not await check_command_access(update.effective_chat.id, update.effective_user.id, "history", context):
+            return await update.message.reply_text("❌ You don't have permission to use this command.")
+
     user_id, name = await get_user_id(update, context)
     if not user_id:
         user_id = update.effective_user.id

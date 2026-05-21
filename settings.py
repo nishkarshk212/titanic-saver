@@ -651,6 +651,7 @@ def get_command_permissions_keyboard(settings):
             ("Staff", "cmd_access_staff"),
             ("Bots", "cmd_access_bots"),
             ("Zombies", "cmd_access_zombies"),
+            ("History", "cmd_access_history"),
         ]),
         ("⚠️ Mass Actions", [
             ("Mass Actions", "cmd_access_mass_actions"),
