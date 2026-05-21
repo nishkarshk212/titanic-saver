@@ -269,26 +269,39 @@ async def send_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply = update.message.reply_to_message
         
         try:
-            if reply.sticker:
-                await context.bot.send_sticker(chat_id=chat.id, sticker=reply.sticker.file_id)
-            elif reply.photo:
-                await context.bot.send_photo(chat_id=chat.id, photo=reply.photo[-1].file_id, caption=reply.caption)
-            elif reply.video:
-                await context.bot.send_video(chat_id=chat.id, video=reply.video.file_id, caption=reply.caption)
-            elif reply.animation:
-                await context.bot.send_animation(chat_id=chat.id, animation=reply.animation.file_id, caption=reply.caption)
-            elif reply.document:
-                await context.bot.send_document(chat_id=chat.id, document=reply.document.file_id, caption=reply.caption)
-            elif reply.audio:
-                await context.bot.send_audio(chat_id=chat.id, audio=reply.audio.file_id, caption=reply.caption)
-            elif reply.voice:
-                await context.bot.send_voice(chat_id=chat.id, voice=reply.voice.file_id, caption=reply.caption)
-            elif reply.video_note:
-                await context.bot.send_video_note(chat_id=chat.id, video_note=reply.video_note.file_id)
-            elif reply.text:
-                await context.bot.send_message(chat_id=chat.id, text=reply.text)
+            # If command has text, send that text as a reply to the original message
+            if context.args:
+                text_to_send = update.message.text.split(None, 1)[1]
+                await context.bot.send_message(
+                    chat_id=chat.id, 
+                    text=text_to_send,
+                    reply_to_message_id=reply.message_id
+                )
+            # If no text, send the replied media/sticker back as a reply to itself (or just send it)
+            # Actually, the user said "when use /send text message to reply an user then bot reply this message to user's reply"
+            # This implies if it's a reply AND there's text, it should be a reply.
+            # What if it's a reply and NO text? It should probably still be a reply to the original message.
             else:
-                return await update.message.reply_text("❌ Unsupported media type in reply.")
+                if reply.sticker:
+                    await context.bot.send_sticker(chat_id=chat.id, sticker=reply.sticker.file_id, reply_to_message_id=reply.message_id)
+                elif reply.photo:
+                    await context.bot.send_photo(chat_id=chat.id, photo=reply.photo[-1].file_id, caption=reply.caption, reply_to_message_id=reply.message_id)
+                elif reply.video:
+                    await context.bot.send_video(chat_id=chat.id, video=reply.video.file_id, caption=reply.caption, reply_to_message_id=reply.message_id)
+                elif reply.animation:
+                    await context.bot.send_animation(chat_id=chat.id, animation=reply.animation.file_id, caption=reply.caption, reply_to_message_id=reply.message_id)
+                elif reply.document:
+                    await context.bot.send_document(chat_id=chat.id, document=reply.document.file_id, caption=reply.caption, reply_to_message_id=reply.message_id)
+                elif reply.audio:
+                    await context.bot.send_audio(chat_id=chat.id, audio=reply.audio.file_id, caption=reply.caption, reply_to_message_id=reply.message_id)
+                elif reply.voice:
+                    await context.bot.send_voice(chat_id=chat.id, voice=reply.voice.file_id, caption=reply.caption, reply_to_message_id=reply.message_id)
+                elif reply.video_note:
+                    await context.bot.send_video_note(chat_id=chat.id, video_note=reply.video_note.file_id, reply_to_message_id=reply.message_id)
+                elif reply.text:
+                    await context.bot.send_message(chat_id=chat.id, text=reply.text, reply_to_message_id=reply.message_id)
+                else:
+                    return await update.message.reply_text("❌ Unsupported media type in reply.")
             
             # Delete the /send command message
             try:
@@ -299,7 +312,7 @@ async def send_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logging.error(f"Error in send_command (reply): {e}")
             return await update.message.reply_text(f"❌ Failed to send: {str(e)}")
 
-    # 2. Handle arguments (text message)
+    # 2. Handle arguments (text message) without reply
     if context.args:
         text_to_send = update.message.text.split(None, 1)[1]
         try:
