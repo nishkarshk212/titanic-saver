@@ -488,7 +488,7 @@ async def vcclean_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.effective_chat or update.effective_chat.type == 'private':
         return
         
-    if not await is_user_admin(update.effective_chat.id, update.effective_user.id):
+    if not await is_user_admin(update.effective_chat.id, update.effective_user.id, context):
         return await update.message.reply_text("❌ Only admins can use this command.")
         
     status_msg = await update.message.reply_text("🔍 Scanning voice chat for ghost participants...")

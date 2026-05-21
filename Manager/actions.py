@@ -312,6 +312,7 @@ async def send_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await update.message.reply_text(error_msg)
 
     is_protected = update.message.text.startswith('/psend')
+    logging.info(f"Send command: chat_id={chat.id}, user_id={update.effective_user.id}, is_protected={is_protected}, args={context.args}")
 
     # Special logic for /psend with target user (Hidden Message)
     if is_protected and context.args:
@@ -323,20 +324,8 @@ async def send_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             if target_user_id:
                 # Get the message text after the target
-                # We need to find where the target mention ends in the raw text
-                raw_text = update.message.text
-                entities = update.message.entities
-                
-                message_text = ""
-                # Find the entity that represents the user mention
-                target_entity = next((e for e in entities if e.type in ['mention', 'text_mention']), None)
-                
-                if target_entity:
-                    mention_end = target_entity.offset + target_entity.length
-                    message_text = raw_text[mention_end:].strip()
-                else:
-                    # Fallback if no mention entity (e.g. raw ID)
-                    message_text = " ".join(context.args[1:])
+                # If the first argument was used to resolve the user, the rest is the message
+                message_text = " ".join(context.args[1:])
 
                 if not message_text:
                     return await update.message.reply_text("Usage: /psend @username secret message")
