@@ -294,7 +294,6 @@ async def unban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def send_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Send a message, media, or sticker through the bot."""
-    print(f"DEBUG: send_command called in chat {update.effective_chat.id if update.effective_chat else 'None'}")
     chat = update.effective_chat
     if not chat or chat.type == 'private':
         return
@@ -444,7 +443,6 @@ async def send_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_interactive_send(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle the media/sticker reply in interactive send mode."""
-    print(f"DEBUG: handle_interactive_send called in chat {update.effective_chat.id if update.effective_chat else 'None'}")
     if not update.message.reply_to_message:
         return
         
