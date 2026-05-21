@@ -73,6 +73,7 @@ DEFAULT_CHAT_SETTINGS = {
     "manager_sg_enabled": True,
     "manager_id_enabled": True,
     "manager_info_enabled": True,
+    "vc_safety_enabled": False,
     # Recurring messages settings
     "recurring_messages": [
         {

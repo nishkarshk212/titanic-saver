@@ -872,10 +872,12 @@ def get_vc_settings_keyboard(settings):
     """Get Voice Chat settings keyboard."""
     vc_user_join_status = "✅" if settings.get("vc_user_join_enabled", True) else "❌"
     vc_invite_status = "✅" if settings.get("vc_invite_notification_enabled", True) else "❌"
+    vc_safety_status = "✅" if settings.get("vc_safety_enabled", False) else "❌"
     
     keyboard = [
         [InlineKeyboardButton(f"User Join Notification: {vc_user_join_status}", callback_data="set_toggle_vc_user_join_enabled")],
         [InlineKeyboardButton(f"Invite Notification: {vc_invite_status}", callback_data="set_toggle_vc_invite_notification_enabled")],
+        [InlineKeyboardButton(f"VC Safety (Anti-Ghost): {vc_safety_status}", callback_data="set_toggle_vc_safety_enabled")],
         [InlineKeyboardButton("ℹ️ Voice chat related notifications", callback_data="set_none")],
         [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
     ]

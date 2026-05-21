@@ -37,6 +37,7 @@ def parse_time(time_str):
     return None
 
 from user_manager_mongo import get_user_id
+from voice_chat import remove_user_from_vc
 
 async def is_admin(chat, user_id):
     """Check if user is admin."""
@@ -236,6 +237,10 @@ async def ban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return await update.message.reply_text("User is already banned.")
         
         await chat.ban_member(user_id)
+        
+        # Remove from VC if safety is enabled
+        if settings.get("vc_safety_enabled", False):
+            await remove_user_from_vc(chat.id, user_id)
         
         admin_name = user.full_name
         text = f"» Ban a user in {chat.title}\n"
@@ -705,6 +710,11 @@ async def kick_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return await update.message.reply_text("I cannot kick an admin or the group owner.")
         
         await chat.ban_member(user_id)
+        
+        # Remove from VC if safety is enabled
+        if settings.get("vc_safety_enabled", False):
+            await remove_user_from_vc(chat.id, user_id)
+            
         await asyncio.sleep(2)
         await chat.unban_member(user_id)
         
@@ -748,6 +758,12 @@ async def dban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return await update.message.reply_text("I cannot ban an admin or the group owner.")
         
         await chat.ban_member(user_id)
+        
+        # Remove from VC if safety is enabled
+        settings = get_chat_settings(chat.id)
+        if settings.get("vc_safety_enabled", False):
+            await remove_user_from_vc(chat.id, user_id)
+            
         await update.message.reply_to_message.delete()
         
         admin_name = user.full_name
@@ -786,6 +802,12 @@ async def sban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return await update.message.reply_text("I cannot ban an admin or the group owner.")
         
         await chat.ban_member(user_id)
+        
+        # Remove from VC if safety is enabled
+        settings = get_chat_settings(chat.id)
+        if settings.get("vc_safety_enabled", False):
+            await remove_user_from_vc(chat.id, user_id)
+            
         await update.message.delete()
     except Exception as e:
         await update.message.reply_text(f"Failed to silently ban: {str(e)}")
@@ -851,6 +873,11 @@ async def tban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         until_date = datetime.utcnow() + delta
         
         await chat.ban_member(user_id, until_date=until_date)
+        
+        # Remove from VC if safety is enabled
+        settings = get_chat_settings(chat.id)
+        if settings.get("vc_safety_enabled", False):
+            await remove_user_from_vc(chat.id, user_id)
         
         admin_name = user.full_name
         text = f"» Ban for {time_str} in {chat.title}\n"

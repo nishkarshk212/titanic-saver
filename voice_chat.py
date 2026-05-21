@@ -3,18 +3,19 @@ import os
 import asyncio
 import datetime
 from telethon import TelegramClient, events
-from telethon.tl.types import UpdateGroupCallParticipants, PeerChat, PeerChannel, PeerUser, UpdateGroupCall
-from telethon.tl.functions.phone import GetGroupCallRequest
+from telethon.tl.functions.phone import GetGroupCallRequest, EditGroupCallParticipantRequest
+from telethon.tl.types import UpdateGroupCallParticipants, PeerChat, PeerChannel, PeerUser, UpdateGroupCall, InputGroupCall
 from telethon.tl.functions.channels import GetFullChannelRequest
 from telethon.tl.functions.messages import GetFullChatRequest
 from telethon.sessions import StringSession
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, ChatMemberBanned
 from telegram.constants import ParseMode
 from config import BOT_TOKEN, to_small_caps
 from font import to_mono
-from telegram.ext import Application, CallbackQueryHandler, ContextTypes, MessageHandler, filters
+from telegram.ext import Application, CallbackQueryHandler, ContextTypes, MessageHandler, filters, CommandHandler
 from settings_manager_mongo import get_chat_settings
 from user_manager_mongo import is_user_admin
+from database import get_collection, COLLECTIONS
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -54,6 +55,9 @@ async def start_voice_chat_monitor(application: Application):
     try:
         await telethon_client.start()
         logger.info("✅ Telethon client started successfully!")
+        
+        # Start automatic ghost cleaner
+        asyncio.create_task(auto_ghost_cleaner_task())
     except Exception as e:
         logger.error(f"❌ Failed to start Telethon client: {e}")
         return
@@ -63,6 +67,32 @@ async def start_voice_chat_monitor(application: Application):
         """Handles voice chat join events for Users and Channels."""
         # Process everything in a non-blocking way
         asyncio.create_task(_process_vc_join_event(event))
+
+async def auto_ghost_cleaner_task():
+    """Periodically cleans up ghost participants in groups with VC Safety enabled."""
+    await asyncio.sleep(60) # Initial delay
+    
+    while True:
+        try:
+            # Find all chats with vc_safety_enabled = True
+            collection = get_collection(COLLECTIONS['SETTINGS'])
+            if collection is None:
+                await asyncio.sleep(1800)
+                continue
+                
+            chats_with_safety = await collection.find({"vc_safety_enabled": True}).to_list(length=None)
+            
+            for chat_doc in chats_with_safety:
+                chat_id = chat_doc.get("chat_id")
+                if chat_id:
+                    logger.info(f"🧹 Auto-cleaning ghosts for chat {chat_id}")
+                    await clean_ghost_participants(chat_id)
+                    await asyncio.sleep(5) # Delay between groups to avoid flood
+                    
+        except Exception as e:
+            logger.error(f"Error in auto_ghost_cleaner_task: {e}")
+            
+        await asyncio.sleep(3600) # Run every hour
 
 async def _process_vc_join_event(event):
     """Internal function to process VC join events asynchronously."""
@@ -340,11 +370,135 @@ async def voice_chat_invite_handler(update: Update, context: ContextTypes.DEFAUL
         except Exception as e:
             logger.error(f"Error sending invite notification: {e}")
 
+async def clean_ghost_participants(chat_id):
+    """
+    Cleans up ghost participants from a voice chat.
+    A 'ghost' is someone in the VC list who is not actually in the group
+    or is causing a glitch.
+    """
+    if not telethon_client or not telethon_client.is_connected():
+        return False, "Voice monitor (Telethon) not connected."
+
+    try:
+        # Normalize chat_id for Telethon
+        tele_chat_id = int(str(chat_id).replace('-100', ''))
+        
+        # Get full chat/channel info to find the call
+        try:
+            if str(chat_id).startswith('-100'):
+                full = await telethon_client(GetFullChannelRequest(channel=tele_chat_id))
+            else:
+                full = await telethon_client(GetFullChatRequest(chat_id=tele_chat_id))
+        except Exception as e:
+            logger.error(f"Failed to get full chat info: {e}")
+            return False, "Could not fetch group info. Is the bot in the group?"
+            
+        if not hasattr(full, 'full_chat') or not hasattr(full.full_chat, 'call') or not full.full_chat.call:
+            return False, "No active voice chat found."
+            
+        call = full.full_chat.call
+        
+        # Get participant list
+        call_info = await telethon_client(GetGroupCallRequest(call=call, limit=100))
+        participants = call_info.participants
+        
+        if not participants:
+            return True, "Voice chat is empty."
+            
+        cleaned_count = 0
+        for p in participants:
+            user_peer = p.peer
+            user_id = getattr(user_peer, 'user_id', getattr(user_peer, 'channel_id', None))
+            
+            if not user_id: continue
+            
+            # Skip if it's the bot itself or the Telethon account
+            me = await telethon_client.get_me()
+            if user_id == me.id: continue
+
+            try:
+                # Check if user is still in the group using PTB
+                member = await ptb_application.bot.get_chat_member(chat_id, user_id)
+                if member.status in ['left', 'kicked']:
+                    # Remove from VC
+                    await telethon_client(EditGroupCallParticipantRequest(
+                        call=call,
+                        participant=user_peer,
+                        removed=True
+                    ))
+                    cleaned_count += 1
+                    await asyncio.sleep(0.5) # Avoid flood
+            except Exception as e:
+                # If member not found, it's likely a ghost
+                if "Chat not found" in str(e) or "User not found" in str(e) or "Member not found" in str(e):
+                    await telethon_client(EditGroupCallParticipantRequest(
+                        call=call,
+                        participant=user_peer,
+                        removed=True
+                    ))
+                    cleaned_count += 1
+                    await asyncio.sleep(0.5)
+                else:
+                    logger.warning(f"Error checking member {user_id}: {e}")
+                
+        return True, f"✅ Cleaned {cleaned_count} ghost participants."
+        
+    except Exception as e:
+        logger.error(f"Error in clean_ghost_participants: {e}")
+        return False, f"Error: {str(e)}"
+
+async def remove_user_from_vc(chat_id, user_id):
+    """Forcefully removes a specific user from the voice chat."""
+    if not telethon_client or not telethon_client.is_connected():
+        return False
+        
+    try:
+        # Normalize chat_id for Telethon
+        tele_chat_id = int(str(chat_id).replace('-100', ''))
+        
+        # Get full chat/channel info to find the call
+        if str(chat_id).startswith('-100'):
+            full = await telethon_client(GetFullChannelRequest(channel=tele_chat_id))
+        else:
+            full = await telethon_client(GetFullChatRequest(chat_id=tele_chat_id))
+            
+        if not hasattr(full, 'full_chat') or not hasattr(full.full_chat, 'call') or not full.full_chat.call:
+            return False
+            
+        call = full.full_chat.call
+        
+        # Try to remove the user
+        await telethon_client(EditGroupCallParticipantRequest(
+            call=call,
+            participant=PeerUser(user_id=int(user_id)),
+            removed=True
+        ))
+        logger.info(f"✅ User {user_id} removed from VC in chat {chat_id}")
+        return True
+    except Exception as e:
+        logger.warning(f"Failed to remove user {user_id} from VC: {e}")
+        return False
+
+async def vcclean_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin command to clean ghost participants."""
+    if not update.effective_chat or update.effective_chat.type == 'private':
+        return
+        
+    if not await is_user_admin(update.effective_chat.id, update.effective_user.id):
+        return await update.message.reply_text("❌ Only admins can use this command.")
+        
+    status_msg = await update.message.reply_text("🔍 Scanning voice chat for ghost participants...")
+    
+    success, result = await clean_ghost_participants(update.effective_chat.id)
+    
+    await status_msg.edit_text(result)
+
 def get_voice_chat_handlers():
     """Returns handlers for voice chat events."""
     return [
         CallbackQueryHandler(vc_join_callback, pattern="^join_vc_"),
-        MessageHandler(filters.StatusUpdate.VIDEO_CHAT_PARTICIPANTS_INVITED, voice_chat_invite_handler)
+        MessageHandler(filters.StatusUpdate.VIDEO_CHAT_PARTICIPANTS_INVITED, voice_chat_invite_handler),
+        CommandHandler("vcclean", vcclean_command)
     ]
 
 async def stop_voice_chat_monitor():
