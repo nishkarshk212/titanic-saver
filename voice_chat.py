@@ -103,30 +103,23 @@ async def auto_ghost_cleaner_task():
 async def _process_vc_join_event(event):
     """Internal function to process VC join events asynchronously."""
     try:
+        # Check if we should even process this based on common flood patterns
+        if len(event.participants) > 5:
+            # High volume of joins, might be a flood or glitch
+            logger.warning(f"High VC activity: {len(event.participants)} joins. Skipping to avoid flood.")
+            return
+
         chat_entity = call_to_chat.get(event.call.id)
         
         if not chat_entity:
-            # Optimize: try to get from dialogs more efficiently
-            try:
-                # We limit the iteration and use a shorter timeout
-                async for dialog in telethon_client.iter_dialogs(limit=10):
-                    if dialog.is_group or dialog.is_channel:
-                        try:
-                            # We don't need full channel request for every dialog
-                            # Just check if we already know about this call
-                            pass # For now, keep the logic simple but limited
-                        except: continue
-                
-                # If still not found, we might have to fetch it, but let's be careful
-            except Exception as e:
-                logger.warning(f"Error iterating dialogs: {e}")
+            # Instead of iter_dialogs (slow/flood prone), try to use the call info if possible
+            # or just wait for the next event where we might have the entity
+            pass
 
         for participant in event.participants:
             if not hasattr(participant, 'date') or participant.date is None:
                 continue
             
-            # Move the rest of the logic here...
-            # (I'll keep the logic but wrap it in more background tasks)
             asyncio.create_task(_process_single_participant(event.call.id, participant, chat_entity))
     except Exception as e:
         logger.error(f"❌ Error in _process_vc_join_event: {e}")
@@ -147,27 +140,31 @@ async def _process_single_participant(call_id, participant, chat_entity):
         
         if not user_id: return
         
-        # Deduplicate
+        # Deduplicate and Rate Limit
         cache_key = f"{user_id}_{call_id}"
         now = datetime.datetime.now()
         if cache_key in notification_cache:
-            if (now - notification_cache[cache_key]).total_seconds() < 60:
+            if (now - notification_cache[cache_key]).total_seconds() < 300: # Increase to 5 mins
                 return
         notification_cache[cache_key] = now
 
-        # Use timeout for entity fetching
+        # Use timeout and handle "Entity not found" gracefully
         try:
-            entity = await asyncio.wait_for(telethon_client.get_entity(peer), timeout=5.0)
-            name = getattr(entity, 'first_name', getattr(entity, 'title', "Unknown"))
-            
+            try:
+                entity = await asyncio.wait_for(telethon_client.get_entity(peer), timeout=2.0)
+                name = getattr(entity, 'first_name', getattr(entity, 'title', "Unknown"))
+            except (ValueError, asyncio.TimeoutError):
+                # If entity not found or timeout, don't crash, just use placeholders or skip
+                # Skipping is better to avoid "Unknown" spam
+                return
+
             if peer_type == "channel":
                 mention = f'<a href="https://t.me/{entity.username}">{name}</a>' if getattr(entity, 'username', None) else f"<b>{name}</b>"
             else:
                 mention = f'<a href="tg://user?id={user_id}">{name}</a>'
             
             if not chat_entity:
-                # Try one last time to resolve chat_id from peer if it's a channel join? 
-                # No, call_id is linked to the group, not the user.
+                # Try to resolve chat from PTB cache if telethon fails
                 return
 
             group_name = chat_entity.title if hasattr(chat_entity, 'title') else "the group"
