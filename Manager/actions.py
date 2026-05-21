@@ -6,7 +6,7 @@ Ported from AnnieXMusic to python-telegram-bot
 import asyncio
 import logging
 from datetime import datetime, timedelta
-from telegram import Update, ChatPermissions, ChatMemberAdministrator, ChatMemberOwner, ChatMemberBanned, ChatMemberRestricted
+from telegram import Update, ChatPermissions, ChatMemberAdministrator, ChatMemberOwner, ChatMemberBanned, ChatMemberRestricted, ReplyParameters
 from telegram.ext import ContextTypes, CommandHandler, MessageHandler, filters
 from telegram.constants import ChatMemberStatus
 from settings_manager_mongo import get_chat_settings
@@ -252,6 +252,45 @@ async def unban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Unban a user from the group."""
     chat = update.effective_chat
     user = update.effective_user
+    
+    # Check if command is enabled
+    settings = get_chat_settings(chat.id)
+    if not settings.get("manager_unban_enabled", True):
+        return await update.message.reply_text("❌ The /unban command is currently disabled.")
+    
+    # Permission check
+    has_perm, error_msg = await check_admin_permission(update, context, 'can_restrict_members')
+    if not has_perm:
+        return await update.message.reply_text(error_msg)
+    
+    # Bot permission check
+    has_bot_perm, bot_error_msg = await check_bot_permission(update, context, 'can_restrict_members')
+    if not has_bot_perm:
+        return await update.message.reply_text(bot_error_msg)
+    
+    user_id, name = await get_user_id(update, context)
+    reason = " ".join(context.args[1:]) if context.args and len(context.args) > 1 else " ".join(context.args) if context.args and not str(context.args[0]).startswith('@') and not str(context.args[0]).isdigit() else None
+    
+    if not user_id:
+        return await update.message.reply_text("Usage: /unban @username or reply to a user with /unban [reason]")
+    
+    try:
+        member = await chat.get_member(user_id)
+        if not isinstance(member, ChatMemberBanned):
+            return await update.message.reply_text("User is not banned.")
+        
+        await chat.unban_member(user_id)
+        
+        admin_name = user.full_name
+        text = f"» Unban a user in {chat.title}\n"
+        text += f" User  : {name}\n"
+        text += f" Admin : {admin_name}"
+        if reason:
+            text += f"\nReason: {reason}"
+        
+        await update.message.reply_text(text)
+    except Exception as e:
+        await update.message.reply_text(f"Failed to unban user: {str(e)}")
 
 async def send_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Send a message, media, or sticker through the bot."""
@@ -426,25 +465,29 @@ async def handle_interactive_send(update: Update, context: ContextTypes.DEFAULT_
     target_id = target_info['target_id']
     msg = update.message
     
+    logging.info(f"Interactive Send: Sending {msg.type} to target_id={target_id}")
+    
     try:
+        reply_params = ReplyParameters(message_id=target_id, allow_sending_without_reply=True)
+        
         if msg.sticker:
-            await context.bot.send_sticker(chat_id=chat_id, sticker=msg.sticker.file_id, reply_to_message_id=target_id)
+            await context.bot.send_sticker(chat_id=chat_id, sticker=msg.sticker.file_id, reply_parameters=reply_params)
         elif msg.photo:
-            await context.bot.send_photo(chat_id=chat_id, photo=msg.photo[-1].file_id, caption=msg.caption, caption_entities=msg.caption_entities, reply_to_message_id=target_id)
+            await context.bot.send_photo(chat_id=chat_id, photo=msg.photo[-1].file_id, caption=msg.caption, caption_entities=msg.caption_entities, reply_parameters=reply_params)
         elif msg.video:
-            await context.bot.send_video(chat_id=chat_id, video=msg.video.file_id, caption=msg.caption, caption_entities=msg.caption_entities, reply_to_message_id=target_id)
+            await context.bot.send_video(chat_id=chat_id, video=msg.video.file_id, caption=msg.caption, caption_entities=msg.caption_entities, reply_parameters=reply_params)
         elif msg.animation:
-            await context.bot.send_animation(chat_id=chat_id, animation=msg.animation.file_id, caption=msg.caption, caption_entities=msg.caption_entities, reply_to_message_id=target_id)
+            await context.bot.send_animation(chat_id=chat_id, animation=msg.animation.file_id, caption=msg.caption, caption_entities=msg.caption_entities, reply_parameters=reply_params)
         elif msg.document:
-            await context.bot.send_document(chat_id=chat_id, document=msg.document.file_id, caption=msg.caption, caption_entities=msg.caption_entities, reply_to_message_id=target_id)
+            await context.bot.send_document(chat_id=chat_id, document=msg.document.file_id, caption=msg.caption, caption_entities=msg.caption_entities, reply_parameters=reply_params)
         elif msg.audio:
-            await context.bot.send_audio(chat_id=chat_id, audio=msg.audio.file_id, caption=msg.caption, caption_entities=msg.caption_entities, reply_to_message_id=target_id)
+            await context.bot.send_audio(chat_id=chat_id, audio=msg.audio.file_id, caption=msg.caption, caption_entities=msg.caption_entities, reply_parameters=reply_params)
         elif msg.voice:
-            await context.bot.send_voice(chat_id=chat_id, voice=msg.voice.file_id, caption=msg.caption, caption_entities=msg.caption_entities, reply_to_message_id=target_id)
+            await context.bot.send_voice(chat_id=chat_id, voice=msg.voice.file_id, caption=msg.caption, caption_entities=msg.caption_entities, reply_parameters=reply_params)
         elif msg.video_note:
-            await context.bot.send_video_note(chat_id=chat_id, video_note=msg.video_note.file_id, reply_to_message_id=target_id)
+            await context.bot.send_video_note(chat_id=chat_id, video_note=msg.video_note.file_id, reply_parameters=reply_params)
         elif msg.text:
-            await context.bot.send_message(chat_id=chat_id, text=msg.text, entities=msg.entities, reply_to_message_id=target_id)
+            await context.bot.send_message(chat_id=chat_id, text=msg.text, entities=msg.entities, reply_parameters=reply_params)
             
         # Cleanup
         try:
@@ -457,47 +500,6 @@ async def handle_interactive_send(update: Update, context: ContextTypes.DEFAULT_
         
     except Exception as e:
         logging.error(f"Error in handle_interactive_send: {e}")
-        # Don't show error to user to avoid spam, just log it
-
-    
-    # Check if command is enabled
-    settings = get_chat_settings(chat.id)
-    if not settings.get("manager_unban_enabled", True):
-        return await update.message.reply_text("❌ The /unban command is currently disabled.")
-    
-    # Permission check
-    has_perm, error_msg = await check_admin_permission(update, context, 'can_restrict_members')
-    if not has_perm:
-        return await update.message.reply_text(error_msg)
-    
-    # Bot permission check
-    has_bot_perm, bot_error_msg = await check_bot_permission(update, context, 'can_restrict_members')
-    if not has_bot_perm:
-        return await update.message.reply_text(bot_error_msg)
-    
-    user_id, name = await get_user_id(update, context)
-    reason = " ".join(context.args[1:]) if context.args and len(context.args) > 1 else " ".join(context.args) if context.args and not str(context.args[0]).startswith('@') and not str(context.args[0]).isdigit() else None
-    
-    if not user_id:
-        return await update.message.reply_text("Usage: /unban @username or reply to a user with /unban [reason]")
-    
-    try:
-        member = await chat.get_member(user_id)
-        if not isinstance(member, ChatMemberBanned):
-            return await update.message.reply_text("User is not banned.")
-        
-        await chat.unban_member(user_id)
-        
-        admin_name = user.full_name
-        text = f"» Unban a user in {chat.title}\n"
-        text += f" User  : {name}\n"
-        text += f" Admin : {admin_name}"
-        if reason:
-            text += f"\nReason: {reason}"
-        
-        await update.message.reply_text(text)
-    except Exception as e:
-        await update.message.reply_text(f"Failed to unban user: {str(e)}")
 
 async def mute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Mute a user in the group."""
