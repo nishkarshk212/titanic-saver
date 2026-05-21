@@ -313,49 +313,58 @@ async def send_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     is_protected = update.message.text.startswith('/psend')
     logging.info(f"Send command: chat_id={chat.id}, user_id={update.effective_user.id}, is_protected={is_protected}, args={context.args}")
 
-    # Special logic for /psend with target user (Hidden Message)
-    if is_protected and context.args:
-        # Check if first arg is a mention or username
-        first_arg = context.args[0]
-        if first_arg.startswith('@') or first_arg.isdigit() or (update.message.entities and any(e.type == 'text_mention' for e in update.message.entities)):
-            # This is likely a targeted hidden message
-            target_user_id, target_name = await get_user_id(update, context)
-            
-            if target_user_id:
-                # Get the message text after the target
-                # If the first argument was used to resolve the user, the rest is the message
-                message_text = " ".join(context.args[1:])
-
-                if not message_text:
-                    return await update.message.reply_text("Usage: /psend @username secret message")
-
-                # Store hidden message in DB
-                msg_id = str(uuid.uuid4())[:8]
-                hidden_col = get_collection(COLLECTIONS["hidden_messages"])
-                if hidden_col is not None:
-                    hidden_col.insert_one({
-                        "msg_id": msg_id,
-                        "text": message_text,
-                        "target_id": target_user_id,
-                        "admin_id": update.effective_user.id,
-                        "expires_at": datetime.utcnow() + timedelta(hours=24)
-                    })
-                    
-                    keyboard = [[InlineKeyboardButton("📩 Click to Read", callback_data=f"hidden_msg_{msg_id}")]]
-                    reply_markup = InlineKeyboardMarkup(keyboard)
-                    
-                    target_mention = f"<a href='tg://user?id={target_user_id}'>{target_name}</a>"
-                    await context.bot.send_message(
-                        chat_id=chat.id,
-                        text=f"🔐 <b>Secret Message for {target_mention}</b>\n<i>Only they can read this.</i>",
-                        reply_markup=reply_markup,
-                        parse_mode='HTML'
-                    )
-                    
-                    # Delete admin command
-                    try: await update.message.delete()
-                    except: pass
-                    return
+    # Special logic for /psend (Hidden Message / Whisper)
+    if is_protected:
+        target_user_id = None
+        target_name = None
+        message_text = ""
+        
+        # Case 1: Targeted via mention/ID in arguments
+        if context.args:
+            first_arg = context.args[0]
+            if first_arg.startswith('@') or first_arg.isdigit() or (update.message.entities and any(e.type == 'text_mention' for e in update.message.entities)):
+                target_user_id, target_name = await get_user_id(update, context)
+                if target_user_id:
+                    message_text = " ".join(context.args[1:])
+        
+        # Case 2: Targeted via reply
+        if not target_user_id and update.message.reply_to_message:
+            reply = update.message.reply_to_message
+            if not reply.from_user.is_bot:
+                target_user_id = reply.from_user.id
+                target_name = reply.from_user.first_name
+                message_text = " ".join(context.args)
+        
+        # If we have a target and a message, send the hidden message
+        if target_user_id and message_text:
+            msg_id = str(uuid.uuid4())[:8]
+            hidden_col = get_collection(COLLECTIONS["hidden_messages"])
+            if hidden_col is not None:
+                hidden_col.insert_one({
+                    "msg_id": msg_id,
+                    "text": message_text,
+                    "target_id": target_user_id,
+                    "admin_id": update.effective_user.id,
+                    "expires_at": datetime.utcnow() + timedelta(hours=24)
+                })
+                
+                keyboard = [[InlineKeyboardButton("📩 Click to Read", callback_data=f"hidden_msg_{msg_id}")]]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
+                target_mention = f"<a href='tg://user?id={target_user_id}'>{target_name}</a>"
+                await context.bot.send_message(
+                    chat_id=chat.id,
+                    text=f"🔐 <b>Secret Message for {target_mention}</b>\n<i>Only they can read this.</i>",
+                    reply_markup=reply_markup,
+                    parse_mode='HTML'
+                )
+                
+                # Delete admin command
+                try: await update.message.delete()
+                except: pass
+                return
+        elif is_protected and not target_user_id and not update.message.reply_to_message:
+             return await update.message.reply_text("Usage: /psend @username message OR reply to someone with /psend message")
 
     # Helper to get text and entities after the command
     def get_text_and_entities_after_command(message):
