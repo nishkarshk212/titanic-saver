@@ -256,7 +256,8 @@ def get_main_settings_keyboard(chat_id=None):
         [InlineKeyboardButton("🕒 Recurring Msg", callback_data="set_view_recurring"),
          InlineKeyboardButton("🌊 Anti-Flood", callback_data="set_view_antiflood")],
         [InlineKeyboardButton("🌙 Night Mode", callback_data="set_view_nightmode"),
-         InlineKeyboardButton("🚫 Banned Words", callback_data="set_view_banned_words")],
+         InlineKeyboardButton("🚫 Banned Words", callback_data="set_view_banned_words"),
+         InlineKeyboardButton("🏷️ Tagger", callback_data="set_view_tagger")],
         [InlineKeyboardButton("🔗 Group Link", callback_data="set_view_group_link"),
          InlineKeyboardButton("📜 Regulations", callback_data="set_view_regulations")],
         [InlineKeyboardButton("👥 Members Mgmt", callback_data="set_view_members_mgmt"),
@@ -879,6 +880,18 @@ def get_vc_settings_keyboard(settings):
         [InlineKeyboardButton(f"Invite Notification: {vc_invite_status}", callback_data="set_toggle_vc_invite_notification_enabled")],
         [InlineKeyboardButton(f"VC Safety (Anti-Ghost): {vc_safety_status}", callback_data="set_toggle_vc_safety_enabled")],
         [InlineKeyboardButton("ℹ️ Voice chat related notifications", callback_data="set_none")],
+        [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+def get_tagger_settings_keyboard(settings):
+    """Get Tagger settings keyboard."""
+    tagger_status = "✅" if settings.get("tagger_enabled", True) else "❌"
+    
+    keyboard = [
+        [InlineKeyboardButton(f"Tagger Feature: {tagger_status}", callback_data="set_toggle_tagger_enabled")],
+        [InlineKeyboardButton("ℹ️ Tag everyone with /tag", callback_data="set_none")],
+        [InlineKeyboardButton("ℹ️ Tag admins with /atag", callback_data="set_none")],
         [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -1639,6 +1652,20 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer()
         return
 
+    if data == "set_view_tagger":
+        settings = get_chat_settings(chat_id)
+        try:
+            await edit_bot_response(
+                query, context,
+                "🏷️ <b>ᴛᴀɢɢᴇʀ ᴄᴏɴꜰɪɢᴜʀᴀᴛɪᴏɴ 🏷️</b>\n\n"
+                "ᴍᴀɴᴀɢᴇ ᴛʜᴇ ᴍᴇɴᴛɪᴏɴ/ᴛᴀɢɢᴇʀ ꜰᴇᴀᴛᴜʀᴇ ꜰᴏʀ ʏᴏᴜʀ ɢʀᴏᴜᴘ:",
+                reply_markup=get_tagger_settings_keyboard(settings),
+                parse_mode='HTML'
+            )
+        except BadRequest: pass
+        await query.answer()
+        return
+
     if data == "set_view_manager":
         settings = get_chat_settings(chat_id)
         try:
@@ -1973,6 +2000,8 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await query.edit_message_reply_markup(reply_markup=get_edit_checks_keyboard(new_settings))
             elif "bio_link" in key:
                 await query.edit_message_reply_markup(reply_markup=get_bio_link_settings_keyboard(new_settings))
+            elif "tagger" in key:
+                await query.edit_message_reply_markup(reply_markup=get_tagger_settings_keyboard(new_settings))
         except BadRequest: pass
         await query.answer(f"Setting updated!")
         return

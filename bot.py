@@ -29,6 +29,7 @@ from nightmode import get_nightmode_handlers
 from font_normalizer import normalize_text
 from recurring import get_recurring_handlers, check_recurring_messages, count_recurring_messages
 from Manager import get_manager_handlers
+from tagger import get_tagger_handlers
 from config import BOT_TOKEN, LOG_CHANNEL_ID, OWNER_ID, log_to_channel, send_bot_response, send_bot_media, START_IMG, to_small_caps
 from voice_chat import start_voice_chat_monitor, stop_voice_chat_monitor, get_voice_chat_handlers
 from user_manager_mongo import cache_user_handler, get_user_id, get_user_stats, is_user_admin, get_sangmata_handlers
@@ -1142,6 +1143,10 @@ def main():
     # Add Manager handlers (Group 0) - Group management commands
     for handler in get_manager_handlers():
         application.add_handler(handler)
+
+    # Add Tagger handlers (Group 17)
+    for handler in get_tagger_handlers():
+        application.add_handler(handler, group=17)
 
     # Start the bot
     print("Bot is starting...")
