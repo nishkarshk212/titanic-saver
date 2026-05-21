@@ -306,9 +306,13 @@ async def send_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # Double-reply logic: If the replied message is itself a reply to something else,
         # target that original message instead.
-        target_message_id = reply.reply_to_message.message_id if reply.reply_to_message else reply.message_id
-        
-        logging.info(f"Send command: reply_id={reply.message_id}, target_id={target_message_id}, has_original={bool(reply.reply_to_message)}")
+        target_message_id = reply.message_id
+        if reply.reply_to_message:
+            target_message_id = reply.reply_to_message.message_id
+            
+        logging.info(f"Send command DEBUG: reply_msg_id={reply.message_id}, target_msg_id={target_message_id}")
+        if reply.reply_to_message:
+            logging.info(f"Send command DEBUG: original_msg_id={reply.reply_to_message.message_id}, original_text={reply.reply_to_message.text[:20] if reply.reply_to_message.text else 'None'}")
         
         try:
             # If command has text, send that text as a reply to the target message
