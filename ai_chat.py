@@ -180,6 +180,9 @@ async def ai_chat_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # In groups, only respond when bot is mentioned
     elif update.effective_chat.type in ["group", "supergroup"]:
+        if not update.message:
+            return
+            
         # Check if bot is mentioned
         if update.message.entities:
             for entity in update.message.entities:

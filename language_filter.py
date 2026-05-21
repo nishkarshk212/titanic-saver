@@ -188,6 +188,8 @@ async def check_language_filter(update: Update, context: ContextTypes.DEFAULT_TY
     
     chat_id = update.effective_chat.id
     message = update.message
+    if not message:
+        return False
     
     # Get group settings
     settings = get_chat_settings(chat_id)
