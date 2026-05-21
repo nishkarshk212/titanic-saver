@@ -308,6 +308,8 @@ async def send_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not has_perm:
         return await update.message.reply_text(error_msg)
 
+    is_protected = update.message.text.startswith('/psend')
+
     # Helper to get text and entities after the command
     def get_text_and_entities_after_command(message):
         raw_text = message.text
@@ -358,15 +360,15 @@ async def send_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if 'send_targets' not in context.chat_data:
                 context.chat_data['send_targets'] = {}
             
-            prompt = await update.message.reply_text(
-                "✅ <b>Target Locked.</b>\n\n"
-                "Now <b>reply to this message</b> with the sticker, media, or text you want the bot to send.",
-                parse_mode='HTML'
-            )
+            prompt_text = "🔐 <b>Protected Target Locked.</b>\n\n" if is_protected else "✅ <b>Target Locked.</b>\n\n"
+            prompt_text += "Now <b>reply to this message</b> with the sticker, media, or text you want the bot to send."
+            
+            prompt = await update.message.reply_text(prompt_text, parse_mode='HTML')
             
             context.chat_data['send_targets'][prompt.message_id] = {
                 'target_id': target_id,
-                'admin_id': admin_id
+                'admin_id': admin_id,
+                'protected': is_protected
             }
             
             # Delete the /send command
@@ -391,28 +393,29 @@ async def send_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     chat_id=chat.id, 
                     text=new_text,
                     entities=new_entities,
-                    reply_to_message_id=target_message_id
+                    reply_to_message_id=target_message_id,
+                    protect_content=is_protected
                 )
             # If no text, send the replied media/sticker back as a reply to the target message
             else:
                 if reply.sticker:
-                    await context.bot.send_sticker(chat_id=chat.id, sticker=reply.sticker.file_id, reply_to_message_id=target_message_id)
+                    await context.bot.send_sticker(chat_id=chat.id, sticker=reply.sticker.file_id, reply_to_message_id=target_message_id, protect_content=is_protected)
                 elif reply.photo:
-                    await context.bot.send_photo(chat_id=chat.id, photo=reply.photo[-1].file_id, caption=reply.caption, caption_entities=reply.caption_entities, reply_to_message_id=target_message_id)
+                    await context.bot.send_photo(chat_id=chat.id, photo=reply.photo[-1].file_id, caption=reply.caption, caption_entities=reply.caption_entities, reply_to_message_id=target_message_id, protect_content=is_protected)
                 elif reply.video:
-                    await context.bot.send_video(chat_id=chat.id, video=reply.video.file_id, caption=reply.caption, caption_entities=reply.caption_entities, reply_to_message_id=target_message_id)
+                    await context.bot.send_video(chat_id=chat.id, video=reply.video.file_id, caption=reply.caption, caption_entities=reply.caption_entities, reply_to_message_id=target_message_id, protect_content=is_protected)
                 elif reply.animation:
-                    await context.bot.send_animation(chat_id=chat.id, animation=reply.animation.file_id, caption=reply.caption, caption_entities=reply.caption_entities, reply_to_message_id=target_message_id)
+                    await context.bot.send_animation(chat_id=chat.id, animation=reply.animation.file_id, caption=reply.caption, caption_entities=reply.caption_entities, reply_to_message_id=target_message_id, protect_content=is_protected)
                 elif reply.document:
-                    await context.bot.send_document(chat_id=chat.id, document=reply.document.file_id, caption=reply.caption, caption_entities=reply.caption_entities, reply_to_message_id=target_message_id)
+                    await context.bot.send_document(chat_id=chat.id, document=reply.document.file_id, caption=reply.caption, caption_entities=reply.caption_entities, reply_to_message_id=target_message_id, protect_content=is_protected)
                 elif reply.audio:
-                    await context.bot.send_audio(chat_id=chat.id, audio=reply.audio.file_id, caption=reply.caption, caption_entities=reply.caption_entities, reply_to_message_id=target_message_id)
+                    await context.bot.send_audio(chat_id=chat.id, audio=reply.audio.file_id, caption=reply.caption, caption_entities=reply.caption_entities, reply_to_message_id=target_message_id, protect_content=is_protected)
                 elif reply.voice:
-                    await context.bot.send_voice(chat_id=chat.id, voice=reply.voice.file_id, caption=reply.caption, caption_entities=reply.caption_entities, reply_to_message_id=target_message_id)
+                    await context.bot.send_voice(chat_id=chat.id, voice=reply.voice.file_id, caption=reply.caption, caption_entities=reply.caption_entities, reply_to_message_id=target_message_id, protect_content=is_protected)
                 elif reply.video_note:
-                    await context.bot.send_video_note(chat_id=chat.id, video_note=reply.video_note.file_id, reply_to_message_id=target_message_id)
+                    await context.bot.send_video_note(chat_id=chat.id, video_note=reply.video_note.file_id, reply_to_message_id=target_message_id, protect_content=is_protected)
                 elif reply.text:
-                    await context.bot.send_message(chat_id=chat.id, text=reply.text, entities=reply.entities, reply_to_message_id=target_message_id)
+                    await context.bot.send_message(chat_id=chat.id, text=reply.text, entities=reply.entities, reply_to_message_id=target_message_id, protect_content=is_protected)
                 else:
                     return await update.message.reply_text("❌ Unsupported media type in reply.")
             
@@ -432,7 +435,7 @@ async def send_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.args:
         new_text, new_entities = get_text_and_entities_after_command(update.message)
         try:
-            await context.bot.send_message(chat_id=chat.id, text=new_text, entities=new_entities)
+            await context.bot.send_message(chat_id=chat.id, text=new_text, entities=new_entities, protect_content=is_protected)
             # Delete the /send command message
             try:
                 await update.message.delete()
@@ -441,6 +444,7 @@ async def send_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logging.error(f"Error in send_command (text): {e}")
             return await update.message.reply_text(f"❌ Failed to send message: {str(e)}")
         return
+
 
 
     await update.message.reply_text("Usage: /send <message> or reply to media/sticker with /send")
@@ -468,31 +472,32 @@ async def handle_interactive_send(update: Update, context: ContextTypes.DEFAULT_
         return
         
     target_id = target_info['target_id']
+    is_protected = target_info.get('protected', False)
     msg = update.message
     
-    logging.info(f"Interactive Send: Sending {msg.type} to target_id={target_id}")
+    logging.info(f"Interactive Send: Sending {msg.type} to target_id={target_id}, protected={is_protected}")
     
     try:
         reply_params = ReplyParameters(message_id=target_id, allow_sending_without_reply=True)
         
         if msg.sticker:
-            await context.bot.send_sticker(chat_id=chat_id, sticker=msg.sticker.file_id, reply_parameters=reply_params)
+            await context.bot.send_sticker(chat_id=chat_id, sticker=msg.sticker.file_id, reply_parameters=reply_params, protect_content=is_protected)
         elif msg.photo:
-            await context.bot.send_photo(chat_id=chat_id, photo=msg.photo[-1].file_id, caption=msg.caption, caption_entities=msg.caption_entities, reply_parameters=reply_params)
+            await context.bot.send_photo(chat_id=chat_id, photo=msg.photo[-1].file_id, caption=msg.caption, caption_entities=msg.caption_entities, reply_parameters=reply_params, protect_content=is_protected)
         elif msg.video:
-            await context.bot.send_video(chat_id=chat_id, video=msg.video.file_id, caption=msg.caption, caption_entities=msg.caption_entities, reply_parameters=reply_params)
+            await context.bot.send_video(chat_id=chat_id, video=msg.video.file_id, caption=msg.caption, caption_entities=msg.caption_entities, reply_parameters=reply_params, protect_content=is_protected)
         elif msg.animation:
-            await context.bot.send_animation(chat_id=chat_id, animation=msg.animation.file_id, caption=msg.caption, caption_entities=msg.caption_entities, reply_parameters=reply_params)
+            await context.bot.send_animation(chat_id=chat_id, animation=msg.animation.file_id, caption=msg.caption, caption_entities=msg.caption_entities, reply_parameters=reply_params, protect_content=is_protected)
         elif msg.document:
-            await context.bot.send_document(chat_id=chat_id, document=msg.document.file_id, caption=msg.caption, caption_entities=msg.caption_entities, reply_parameters=reply_params)
+            await context.bot.send_document(chat_id=chat_id, document=msg.document.file_id, caption=msg.caption, caption_entities=msg.caption_entities, reply_parameters=reply_params, protect_content=is_protected)
         elif msg.audio:
-            await context.bot.send_audio(chat_id=chat_id, audio=msg.audio.file_id, caption=msg.caption, caption_entities=msg.caption_entities, reply_parameters=reply_params)
+            await context.bot.send_audio(chat_id=chat_id, audio=msg.audio.file_id, caption=msg.caption, caption_entities=msg.caption_entities, reply_parameters=reply_params, protect_content=is_protected)
         elif msg.voice:
-            await context.bot.send_voice(chat_id=chat_id, voice=msg.voice.file_id, caption=msg.caption, caption_entities=msg.caption_entities, reply_parameters=reply_params)
+            await context.bot.send_voice(chat_id=chat_id, voice=msg.voice.file_id, caption=msg.caption, caption_entities=msg.caption_entities, reply_parameters=reply_params, protect_content=is_protected)
         elif msg.video_note:
-            await context.bot.send_video_note(chat_id=chat_id, video_note=msg.video_note.file_id, reply_parameters=reply_params)
+            await context.bot.send_video_note(chat_id=chat_id, video_note=msg.video_note.file_id, reply_parameters=reply_params, protect_content=is_protected)
         elif msg.text:
-            await context.bot.send_message(chat_id=chat_id, text=msg.text, entities=msg.entities, reply_parameters=reply_params)
+            await context.bot.send_message(chat_id=chat_id, text=msg.text, entities=msg.entities, reply_parameters=reply_params, protect_content=is_protected)
             
         # Cleanup
         try:
@@ -903,6 +908,6 @@ def get_manager_actions_handlers():
         CommandHandler("sban", sban_user),
         CommandHandler("kickme", kickme),
         CommandHandler("tban", tban_user),
-        CommandHandler("send", send_command),
+        CommandHandler(["send", "psend"], send_command),
         MessageHandler(filters.REPLY & (filters.ChatType.GROUPS | filters.ChatType.SUPERGROUP) & ~filters.COMMAND, handle_interactive_send),
     ]
