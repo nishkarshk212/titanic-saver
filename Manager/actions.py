@@ -38,6 +38,9 @@ def parse_time(time_str):
 
 from user_manager_mongo import get_user_id
 from voice_chat import remove_user_from_vc
+from database import get_collection, COLLECTIONS
+import uuid
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, CallbackQueryHandler
 
 async def is_admin(chat, user_id):
     """Check if user is admin."""
@@ -310,6 +313,62 @@ async def send_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     is_protected = update.message.text.startswith('/psend')
 
+    # Special logic for /psend with target user (Hidden Message)
+    if is_protected and context.args:
+        # Check if first arg is a mention or username
+        first_arg = context.args[0]
+        if first_arg.startswith('@') or first_arg.isdigit() or (update.message.entities and any(e.type == 'text_mention' for e in update.message.entities)):
+            # This is likely a targeted hidden message
+            target_user_id, target_name = await get_user_id(update, context)
+            
+            if target_user_id:
+                # Get the message text after the target
+                # We need to find where the target mention ends in the raw text
+                raw_text = update.message.text
+                entities = update.message.entities
+                
+                message_text = ""
+                # Find the entity that represents the user mention
+                target_entity = next((e for e in entities if e.type in ['mention', 'text_mention']), None)
+                
+                if target_entity:
+                    mention_end = target_entity.offset + target_entity.length
+                    message_text = raw_text[mention_end:].strip()
+                else:
+                    # Fallback if no mention entity (e.g. raw ID)
+                    message_text = " ".join(context.args[1:])
+
+                if not message_text:
+                    return await update.message.reply_text("Usage: /psend @username secret message")
+
+                # Store hidden message in DB
+                msg_id = str(uuid.uuid4())[:8]
+                hidden_col = get_collection(COLLECTIONS["hidden_messages"])
+                if hidden_col is not None:
+                    hidden_col.insert_one({
+                        "msg_id": msg_id,
+                        "text": message_text,
+                        "target_id": target_user_id,
+                        "admin_id": update.effective_user.id,
+                        "expires_at": datetime.utcnow() + timedelta(hours=24)
+                    })
+                    
+                    keyboard = [[InlineKeyboardButton("📩 Click to Read", callback_data=f"hidden_msg_{msg_id}")]]
+                    reply_markup = InlineKeyboardMarkup(keyboard)
+                    
+                    target_mention = f"<a href='tg://user?id={target_user_id}'>{target_name}</a>"
+                    await context.bot.send_message(
+                        chat_id=chat.id,
+                        text=f"🔐 <b>Secret Message for {target_mention}</b>\n<i>Only they can read this.</i>",
+                        reply_markup=reply_markup,
+                        parse_mode='HTML'
+                    )
+                    
+                    # Delete admin command
+                    try: await update.message.delete()
+                    except: pass
+                    return
+
     # Helper to get text and entities after the command
     def get_text_and_entities_after_command(message):
         raw_text = message.text
@@ -448,6 +507,37 @@ async def send_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
     await update.message.reply_text("Usage: /send <message> or reply to media/sticker with /send")
+
+
+async def hidden_msg_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Callback for the 'Click to Read' button on hidden messages."""
+    query = update.callback_query
+    data = query.data
+    user_id = update.effective_user.id
+    
+    if not data.startswith("hidden_msg_"):
+        return
+        
+    msg_id = data.replace("hidden_msg_", "")
+    hidden_col = get_collection(COLLECTIONS["hidden_messages"])
+    
+    if hidden_col is None:
+        return await query.answer("❌ Database connection error.", show_alert=True)
+        
+    hidden_msg = hidden_col.find_one({"msg_id": msg_id})
+    
+    if not hidden_msg:
+        return await query.answer("❌ This message has expired or no longer exists.", show_alert=True)
+        
+    target_id = hidden_msg["target_id"]
+    admin_id = hidden_msg["admin_id"]
+    
+    if user_id == target_id or user_id == admin_id or user_id == OWNER_ID:
+        # Show the message
+        await query.answer(hidden_msg["text"], show_alert=True)
+    else:
+        # Not the target user
+        await query.answer("❌ This message is not for you!", show_alert=True)
 
 
 async def handle_interactive_send(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -909,5 +999,6 @@ def get_manager_actions_handlers():
         CommandHandler("kickme", kickme),
         CommandHandler("tban", tban_user),
         CommandHandler(["send", "psend"], send_command),
+        CallbackQueryHandler(hidden_msg_callback, pattern="^hidden_msg_"),
         MessageHandler(filters.REPLY & (filters.ChatType.GROUPS | filters.ChatType.SUPERGROUP) & ~filters.COMMAND, handle_interactive_send),
     ]

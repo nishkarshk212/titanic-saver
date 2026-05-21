@@ -127,7 +127,8 @@ COLLECTIONS = {
     "blocked_content": "blocked_content",
     "filters": "filters",
     "group_muters": "group_muters",
-    "admins": "admins"
+    "admins": "admins",
+    "hidden_messages": "hidden_messages"
 }
 
 def initialize_collections():
@@ -166,6 +167,11 @@ def initialize_collections():
         # Blocked content indexes
         blocked_col = database[COLLECTIONS["blocked_content"]]
         blocked_col.create_index("chat_id")
+
+        # Hidden messages indexes
+        hidden_col = database[COLLECTIONS["hidden_messages"]]
+        hidden_col.create_index("msg_id", unique=True)
+        hidden_col.create_index("expires_at", expireAfterSeconds=0) # Auto cleanup
         
         # Filters indexes
         filters_col = database[COLLECTIONS["filters"]]
