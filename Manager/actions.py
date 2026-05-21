@@ -340,11 +340,12 @@ async def send_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             msg_id = str(uuid.uuid4())[:8]
             hidden_col = get_collection(COLLECTIONS["hidden_messages"])
             if hidden_col is not None:
+                logging.info(f"Storing hidden message {msg_id}: target={target_user_id}, admin={update.effective_user.id}")
                 hidden_col.insert_one({
                     "msg_id": msg_id,
                     "text": message_text,
-                    "target_id": target_user_id,
-                    "admin_id": update.effective_user.id,
+                    "target_id": int(target_user_id),
+                    "admin_id": int(update.effective_user.id),
                     "expires_at": datetime.utcnow() + timedelta(hours=24)
                 })
                 
@@ -529,7 +530,9 @@ async def hidden_msg_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     target_id = hidden_msg["target_id"]
     admin_id = hidden_msg["admin_id"]
     
-    if user_id == target_id or user_id == admin_id or user_id == OWNER_ID:
+    logging.info(f"Hidden message read attempt {msg_id}: clicker={user_id}, target={target_id}, admin={admin_id}")
+    
+    if int(user_id) == int(target_id) or int(user_id) == int(admin_id) or int(user_id) == int(OWNER_ID):
         # Show the message
         await query.answer(hidden_msg["text"], show_alert=True)
     else:
