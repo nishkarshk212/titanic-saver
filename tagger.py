@@ -4,7 +4,7 @@ from telegram import Update
 from telegram.ext import ContextTypes, CommandHandler
 from telegram.constants import ParseMode
 from telethon import functions, types
-from voice_chat import telethon_client
+import voice_chat
 from settings_manager_mongo import get_chat_settings
 from user_manager_mongo import is_user_admin
 from config import delete_message_job
@@ -33,7 +33,7 @@ async def tag_everyone(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await update.message.reply_text("❌ Only admins can use this command.")
 
     # Telethon check
-    if not telethon_client or not telethon_client.is_connected():
+    if not voice_chat.telethon_client or not voice_chat.telethon_client.is_connected():
         return await update.message.reply_text("❌ Voice Monitor (Telethon) is not connected. Tagger unavailable.")
 
     # Check for stop command
@@ -57,13 +57,13 @@ async def tag_everyone(update: Update, context: ContextTypes.DEFAULT_TYPE):
         tele_chat_id = int(str(chat.id).replace('-100', ''))
         
         # Get all participants
-        participants = await telethon_client.get_participants(tele_chat_id)
+        participants = await voice_chat.telethon_client.get_participants(tele_chat_id)
         
         if not participants:
             return await update.message.reply_text("❌ Could not find any participants to tag.")
 
         # Filter out bots and the bot itself
-        me = await telethon_client.get_me()
+        me = await voice_chat.telethon_client.get_me()
         users_to_tag = [p for p in participants if not p.bot and p.id != me.id]
         
         total = len(users_to_tag)
