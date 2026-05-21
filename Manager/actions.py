@@ -304,8 +304,12 @@ async def send_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.reply_to_message:
         reply = update.message.reply_to_message
         
+        # Double-reply logic: If the replied message is itself a reply to something else,
+        # target that original message instead.
+        target_message_id = reply.reply_to_message.message_id if reply.reply_to_message else reply.message_id
+        
         try:
-            # If command has text, send that text as a reply to the original message
+            # If command has text, send that text as a reply to the target message
             if context.args:
                 new_text, new_entities = get_text_and_entities_after_command(update.message)
                 
@@ -313,39 +317,42 @@ async def send_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     chat_id=chat.id, 
                     text=new_text,
                     entities=new_entities,
-                    reply_to_message_id=reply.message_id
+                    reply_to_message_id=target_message_id
                 )
-            # If no text, send the replied media/sticker back as a reply to itself
+            # If no text, send the replied media/sticker back as a reply to the target message
             else:
                 if reply.sticker:
-                    await context.bot.send_sticker(chat_id=chat.id, sticker=reply.sticker.file_id, reply_to_message_id=reply.message_id)
+                    await context.bot.send_sticker(chat_id=chat.id, sticker=reply.sticker.file_id, reply_to_message_id=target_message_id)
                 elif reply.photo:
-                    await context.bot.send_photo(chat_id=chat.id, photo=reply.photo[-1].file_id, caption=reply.caption, caption_entities=reply.caption_entities, reply_to_message_id=reply.message_id)
+                    await context.bot.send_photo(chat_id=chat.id, photo=reply.photo[-1].file_id, caption=reply.caption, caption_entities=reply.caption_entities, reply_to_message_id=target_message_id)
                 elif reply.video:
-                    await context.bot.send_video(chat_id=chat.id, video=reply.video.file_id, caption=reply.caption, caption_entities=reply.caption_entities, reply_to_message_id=reply.message_id)
+                    await context.bot.send_video(chat_id=chat.id, video=reply.video.file_id, caption=reply.caption, caption_entities=reply.caption_entities, reply_to_message_id=target_message_id)
                 elif reply.animation:
-                    await context.bot.send_animation(chat_id=chat.id, animation=reply.animation.file_id, caption=reply.caption, caption_entities=reply.caption_entities, reply_to_message_id=reply.message_id)
+                    await context.bot.send_animation(chat_id=chat.id, animation=reply.animation.file_id, caption=reply.caption, caption_entities=reply.caption_entities, reply_to_message_id=target_message_id)
                 elif reply.document:
-                    await context.bot.send_document(chat_id=chat.id, document=reply.document.file_id, caption=reply.caption, caption_entities=reply.caption_entities, reply_to_message_id=reply.message_id)
+                    await context.bot.send_document(chat_id=chat.id, document=reply.document.file_id, caption=reply.caption, caption_entities=reply.caption_entities, reply_to_message_id=target_message_id)
                 elif reply.audio:
-                    await context.bot.send_audio(chat_id=chat.id, audio=reply.audio.file_id, caption=reply.caption, caption_entities=reply.caption_entities, reply_to_message_id=reply.message_id)
+                    await context.bot.send_audio(chat_id=chat.id, audio=reply.audio.file_id, caption=reply.caption, caption_entities=reply.caption_entities, reply_to_message_id=target_message_id)
                 elif reply.voice:
-                    await context.bot.send_voice(chat_id=chat.id, voice=reply.voice.file_id, caption=reply.caption, caption_entities=reply.caption_entities, reply_to_message_id=reply.message_id)
+                    await context.bot.send_voice(chat_id=chat.id, voice=reply.voice.file_id, caption=reply.caption, caption_entities=reply.caption_entities, reply_to_message_id=target_message_id)
                 elif reply.video_note:
-                    await context.bot.send_video_note(chat_id=chat.id, video_note=reply.video_note.file_id, reply_to_message_id=reply.message_id)
+                    await context.bot.send_video_note(chat_id=chat.id, video_note=reply.video_note.file_id, reply_to_message_id=target_message_id)
                 elif reply.text:
-                    await context.bot.send_message(chat_id=chat.id, text=reply.text, entities=reply.entities, reply_to_message_id=reply.message_id)
+                    await context.bot.send_message(chat_id=chat.id, text=reply.text, entities=reply.entities, reply_to_message_id=target_message_id)
                 else:
                     return await update.message.reply_text("❌ Unsupported media type in reply.")
             
-            # Delete the /send command message
+            # Delete the /send command message and the intermediate reply if it was a double-reply
             try:
                 await update.message.delete()
+                if reply.reply_to_message: # Only delete the intermediate media if it was a double-reply
+                    await reply.delete()
             except: pass
             return
         except Exception as e:
             logging.error(f"Error in send_command (reply): {e}")
             return await update.message.reply_text(f"❌ Failed to send: {str(e)}")
+
 
     # 2. Handle arguments (text message) without reply
     if context.args:
