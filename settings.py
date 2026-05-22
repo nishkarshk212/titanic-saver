@@ -2033,6 +2033,11 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             next_idx = (options.index(current) + 1) % len(options)
             new_val = options[next_idx]
             update_chat_setting(chat_id, "forward_protection_apply_on", new_val)
+        elif key == "emergency_mode":
+            # Rotate: daily -> today -> daily
+            current = settings.get("emergency_mode", "daily")
+            new_val = "today" if current == "daily" else "daily"
+            update_chat_setting(chat_id, "emergency_mode", new_val)
         elif key == "block_reactions":
             new_val = not settings.get(key, False)
             update_chat_setting(chat_id, key, new_val)
@@ -2112,6 +2117,8 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await query.edit_message_reply_markup(reply_markup=get_banned_words_keyboard(new_settings))
             elif "antiflood" in key:
                 await query.edit_message_reply_markup(reply_markup=get_antiflood_settings_keyboard(new_settings))
+            elif "emergency" in key:
+                await query.edit_message_reply_markup(reply_markup=get_emergency_settings_keyboard(new_settings))
             elif "nightmode" in key:
                 from datetime import datetime
                 import pytz
@@ -2351,6 +2358,7 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif "group_link" in config_full: section = "group_link"
         elif "banned_words" in config_full: section = "banned_words"
         elif "rules" in config_full: section = "rules"
+        elif "emergency" in config_full: section = "emergency"
         else: section = "unknown"
         
         config_type = config_full.replace(f"{section}_", "")
@@ -2380,7 +2388,9 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ),
             "buttons_add": f"Please send the {section} button text and URL in this format:\n`Button Text | https://t.me/yourlink`",
             "button": f"Please send the {section} button text and URL in this format:\n`Button Text | https://t.me/yourlink`",
-            "limit": f"Please send the maximum character limit for messages (e.g., 500)."
+            "limit": f"Please send the maximum character limit for messages (e.g., 500).",
+            "start_time": "Please send the start time for Emergency Mode in HH:MM format (e.g., 09:00).",
+            "end_time": "Please send the end time for Emergency Mode in HH:MM format (e.g., 22:00)."
         }
         
         await edit_bot_response(
@@ -2452,6 +2462,15 @@ async def handle_setting_input(update: Update, context: ContextTypes.DEFAULT_TYP
         if update.message.text and update.message.text.isdigit():
             update_chat_setting(chat_id, setting_key, int(update.message.text))
             success = True
+    elif config_type in ["start_time", "end_time"]:
+        if update.message.text and ":" in update.message.text:
+            try:
+                # Basic validation for HH:MM format
+                h, m = map(int, update.message.text.split(":"))
+                if 0 <= h <= 23 and 0 <= m <= 59:
+                    update_chat_setting(chat_id, setting_key, update.message.text)
+                    success = True
+            except (ValueError, TypeError): pass
     elif section == "group_link":
         update_chat_setting(chat_id, "group_link", update.message.text)
         success = True

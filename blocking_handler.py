@@ -82,7 +82,16 @@ def is_emergency_active(settings, chat_id=None):
     if not settings.get("emergency_enabled", False):
         return False
     
-    now = datetime.now()
+    import pytz
+    from datetime import datetime
+    
+    timezone_str = settings.get("nightmode_timezone", "Asia/Kolkata")
+    try:
+        tz = pytz.timezone(timezone_str)
+    except Exception:
+        tz = pytz.timezone("Asia/Kolkata")
+        
+    now = datetime.now(tz)
     current_time = now.strftime("%H:%M")
     start_time = settings.get("emergency_start_time", "00:00")
     end_time = settings.get("emergency_end_time", "23:59")
