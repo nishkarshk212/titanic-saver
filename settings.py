@@ -759,6 +759,7 @@ def get_blocking_settings_keyboard(settings):
     command_status = "✅" if settings.get("block_command", False) else "❌"
     contact_status = "✅" if settings.get("block_contact", False) else "❌"
     location_status = "✅" if settings.get("block_location", False) else "❌"
+    text_status = "✅" if settings.get("block_text", False) else "❌"
     voice_status = "✅" if settings.get("block_voice", False) else "❌"
     audio_status = "✅" if settings.get("block_audio", False) else "❌"
     video_note_status = "✅" if settings.get("block_video_note", False) else "❌"
@@ -785,6 +786,7 @@ def get_blocking_settings_keyboard(settings):
         [InlineKeyboardButton(f"Block Commands: {command_status}", callback_data="set_toggle_block_command")],
         [InlineKeyboardButton("── Other ──", callback_data="set_none")],
         [InlineKeyboardButton(f"Block Contact: {contact_status}", callback_data="set_toggle_block_contact")],
+        [InlineKeyboardButton(f"Block Text Messages: {text_status}", callback_data="set_toggle_block_text")],
         [InlineKeyboardButton(f"Block Location: {location_status}", callback_data="set_toggle_block_location")],
         [InlineKeyboardButton(f"Block Voice: {voice_status}", callback_data="set_toggle_block_voice")],
         [InlineKeyboardButton(f"Block Video Note: {video_note_status}", callback_data="set_toggle_block_video_note")],

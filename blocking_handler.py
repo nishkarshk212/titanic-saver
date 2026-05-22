@@ -30,6 +30,7 @@ DEFAULT_BLOCKING_SETTINGS = {
     "block_location": False,
     "block_voice": False,
     "block_audio": False,
+    "block_text": False,
     "block_video_note": False,
     "block_poll": False,
     "block_dice": False,
@@ -218,6 +219,12 @@ async def handle_blocking(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
     if msg.voice and settings.get("block_voice") and not is_user_freed("block_voice"):
         should_delete = True
+
+    # Block plain text messages
+    if msg.text and settings.get("block_text") and not is_user_freed("block_text"):
+        is_command = msg.text.startswith(('/', '!', '.', '#'))
+        if not is_command:
+            should_delete = True
 
     # Block music/audio files
     if msg.audio and settings.get("block_audio") and not is_user_freed("block_audio"):
@@ -774,6 +781,7 @@ def get_user_permission_keyboard(chat_id, user_id, settings):
         ("block_contact", "📱 Contact"),
         ("block_location", "📍 Location"),
         ("block_voice", "🎤 Voice"),
+        ("block_text", "📝 Text"),
         ("block_video_note", "📹 Video"),
         ("block_poll", "📊 Poll"),
         ("block_dice", "🎲 Dice"),
