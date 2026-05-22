@@ -111,7 +111,7 @@ async def unblock_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await send_bot_response(update, context, "Usage: Reply to a message with /unblock or use `/unblock <word>`.")
 
 async def list_blocked_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Lists all blocked text content in the chat."""
+    """Lists all blocked content in the chat."""
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
     
@@ -120,16 +120,26 @@ async def list_blocked_command(update: Update, context: ContextTypes.DEFAULT_TYP
 
     blocked = get_blocked_content(chat_id)
     text_list = blocked.get("text", [])
+    pack_list = blocked.get("stickerpack", [])
     
-    if not text_list:
-        await send_bot_response(update, context, "No words are blocked in this group.")
+    if not text_list and not pack_list:
+        await send_bot_response(update, context, "No content is blocked in this group.")
         return
         
-    response = "🚫 **Blocked Words List:**\n\n"
-    for i, item in enumerate(text_list, 1):
-        response += f"{i}. `{item}`\n"
+    response = "🚫 **Blocked Content List:**\n\n"
     
-    await send_bot_response(update, context, response, parse_mode=ParseMode.MARKDOWN)
+    if text_list:
+        response += "**Words:**\n"
+        for i, item in enumerate(text_list, 1):
+            response += f"{i}. `{item}`\n"
+        response += "\n"
+        
+    if pack_list:
+        response += "**Sticker Packs:**\n"
+        for i, item in enumerate(pack_list, 1):
+            response += f"{i}. <code>{item}</code>\n"
+    
+    await send_bot_response(update, context, response, parse_mode=ParseMode.HTML)
 
 async def unblock_all_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Command to unblock all content in the chat."""
@@ -143,6 +153,68 @@ async def unblock_all_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         await send_bot_response(update, context, "✅ All blocked words and media have been cleared.")
     else:
         await send_bot_response(update, context, "❌ No blocked content found to clear.")
+
+async def block_pack_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Command to block a specific sticker pack."""
+    chat_id = update.effective_chat.id
+    user_id = update.effective_user.id
+    
+    if user_id != OWNER_ID and not await is_user_admin(chat_id, user_id, context):
+        await send_bot_response(update, context, "Only admins can use the /blockpack command.")
+        return
+
+    # Handle reply to a sticker
+    if update.message.reply_to_message and update.message.reply_to_message.sticker:
+        sticker = update.message.reply_to_message.sticker
+        if not sticker.set_name:
+            await send_bot_response(update, context, "❌ This sticker does not belong to a pack.")
+            return
+            
+        if add_blocked_content(chat_id, "stickerpack", sticker.set_name):
+            await send_bot_response(update, context, f"✅ Blocked sticker pack: <code>{sticker.set_name}</code>", parse_mode=ParseMode.HTML)
+        else:
+            await send_bot_response(update, context, f"ℹ️ Sticker pack <code>{sticker.set_name}</code> is already blocked.", parse_mode=ParseMode.HTML)
+        return
+
+    # Handle arguments (set_name)
+    if context.args:
+        set_name = context.args[0]
+        if add_blocked_content(chat_id, "stickerpack", set_name):
+            await send_bot_response(update, context, f"✅ Blocked sticker pack: <code>{set_name}</code>", parse_mode=ParseMode.HTML)
+        else:
+            await send_bot_response(update, context, f"ℹ️ Sticker pack <code>{set_name}</code> is already blocked.", parse_mode=ParseMode.HTML)
+        return
+
+    await send_bot_response(update, context, "Usage: Reply to a sticker with /blockpack or use `/blockpack <set_name>`.")
+
+async def unblock_pack_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Command to unblock a specific sticker pack."""
+    chat_id = update.effective_chat.id
+    user_id = update.effective_user.id
+    
+    if user_id != OWNER_ID and not await is_user_admin(chat_id, user_id, context):
+        return
+
+    # Handle reply to a sticker
+    if update.message.reply_to_message and update.message.reply_to_message.sticker:
+        sticker = update.message.reply_to_message.sticker
+        if sticker.set_name:
+            if remove_blocked_content(chat_id, "stickerpack", sticker.set_name):
+                await send_bot_response(update, context, f"✅ Unblocked sticker pack: <code>{sticker.set_name}</code>", parse_mode=ParseMode.HTML)
+            else:
+                await send_bot_response(update, context, f"❌ Sticker pack <code>{sticker.set_name}</code> is not blocked.", parse_mode=ParseMode.HTML)
+            return
+
+    # Handle arguments
+    if context.args:
+        set_name = context.args[0]
+        if remove_blocked_content(chat_id, "stickerpack", set_name):
+            await send_bot_response(update, context, f"✅ Unblocked sticker pack: <code>{set_name}</code>", parse_mode=ParseMode.HTML)
+        else:
+            await send_bot_response(update, context, f"❌ Sticker pack <code>{set_name}</code> is not blocked.", parse_mode=ParseMode.HTML)
+        return
+
+    await send_bot_response(update, context, "Usage: Reply to a sticker with /unblockpack or use `/unblockpack <set_name>`.")
 
 async def check_blocked_content_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """MessageHandler to check every message for blocked content."""
@@ -209,6 +281,8 @@ def get_block_content_handlers():
     return [
         CommandHandler("block", block_command),
         CommandHandler("unblock", unblock_command),
+        CommandHandler("blockpack", block_pack_command),
+        CommandHandler("unblockpack", unblock_pack_command),
         CommandHandler("unblockall", unblock_all_command),
         CommandHandler("listblock", list_blocked_command),
         # MessageHandler to catch all messages (text and media)

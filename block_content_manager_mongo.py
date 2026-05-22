@@ -20,6 +20,7 @@ def add_blocked_content(chat_id, content_type, content_value):
                 "chat_id": chat_id_str,
                 "text": [],
                 "media": [],
+                "stickerpack": [],
                 "created_at": datetime.datetime.now(),
                 "updated_at": datetime.datetime.now()
             }
@@ -43,6 +44,16 @@ def add_blocked_content(chat_id, content_type, content_value):
                     {"chat_id": chat_id_str},
                     {
                         "$push": {"media": content_value},
+                        "$set": {"updated_at": datetime.datetime.now()}
+                    }
+                )
+                return True
+        elif content_type == "stickerpack":
+            if content_value not in blocked_doc.get("stickerpack", []):
+                blocked_col.update_one(
+                    {"chat_id": chat_id_str},
+                    {
+                        "$push": {"stickerpack": content_value},
                         "$set": {"updated_at": datetime.datetime.now()}
                     }
                 )
@@ -81,6 +92,15 @@ def remove_blocked_content(chat_id, content_type, content_value):
                 }
             )
             return result.modified_count > 0
+        elif content_type == "stickerpack":
+            result = blocked_col.update_one(
+                {"chat_id": chat_id_str},
+                {
+                    "$pull": {"stickerpack": content_value},
+                    "$set": {"updated_at": datetime.datetime.now()}
+                }
+            )
+            return result.modified_count > 0
         
         return False
     except Exception as e:
@@ -100,13 +120,14 @@ def get_blocked_content(chat_id):
         if blocked_doc:
             return {
                 "text": blocked_doc.get("text", []),
-                "media": blocked_doc.get("media", [])
+                "media": blocked_doc.get("media", []),
+                "stickerpack": blocked_doc.get("stickerpack", [])
             }
         
-        return {"text": [], "media": []}
+        return {"text": [], "media": [], "stickerpack": []}
     except Exception as e:
         logging.error(f"Error getting blocked content: {e}")
-        return {"text": [], "media": []}
+        return {"text": [], "media": [], "stickerpack": []}
 
 def is_content_blocked(chat_id, message):
     """Checks if a message contains blocked content."""
@@ -131,6 +152,11 @@ def is_content_blocked(chat_id, message):
     
     if media_file_id and media_file_id in blocked.get("media", []):
         return True, "media"
+    
+    # Check sticker pack
+    if message.sticker and message.sticker.set_name:
+        if message.sticker.set_name in blocked.get("stickerpack", []):
+            return True, f"stickerpack: {message.sticker.set_name}"
         
     return False, None
 
