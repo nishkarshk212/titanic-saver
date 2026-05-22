@@ -6,6 +6,7 @@ from config import OWNER_ID, send_bot_response, log_to_channel
 from settings_manager_mongo import get_chat_settings
 from moderation_manager_mongo import add_warn, reset_warns
 from user_manager_mongo import is_user_admin, get_user_id
+from moderation import can_user_ban
 from block_content_manager_mongo import add_blocked_content, remove_blocked_content, is_content_blocked, get_blocked_content, clear_all_blocked_content
 import re
 
@@ -33,8 +34,9 @@ async def block_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
     
-    if user_id != OWNER_ID and not await is_user_admin(chat_id, user_id, context):
-        await send_bot_response(update, context, "Only admins can use the /block command.")
+    can_ban, error_msg = await can_user_ban(chat_id, user_id, context)
+    if not can_ban:
+        await send_bot_response(update, context, error_msg or "Only admins with ban permission can use the /block command.")
         return
 
     # 1. Handle reply to a message (media or text)
@@ -92,7 +94,8 @@ async def unblock_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
     
-    if user_id != OWNER_ID and not await is_user_admin(chat_id, user_id, context):
+    can_ban, _ = await can_user_ban(chat_id, user_id, context)
+    if not can_ban:
         return
 
     # Handle reply
@@ -135,7 +138,8 @@ async def list_blocked_command(update: Update, context: ContextTypes.DEFAULT_TYP
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
     
-    if user_id != OWNER_ID and not await is_user_admin(chat_id, user_id, context):
+    can_ban, _ = await can_user_ban(chat_id, user_id, context)
+    if not can_ban:
         return
 
     blocked = get_blocked_content(chat_id)
@@ -166,7 +170,8 @@ async def unblock_all_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
     
-    if user_id != OWNER_ID and not await is_user_admin(chat_id, user_id, context):
+    can_ban, _ = await can_user_ban(chat_id, user_id, context)
+    if not can_ban:
         return
 
     if clear_all_blocked_content(chat_id):
@@ -179,8 +184,9 @@ async def block_pack_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
     
-    if user_id != OWNER_ID and not await is_user_admin(chat_id, user_id, context):
-        await send_bot_response(update, context, "Only admins can use the /blockpack command.")
+    can_ban, error_msg = await can_user_ban(chat_id, user_id, context)
+    if not can_ban:
+        await send_bot_response(update, context, error_msg or "Only admins with ban permission can use the /blockpack command.")
         return
 
     # Handle reply to a sticker
@@ -212,7 +218,8 @@ async def unblock_pack_command(update: Update, context: ContextTypes.DEFAULT_TYP
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
     
-    if user_id != OWNER_ID and not await is_user_admin(chat_id, user_id, context):
+    can_ban, _ = await can_user_ban(chat_id, user_id, context)
+    if not can_ban:
         return
 
     # Handle reply to a sticker
