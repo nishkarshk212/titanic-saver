@@ -201,6 +201,9 @@ DEFAULT_CHAT_SETTINGS = {
     "emergency_end_time": "23:59",
     "emergency_mode": "daily", # daily, today
     "emergency_apply_on_freed": False,
+    "blocking_delete_notifications": True,
+    "blocking_notification_timer": 30,
+    "blocking_custom_text": None,
     "ui_layout_type": 1 # 1 (Default/Large), 2 (Small/Compact)
 }
 

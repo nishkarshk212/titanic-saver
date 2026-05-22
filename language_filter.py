@@ -251,12 +251,9 @@ async def check_language_filter(update: Update, context: ContextTypes.DEFAULT_TY
                 f"Please use one of the allowed languages."
             )
             
-            # Send warning and auto-delete after 10 seconds
-            warning = await message.reply_text(warning_msg, parse_mode='HTML')
-            
-            # Schedule deletion of warning message
-            import asyncio
-            asyncio.create_task(delete_after_delay(context, warning.chat_id, warning.message_id, 10))
+            # Send warning and auto-delete using helper
+            from blocking_handler import send_blocking_notification
+            await send_blocking_notification(update, context, settings, warning_msg)
             
             return True  # Message was deleted
             

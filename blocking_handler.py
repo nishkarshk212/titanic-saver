@@ -116,6 +116,38 @@ def is_emergency_active(settings, chat_id=None):
 
     return is_in_time_range
 
+async def send_blocking_notification(update: Update, context: ContextTypes.DEFAULT_TYPE, settings, default_text):
+    """Sends a notification when content is blocked, respects settings."""
+    chat_id = update.effective_chat.id
+    msg = update.effective_message
+    
+    custom_text = settings.get("blocking_custom_text")
+    if custom_text:
+        # Simple formatting
+        user = update.effective_user
+        text = custom_text.replace("{NAME}", user.first_name).replace("{ID}", str(user.id))
+    else:
+        text = default_text
+        
+    try:
+        sent_msg = await msg.reply_text(text, parse_mode='HTML')
+        
+        # Check if we should delete this notification
+        if settings.get("blocking_delete_notifications", True):
+            timer = settings.get("blocking_notification_timer", 30)
+            
+            async def delete_notification():
+                await asyncio.sleep(timer)
+                try:
+                    await sent_msg.delete()
+                except:
+                    pass
+                    
+            asyncio.create_task(delete_notification())
+            
+    except Exception as e:
+        logging.error(f"Error sending blocking notification: {e}")
+
 async def handle_blocking(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handles all blocking logic for messages."""
     if not update.effective_chat or update.effective_chat.type == "private":
@@ -364,23 +396,24 @@ async def handle_blocking(update: Update, context: ContextTypes.DEFAULT_TYPE):
                               (hasattr(msg, 'forward_from') and msg.forward_from is not None)
             
             if msg.audio and settings.get("block_audio"):
-                try:
-                    await msg.reply_text(
-                        f"🎵 <b>Music files are not allowed in this group.</b>\n\n"
-                        f"<i>Your audio file has been automatically deleted.</i>",
-                        parse_mode='HTML'
-                    )
-                except Exception:
-                    pass
+                await send_blocking_notification(
+                    update, context, settings,
+                    f"🎵 <b>Music files are not allowed in this group.</b>\n\n"
+                    f"<i>Your audio file has been automatically deleted.</i>"
+                )
             elif is_forwarded_msg and settings.get("block_forward"):
-                try:
-                    await msg.reply_text(
-                        f"⚠️ <b>Forwarded messages are not allowed in this group.</b>\n\n"
-                        f"<i>Your forwarded message has been automatically deleted.</i>",
-                        parse_mode='HTML'
-                    )
-                except Exception:
-                    pass
+                await send_blocking_notification(
+                    update, context, settings,
+                    f"⚠️ <b>Forwarded messages are not allowed in this group.</b>\n\n"
+                    f"<i>Your forwarded message has been automatically deleted.</i>"
+                )
+            else:
+                # Generic notification for other blocked content
+                await send_blocking_notification(
+                    update, context, settings,
+                    f"⚠️ <b>Content blocked!</b>\n\n"
+                    f"<i>Your message has been automatically deleted due to group rules.</i>"
+                )
                 
             await msg.delete()
             return True

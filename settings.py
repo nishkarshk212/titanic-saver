@@ -853,6 +853,7 @@ def get_blocking_settings_keyboard(settings):
     
     keyboard = [
         [InlineKeyboardButton(f"Master Blocking: {master_status}", callback_data="set_toggle_blocking_enabled")],
+        [InlineKeyboardButton("🔔 Notification Settings", callback_data="set_view_blocking_notifications")],
         [InlineKeyboardButton("── Stickers ──", callback_data="set_none")],
         [InlineKeyboardButton(f"Block Stickers: {stickers_status}", callback_data="set_toggle_block_stickers")],
         [InlineKeyboardButton(f"Block Premium Stickers: {premium_sticker_status}", callback_data="set_toggle_block_premium_sticker")],
@@ -1020,6 +1021,25 @@ def get_manager_settings_keyboard(settings):
         [InlineKeyboardButton(f"Info Command: {info_status}", callback_data="set_toggle_manager_info_enabled")],
         [InlineKeyboardButton("ℹ️ Toggle to enable/disable commands", callback_data="set_none")],
         [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+def get_blocking_notification_settings_keyboard(settings):
+    """Get blocking notification settings keyboard."""
+    delete_status = "✅" if settings.get("blocking_delete_notifications", True) else "❌"
+    timer = settings.get("blocking_notification_timer", 30)
+    custom_text = "✅ Set" if settings.get("blocking_custom_text") else "❌ Not Set"
+    
+    keyboard = [
+        [InlineKeyboardButton(f"Delete Notifications: {delete_status}", callback_data="set_toggle_blocking_delete_notifications")],
+        [
+            InlineKeyboardButton("-5s", callback_data="set_blocking_timer_sub_5"),
+            InlineKeyboardButton(f"🕒 Timer: {timer}s", callback_data="set_none"),
+            InlineKeyboardButton("+5s", callback_data="set_blocking_timer_add_5")
+        ],
+        [InlineKeyboardButton(f"Custom Block Text: {custom_text}", callback_data="set_config_blocking_custom_text")],
+        [InlineKeyboardButton("🗑️ Clear Custom Text", callback_data="set_clear_blocking_custom_text")],
+        [InlineKeyboardButton("🔙 Back", callback_data="set_view_blocking")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -1195,6 +1215,19 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "ᴄᴏɴᴛʀᴏʟ ᴡʜᴀᴛ ᴛʏᴘᴇꜱ ᴏꜰ ᴄᴏɴᴛᴇɴᴛ ᴀʀᴇ ᴀʟʟᴏᴡᴇᴅ ɪɴ ʏᴏᴜʀ ɢʀᴏᴜᴘ.\n"
                 "ᴛᴏɢɢʟᴇ ᴇᴀᴄʜ ꜱᴇᴛᴛɪɴɢ ᴛᴏ ʙʟᴏᴄᴋ ᴏʀ ᴀʟʟᴏᴡ ꜱᴘᴇᴄɪꜰɪᴄ ᴄᴏɴᴛᴇɴᴛ:",
                 reply_markup=get_blocking_settings_keyboard(settings),
+                parse_mode='HTML'
+            )
+        except BadRequest: pass
+        return
+
+    if data == "set_view_blocking_notifications":
+        settings = get_chat_settings(chat_id)
+        try:
+            await edit_bot_response(
+                query, context,
+                "🔔 <b>ʙʟᴏᴄᴋɪɴɢ ɴᴏᴛɪꜰɪᴄᴀᴛɪᴏɴꜱ ꜱᴇᴛᴛɪɴɢꜱ 🔔</b>\n\n"
+                "ᴄᴏɴꜰɪɢᴜʀᴇ ʜᴏᴡ ᴛʜᴇ ʙᴏᴛ ɴᴏᴛɪꜰɪᴇꜱ ᴜꜱᴇʀꜱ ᴡʜᴇɴ ᴛʜᴇɪʀ ᴍᴇꜱꜱᴀɢᴇꜱ ᴀʀᴇ ʙʟᴏᴄᴋᴇᴅ.",
+                reply_markup=get_blocking_notification_settings_keyboard(settings),
                 parse_mode='HTML'
             )
         except BadRequest: pass
@@ -2071,6 +2104,9 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             current = settings.get("emergency_mode", "daily")
             new_val = "today" if current == "daily" else "daily"
             update_chat_setting(chat_id, "emergency_mode", new_val)
+        elif key == "blocking_delete_notifications":
+            new_val = not settings.get(key, True)
+            update_chat_setting(chat_id, key, new_val)
         elif key == "block_reactions":
             new_val = not settings.get(key, False)
             update_chat_setting(chat_id, key, new_val)
@@ -2152,6 +2188,11 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await query.edit_message_reply_markup(reply_markup=get_antiflood_settings_keyboard(new_settings))
             elif "emergency" in key:
                 await query.edit_message_reply_markup(reply_markup=get_emergency_settings_keyboard(new_settings))
+            elif "blocking" in key:
+                if "notification" in key or "timer" in key or "custom_text" in key:
+                    await query.edit_message_reply_markup(reply_markup=get_blocking_notification_settings_keyboard(new_settings))
+                else:
+                    await query.edit_message_reply_markup(reply_markup=get_blocking_settings_keyboard(new_settings))
             elif "nightmode" in key:
                 from datetime import datetime
                 import pytz
@@ -2338,6 +2379,33 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logging.error(f"Error sending nightmode timezone message: {e}")
         return
 
+    if data.startswith("set_blocking_timer_"):
+        action = data.replace("set_blocking_timer_", "")
+        settings = get_chat_settings(chat_id)
+        current = settings.get("blocking_notification_timer", 30)
+        
+        if action == "add_5":
+            new_val = min(3600, current + 5)
+        else:
+            new_val = max(0, current - 5)
+            
+        update_chat_setting(chat_id, "blocking_notification_timer", new_val)
+        new_settings = get_chat_settings(chat_id)
+        try:
+            await query.edit_message_reply_markup(reply_markup=get_blocking_notification_settings_keyboard(new_settings))
+        except BadRequest: pass
+        await query.answer(f"Timer set to {new_val}s")
+        return
+
+    if data == "set_clear_blocking_custom_text":
+        update_chat_setting(chat_id, "blocking_custom_text", None)
+        new_settings = get_chat_settings(chat_id)
+        try:
+            await query.edit_message_reply_markup(reply_markup=get_blocking_notification_settings_keyboard(new_settings))
+        except BadRequest: pass
+        await query.answer("Custom text cleared!")
+        return
+
     # Handle Anti-Flood adjustment buttons
     if data.startswith("set_antiflood_limit_"):
         action = data.replace("set_antiflood_limit_", "")
@@ -2392,6 +2460,7 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif "banned_words" in config_full: section = "banned_words"
         elif "rules" in config_full: section = "rules"
         elif "emergency" in config_full: section = "emergency"
+        elif "blocking" in config_full: section = "blocking"
         else: section = "unknown"
         
         config_type = config_full.replace(f"{section}_", "")
@@ -2423,7 +2492,8 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "button": f"Please send the {section} button text and URL in this format:\n`Button Text | https://t.me/yourlink`",
             "limit": f"Please send the maximum character limit for messages (e.g., 500).",
             "start_time": "Please send the start time for Emergency Mode in HH:MM format (e.g., 09:00).",
-            "end_time": "Please send the end time for Emergency Mode in HH:MM format (e.g., 22:00)."
+            "end_time": "Please send the end time for Emergency Mode in HH:MM format (e.g., 22:00).",
+            "custom_text": "Please send the custom message you want to show when content is blocked. Use {NAME} for user name, {ID} for ID."
         }
         
         await edit_bot_response(
@@ -2501,9 +2571,16 @@ async def handle_setting_input(update: Update, context: ContextTypes.DEFAULT_TYP
                 # Basic validation for HH:MM format
                 h, m = map(int, update.message.text.split(":"))
                 if 0 <= h <= 23 and 0 <= m <= 59:
-                    update_chat_setting(chat_id, setting_key, update.message.text)
+                    # Ensure we use the correct key based on section
+                    key_to_use = f"{section}_{config_type}" if section != "unknown" else setting_key
+                    update_chat_setting(chat_id, key_to_use, update.message.text)
                     success = True
             except (ValueError, TypeError): pass
+    elif config_type == "custom_text":
+        if update.message.text:
+            text_to_save = update.message.text_html if update.message.text_html else update.message.text
+            update_chat_setting(chat_id, setting_key, text_to_save)
+            success = True
     elif section == "group_link":
         update_chat_setting(chat_id, "group_link", update.message.text)
         success = True
