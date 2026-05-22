@@ -133,6 +133,12 @@ def is_content_blocked(chat_id, message):
     """Checks if a message contains blocked content."""
     blocked = get_blocked_content(chat_id)
     
+    # Check sticker pack
+    if message.sticker and message.sticker.set_name:
+        logging.info(f"[BLOCK] Checking sticker set: {message.sticker.set_name} against {blocked.get('stickerpack', [])}")
+        if message.sticker.set_name in blocked.get("stickerpack", []):
+            return True, f"stickerpack: {message.sticker.set_name}"
+            
     # Check text
     if message.text or message.caption:
         text = (message.text or message.caption).lower()
@@ -152,11 +158,6 @@ def is_content_blocked(chat_id, message):
     
     if media_file_id and media_file_id in blocked.get("media", []):
         return True, "media"
-    
-    # Check sticker pack
-    if message.sticker and message.sticker.set_name:
-        if message.sticker.set_name in blocked.get("stickerpack", []):
-            return True, f"stickerpack: {message.sticker.set_name}"
         
     return False, None
 

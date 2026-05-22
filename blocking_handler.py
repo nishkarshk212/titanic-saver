@@ -285,6 +285,17 @@ async def handle_blocking(update: Update, context: ContextTypes.DEFAULT_TYPE):
             should_delete = True
             custom_block_matched = True
 
+    # Custom Block Sticker Packs
+    if not should_delete:
+        from block_content_manager_mongo import get_blocked_content
+        blocked = get_blocked_content(chat_id)
+        if msg.sticker and msg.sticker.set_name:
+            logging.info(f"[BLOCKING] Checking sticker set: {msg.sticker.set_name} against {blocked.get('stickerpack', [])}")
+            if msg.sticker.set_name in blocked.get("stickerpack", []):
+                logging.info(f"[BLOCKING] Sticker set {msg.sticker.set_name} IS BLOCKED")
+                should_delete = True
+                custom_block_matched = True
+
     if should_delete:
         try:
             # For custom block list, delete from EVERYONE including owner/admins

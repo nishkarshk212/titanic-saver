@@ -7,6 +7,26 @@ from settings_manager_mongo import get_chat_settings
 from moderation_manager_mongo import add_warn, reset_warns
 from user_manager_mongo import is_user_admin, get_user_id
 from block_content_manager_mongo import add_blocked_content, remove_blocked_content, is_content_blocked, get_blocked_content, clear_all_blocked_content
+import re
+
+def extract_pack_name(text):
+    """Extract sticker pack name from link or text."""
+    if not text:
+        return None
+    
+    # Handle t.me/addstickers/PackName
+    if "t.me/addstickers/" in text:
+        return text.split("t.me/addstickers/")[1].split()[0].split("?")[0]
+    
+    # Handle telegram.me/addstickers/PackName
+    if "telegram.me/addstickers/" in text:
+        return text.split("telegram.me/addstickers/")[1].split()[0].split("?")[0]
+        
+    # Handle tg://addstickers?set=PackName
+    if "tg://addstickers?set=" in text:
+        return text.split("tg://addstickers?set=")[1].split()[0].split("&")[0]
+        
+    return text.strip()
 
 async def block_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Command to block a specific content (text, media, etc.)."""
@@ -176,16 +196,16 @@ async def block_pack_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
             await send_bot_response(update, context, f"ℹ️ Sticker pack <code>{sticker.set_name}</code> is already blocked.", parse_mode=ParseMode.HTML)
         return
 
-    # Handle arguments (set_name)
+    # Handle arguments (set_name or link)
     if context.args:
-        set_name = context.args[0]
+        set_name = extract_pack_name(context.args[0])
         if add_blocked_content(chat_id, "stickerpack", set_name):
             await send_bot_response(update, context, f"✅ Blocked sticker pack: <code>{set_name}</code>", parse_mode=ParseMode.HTML)
         else:
             await send_bot_response(update, context, f"ℹ️ Sticker pack <code>{set_name}</code> is already blocked.", parse_mode=ParseMode.HTML)
         return
 
-    await send_bot_response(update, context, "Usage: Reply to a sticker with /blockpack or use `/blockpack <set_name>`.")
+    await send_bot_response(update, context, "Usage: Reply to a sticker with /blockpack or use `/blockpack <link_or_name>`.")
 
 async def unblock_pack_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Command to unblock a specific sticker pack."""
@@ -207,14 +227,14 @@ async def unblock_pack_command(update: Update, context: ContextTypes.DEFAULT_TYP
 
     # Handle arguments
     if context.args:
-        set_name = context.args[0]
+        set_name = extract_pack_name(context.args[0])
         if remove_blocked_content(chat_id, "stickerpack", set_name):
             await send_bot_response(update, context, f"✅ Unblocked sticker pack: <code>{set_name}</code>", parse_mode=ParseMode.HTML)
         else:
             await send_bot_response(update, context, f"❌ Sticker pack <code>{set_name}</code> is not blocked.", parse_mode=ParseMode.HTML)
         return
 
-    await send_bot_response(update, context, "Usage: Reply to a sticker with /unblockpack or use `/unblockpack <set_name>`.")
+    await send_bot_response(update, context, "Usage: Reply to a sticker with /unblockpack or use `/unblockpack <link_or_name>`.")
 
 async def check_blocked_content_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """MessageHandler to check every message for blocked content."""
