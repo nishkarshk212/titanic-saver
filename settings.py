@@ -2287,7 +2287,7 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # Handle Time adjustment buttons
-    if data.startswith("set_time_"):
+    if data.startswith("set_time_") and not data.startswith("set_time_adj_"):
         action, amount = data.replace("set_time_", "").split("_")
         amount = int(amount)
         settings = get_chat_settings(chat_id)
