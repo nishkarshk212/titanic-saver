@@ -994,6 +994,31 @@ def get_blocking_notification_settings_keyboard(settings):
     ]
     return InlineKeyboardMarkup(keyboard)
 
+def get_time_picker_keyboard(settings, setting_key):
+    """Get an interactive time picker keyboard."""
+    current_time = settings.get(setting_key, "00:00")
+    try:
+        h, m = map(int, current_time.split(":"))
+    except:
+        h, m = 0, 0
+        
+    keyboard = [
+        [
+            InlineKeyboardButton("➕ Hour", callback_data=f"set_time_adj_{setting_key}_h+"),
+            InlineKeyboardButton("➕ Minute", callback_data=f"set_time_adj_{setting_key}_m+")
+        ],
+        [
+            InlineKeyboardButton(f"⏰ {h:02d}:{m:02d}", callback_data="set_none")
+        ],
+        [
+            InlineKeyboardButton("➖ Hour", callback_data=f"set_time_adj_{setting_key}_h-"),
+            InlineKeyboardButton("➖ Minute", callback_data=f"set_time_adj_{setting_key}_m-")
+        ],
+        [InlineKeyboardButton("✍️ Manual Input", callback_data=f"set_manual_time_{setting_key}")],
+        [InlineKeyboardButton("✅ Save & Back", callback_data="set_view_emergency")]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
 def get_emergency_settings_keyboard(settings):
     """Get Emergency Mode settings keyboard."""
     enabled = "✅ Enabled" if settings.get("emergency_enabled", False) else "❌ Disabled"
@@ -1829,8 +1854,24 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if data.startswith("set_config_emergency_"):
         field = data.replace("set_config_", "")
+        settings = get_chat_settings(chat_id)
+        
+        try:
+            await edit_bot_response(
+                query, context,
+                f"⏰ <b>Set Time: {field.replace('_', ' ').title()}</b>\n\n"
+                "Use the buttons below to adjust the time or click 'Manual Input' to type it.",
+                reply_markup=get_time_picker_keyboard(settings, field),
+                parse_mode='HTML'
+            )
+        except BadRequest: pass
+        await query.answer()
+        return
+
+    if data.startswith("set_manual_time_"):
+        field = data.replace("set_manual_time_", "")
         context.chat_data['setting_to_config'] = field
-        context.chat_data['setting_type'] = "text" # We'll treat time as text
+        context.chat_data['setting_type'] = "text"
         
         prompt = f"Please send the new value for <b>{field.replace('_', ' ').title()}</b> (e.g., 09:00):"
         await query.message.reply_text(prompt, parse_mode='HTML')
@@ -2345,6 +2386,34 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_reply_markup(reply_markup=get_blocking_notification_settings_keyboard(new_settings))
         except BadRequest: pass
         await query.answer("Custom text cleared!")
+        return
+
+    if data.startswith("set_time_adj_"):
+        # Format: set_time_adj_{setting_key}_{h+|h-|m+|m-}
+        parts = data.split("_")
+        action = parts[-1]
+        setting_key = "_".join(parts[3:-1])
+        
+        settings = get_chat_settings(chat_id)
+        current_time = settings.get(setting_key, "00:00")
+        try:
+            h, m = map(int, current_time.split(":"))
+        except:
+            h, m = 0, 0
+            
+        if action == "h+": h = (h + 1) % 24
+        elif action == "h-": h = (h - 1) % 24
+        elif action == "m+": m = (m + 5) % 60
+        elif action == "m-": m = (m - 5) % 60
+        
+        new_time = f"{h:02d}:{m:02d}"
+        update_chat_setting(chat_id, setting_key, new_time)
+        settings[setting_key] = new_time
+        
+        try:
+            await query.edit_message_reply_markup(reply_markup=get_time_picker_keyboard(settings, setting_key))
+        except BadRequest: pass
+        await query.answer()
         return
 
     # Handle Anti-Flood adjustment buttons
