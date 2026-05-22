@@ -2411,9 +2411,20 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         settings[setting_key] = new_time
         
         try:
-            await query.edit_message_reply_markup(reply_markup=get_time_picker_keyboard(settings, setting_key))
+            # We also update the message text to show the new time clearly in the title
+            title_field = setting_key.replace("emergency_", "").replace("_", " ").title()
+            new_text = (
+                f"⏰ <b>Set Time: {title_field}</b>\n\n"
+                f"ᴄᴜʀʀᴇɴᴛ ᴛɪᴍᴇ: <code>{new_time}</code>\n\n"
+                "Use the buttons below to adjust the time or click 'Manual Input' to type it."
+            )
+            await query.edit_message_text(
+                text=new_text,
+                reply_markup=get_time_picker_keyboard(settings, setting_key),
+                parse_mode='HTML'
+            )
         except BadRequest: pass
-        await query.answer()
+        await query.answer(f"Time: {new_time}")
         return
 
     # Handle Anti-Flood adjustment buttons
