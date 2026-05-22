@@ -125,7 +125,7 @@ async def open_settings_here(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     await show_settings_panel(update, context, chat_id)
 
-async def show_settings_panel(query_or_update, context, chat_id, is_private=False, page=1):
+async def show_settings_panel(query_or_update, context, chat_id, is_private=False):
     """Show the actual settings panel."""
     # First check if it has message attribute (Update object from deep link)
     if hasattr(query_or_update, 'message') and hasattr(query_or_update, 'effective_user'):
@@ -138,7 +138,7 @@ async def show_settings_panel(query_or_update, context, chat_id, is_private=Fals
             await send_bot_response(update, context, "You need both 'Change Group Info' and 'Ban Users' permissions to configure settings.")
             return
         
-        keyboard = get_main_settings_keyboard(chat_id, page=page)
+        keyboard = get_main_settings_keyboard(chat_id)
         
         # Get group info
         try:
@@ -157,9 +157,6 @@ async def show_settings_panel(query_or_update, context, chat_id, is_private=Fals
             f"ᴏᴘᴇɴᴇᴅ ʙʏ: {user_mention}\n\n"
             f"ꜱᴇʟᴇᴄᴛ ᴏɴᴇ ᴏꜰ ᴛʜᴇ ꜱᴇᴛᴛɪɴɢꜱ ᴛʜᴀᴛ ʏᴏᴜ ᴡᴀɴᴛ ᴛᴏ ᴄʜᴀɴɢᴇ:"
         )
-        
-        if page > 1:
-            settings_text += f"\n(Page {page})"
         
         # Send directly with HTML parse mode to preserve links
         try:
@@ -184,7 +181,7 @@ async def show_settings_panel(query_or_update, context, chat_id, is_private=Fals
             await query.answer("You don't have permission to access settings.", show_alert=True)
             return
         
-        keyboard = get_main_settings_keyboard(chat_id, page=page)
+        keyboard = get_main_settings_keyboard(chat_id)
         
         # Get group info
         try:
@@ -203,9 +200,6 @@ async def show_settings_panel(query_or_update, context, chat_id, is_private=Fals
             f"ᴏᴘᴇɴᴇᴅ ʙʏ: {user_mention}\n\n"
             f"ꜱᴇʟᴇᴄᴛ ᴏɴᴇ ᴏꜰ ᴛʜᴇ ꜱᴇᴛᴛɪɴɢꜱ ᴛʜᴀᴛ ʏᴏᴜ ᴡᴀɴᴛ ᴛᴏ ᴄʜᴀɴɢᴇ:"
         )
-        
-        if page > 1:
-            settings_text += f"\n(Page {page})"
         
         try:
             await query.edit_message_text(settings_text, reply_markup=keyboard, parse_mode='HTML')
@@ -221,7 +215,7 @@ async def show_settings_panel(query_or_update, context, chat_id, is_private=Fals
             await query.answer("You don't have permission to access settings.", show_alert=True)
             return
         
-        keyboard = get_main_settings_keyboard(chat_id, page=page)
+        keyboard = get_main_settings_keyboard(chat_id)
         
         # Get group info
         try:
@@ -241,59 +235,16 @@ async def show_settings_panel(query_or_update, context, chat_id, is_private=Fals
             f"ꜱᴇʟᴇᴄᴛ ᴏɴᴇ ᴏꜰ ᴛʜᴇ ꜱᴇᴛᴛɪɴɢꜱ ᴛʜᴀᴛ ʏᴏᴜ ᴡᴀɴᴛ ᴛᴏ ᴄʜᴀɴɢᴇ:"
         )
         
-        if page > 1:
-            settings_text += f"\n(Page {page})"
-        
         try:
             await query.edit_message_text(settings_text, reply_markup=keyboard, parse_mode='HTML')
         except BadRequest:
             await query.message.edit_text(settings_text, reply_markup=keyboard, parse_mode='HTML')
 
-def get_main_settings_keyboard(chat_id, page=1):
+def get_main_settings_keyboard(chat_id):
     """Get main settings keyboard with layout support."""
     settings = get_chat_settings(chat_id)
     layout_type = settings.get("ui_layout_type", 1)
     
-    if layout_type == 3:
-        # Categorized Grid Layout (Screenshot Style)
-        if page == 1:
-            keyboard = [
-                [InlineKeyboardButton("BANS 🚫", callback_data="set_view_mod"),
-                 InlineKeyboardButton("BACKUP 🔃", callback_data="set_view_manager")],
-                [InlineKeyboardButton("CRYPTO 🌕", callback_data="set_view_recurring"),
-                 InlineKeyboardButton("CHAT-BOT 🤖", callback_data="set_view_bot_protection")],
-                [InlineKeyboardButton("CLEAN-CMDS 🧹", callback_data="set_view_deleting"),
-                 InlineKeyboardButton("CLEAN-SERVICE 🈂️", callback_data="set_view_welcome")],
-                [InlineKeyboardButton("CALCULATOR 🧮", callback_data="set_view_msg_length"),
-                 InlineKeyboardButton("COUNTRY 🌍", callback_data="set_view_nightmode")],
-                [InlineKeyboardButton("COUPLES 💑", callback_data="set_view_tagger"),
-                 InlineKeyboardButton("DISABLE 🕳️", callback_data="set_view_emergency")],
-                [InlineKeyboardButton("DEVS-TOOL 🤴", callback_data="set_view_command_access"),
-                 InlineKeyboardButton("EXTRA ⚠️", callback_data="set_view_regulations")],
-                [InlineKeyboardButton("⬅️ BACK", callback_data="set_view_main_page_1"),
-                 InlineKeyboardButton("➡️ NEXT", callback_data="set_view_main_page_2")],
-                [InlineKeyboardButton("🔄 BACK", callback_data="set_close")],
-                [InlineKeyboardButton("🎨 Layout: Grid", callback_data="set_toggle_ui_layout")]
-            ]
-        else:
-            keyboard = [
-                [InlineKeyboardButton("LINK-SPAM 🔗", callback_data="set_view_link_spam"),
-                 InlineKeyboardButton("FWD-PROT 🔄", callback_data="set_view_forward_protection")],
-                [InlineKeyboardButton("CMD-PERMS 🎛️", callback_data="set_view_command_permissions"),
-                 InlineKeyboardButton("LANG-FILT 🌐", callback_data="set_view_language_filter")],
-                [InlineKeyboardButton("ANTIFLOOD 🌊", callback_data="set_view_antiflood"),
-                 InlineKeyboardButton("BANNED-W 🚫", callback_data="set_view_banned_words")],
-                [InlineKeyboardButton("GRP-LINK 🔗", callback_data="set_view_group_link"),
-                 InlineKeyboardButton("MEMBERS 👥", callback_data="set_view_members_mgmt")],
-                [InlineKeyboardButton("VC-CHAT 🎙", callback_data="set_view_vc"),
-                 InlineKeyboardButton("FREED 📋", callback_data="free_list_members")],
-                [InlineKeyboardButton("⬅️ BACK", callback_data="set_view_main_page_1"),
-                 InlineKeyboardButton("➡️ NEXT", callback_data="set_view_main_page_2")],
-                [InlineKeyboardButton("🔄 BACK", callback_data="set_close")],
-                [InlineKeyboardButton("🎨 Layout: Grid", callback_data="set_toggle_ui_layout")]
-            ]
-        return InlineKeyboardMarkup(keyboard)
-
     if layout_type == 2:
         # Compact layout (Small)
         keyboard = [
@@ -1159,16 +1110,6 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer()
         return
 
-    if data == "set_view_main_page_1":
-        await show_settings_panel(query, context, chat_id, page=1)
-        await query.answer()
-        return
-
-    if data == "set_view_main_page_2":
-        await show_settings_panel(query, context, chat_id, page=2)
-        await query.answer()
-        return
-
     if data == "set_view_welcome":
         settings = get_chat_settings(chat_id)
         try:
@@ -1851,8 +1792,8 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "set_toggle_ui_layout":
         settings = get_chat_settings(chat_id)
         current_layout = settings.get("ui_layout_type", 1)
-        # Rotate: 1 -> 2 -> 3 -> 1
-        new_layout = 2 if current_layout == 1 else 3 if current_layout == 2 else 1
+        # Rotate: 1 (Large) -> 2 (Small) -> 1
+        new_layout = 2 if current_layout == 1 else 1
         update_chat_setting(chat_id, "ui_layout_type", new_layout)
         try:
             await edit_bot_response(
