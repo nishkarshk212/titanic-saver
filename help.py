@@ -132,14 +132,19 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     elif data == "help_block":
         help_text = (
-            "🚫 <b>Block Content</b>\n\n"
-            "• /block - Reply to a message (text/media) or use `/block &lt;text&gt;` to add content to the block list.\n"
-            "• /unblock - Reply to a message or use `/unblock &lt;text&gt;` to remove content from the block list.\n"
-            "• /blockpack - Reply to a sticker or use `/blockpack &lt;set_name&gt;` to block an entire sticker pack.\n"
-            "• /unblockpack - Reply to a sticker or use `/unblockpack &lt;set_name&gt;` to unblock a sticker pack.\n"
-            "• /listblock - List all blocked content (text and sticker packs) in the group.\n\n"
-            "📏 <b>Message Length Limit</b>\n\n"
-            "Configure a maximum character limit for messages in /config &gt; Message Length. Messages exceeding this limit will be automatically deleted.\n\n"
+            "🚫 <b>ʙʟᴏᴄᴋ ᴄᴏɴᴛᴇɴᴛ</b>\n\n"
+            "• /block - Reply to a message (text/media) or use `/block <text>` to add content to the block list.\n"
+            "• /unblock - Reply to a message or use `/unblock <text>` to remove content from the block list.\n"
+            "• /blockpack - Reply to a sticker or use `/blockpack <link_or_name>` to block an entire sticker pack.\n"
+            "• /unblockpack - Reply to a sticker or use `/unblockpack <link_or_name>` to unblock a sticker pack.\n"
+            "• /listblock - List all blocked content (text and sticker packs) in the group.\n"
+            "• /unblockall - Clear all blocked content in the chat.\n"
+            "• /free - Exempt a user from specific blocking rules (Admins only).\n"
+            "• /unfree - Remove all exemptions from a user.\n\n"
+            "📏 <b>ᴍᴇꜱꜱᴀɢᴇ ʟᴇɴɢᴛʜ ʟɪᴍɪᴛ</b>\n\n"
+            "Configure a maximum character limit for messages in /config > Message Length. Messages exceeding this limit will be automatically deleted.\n\n"
+            "🚧 <b>ʙʟᴏᴄᴋɪɴɢ ꜱᴇᴛᴛɪɴɢꜱ</b>\n\n"
+            "Toggle specific content types (Text, Stickers, Links, etc.) in /config > Deleting Messages > Block cancellation.\n\n"
             "<i>Note: Admins are exempt from these checks.</i>"
         )
     elif data == "help_bot_prot":
