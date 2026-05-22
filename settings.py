@@ -258,11 +258,9 @@ def get_main_settings_keyboard(chat_id):
              InlineKeyboardButton("🎛️ Perms", callback_data="set_view_command_permissions")],
             [InlineKeyboardButton("🕒 Recur", callback_data="set_view_recurring"),
              InlineKeyboardButton("🌊 Flood", callback_data="set_view_antiflood")],
-            [InlineKeyboardButton("🌙 Night", callback_data="set_view_nightmode"),
-             InlineKeyboardButton("🚫 Words", callback_data="set_view_banned_words")],
-            [InlineKeyboardButton("🏷️ Tag", callback_data="set_view_tagger"),
-             InlineKeyboardButton("🔗 Link", callback_data="set_view_group_link")],
-            [InlineKeyboardButton("📜 Rules", callback_data="set_view_regulations"),
+            [InlineKeyboardButton("🚫 Words", callback_data="set_view_banned_words"),
+             InlineKeyboardButton("🏷️ Tag", callback_data="set_view_tagger")],
+            [InlineKeyboardButton("🔗 Link", callback_data="set_view_group_link"),
              InlineKeyboardButton("👥 Mem", callback_data="set_view_members_mgmt")],
             [InlineKeyboardButton("🎙 VC", callback_data="set_view_vc"),
              InlineKeyboardButton("🗑️ Del", callback_data="set_view_deleting")],
@@ -286,8 +284,7 @@ def get_main_settings_keyboard(chat_id):
              InlineKeyboardButton("🌐 Language Filter", callback_data="set_view_language_filter")],
             [InlineKeyboardButton("🕒 Recurring Msg", callback_data="set_view_recurring"),
              InlineKeyboardButton("🌊 Anti-Flood", callback_data="set_view_antiflood")],
-            [InlineKeyboardButton("🌙 Night Mode", callback_data="set_view_nightmode"),
-             InlineKeyboardButton("🚫 Banned Words", callback_data="set_view_banned_words"),
+            [InlineKeyboardButton("🚫 Banned Words", callback_data="set_view_banned_words"),
              InlineKeyboardButton("🏷️ Tagger", callback_data="set_view_tagger")],
             [InlineKeyboardButton("🔗 Group Link", callback_data="set_view_group_link"),
              InlineKeyboardButton("📜 Regulations", callback_data="set_view_regulations")],
@@ -1031,6 +1028,7 @@ def get_emergency_settings_keyboard(settings):
     mode = settings.get("emergency_mode", "daily").title()
     start = settings.get("emergency_start_time", "00:00")
     end = settings.get("emergency_end_time", "23:59")
+    apply_on = settings.get("emergency_apply_on", "members").title()
     
     keyboard = [
         [InlineKeyboardButton(enabled, callback_data="set_toggle_emergency_enabled")],
@@ -1039,7 +1037,7 @@ def get_emergency_settings_keyboard(settings):
         [InlineKeyboardButton(media, callback_data="set_toggle_emergency_block_media"),
          InlineKeyboardButton(links, callback_data="set_toggle_emergency_block_links")],
         [InlineKeyboardButton(f"Mode: {mode}", callback_data="set_toggle_emergency_mode"),
-         InlineKeyboardButton(apply_on_freed, callback_data="set_toggle_emergency_apply_on_freed")],
+         InlineKeyboardButton(f"Apply on: {apply_on}", callback_data="set_toggle_emergency_apply_on")],
         [InlineKeyboardButton(f"🕒 Start: {start}", callback_data="set_config_emergency_start_time"),
          InlineKeyboardButton(f"🕒 End: {end}", callback_data="set_config_emergency_end_time")],
         [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
@@ -1839,6 +1837,11 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if field == "emergency_mode":
             current = settings.get(field, "daily")
             new_val = "today" if current == "daily" else "daily"
+        elif field == "emergency_apply_on":
+            options = ["members", "admins", "everyone"]
+            current = settings.get(field, "members")
+            next_idx = (options.index(current) + 1) % len(options)
+            new_val = options[next_idx]
         else:
             current = settings.get(field, False)
             new_val = not current
@@ -2331,36 +2334,6 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer(f"Warning deletion time set to {new_time}s")
         return
 
-    if data == "set_config_nightmode_time":
-        await query.answer()
-        try:
-            await context.bot.send_message(
-                chat_id=interaction_chat_id,
-                text="🕒 <b>Set Night Mode Time Slot</b>\n\n"
-                     "Please reply to this message with the start and end hours in 24h format (e.g., <code>23 9</code>).",
-                parse_mode='HTML',
-                reply_markup=ForceReply(selective=True)
-            )
-            context.user_data['config_state'] = ('nightmode_time', chat_id)
-        except Exception as e:
-            logging.error(f"Error sending nightmode time message: {e}")
-        return
-
-    if data == "set_config_nightmode_timezone":
-        await query.answer()
-        try:
-            await context.bot.send_message(
-                chat_id=interaction_chat_id,
-                text="🌍 <b>Set Night Mode Time Zone</b>\n\n"
-                     "Please reply to this message with your timezone (e.g., <code>Asia/Kolkata</code>, <code>UTC</code>, <code>Europe/London</code>).",
-                parse_mode='HTML',
-                reply_markup=ForceReply(selective=True)
-            )
-            context.user_data['config_state'] = ('nightmode_timezone', chat_id)
-        except Exception as e:
-            logging.error(f"Error sending nightmode timezone message: {e}")
-        return
-
     if data.startswith("set_blocking_timer_"):
         action = data.replace("set_blocking_timer_", "")
         settings = get_chat_settings(chat_id)
@@ -2645,7 +2618,7 @@ async def handle_setting_input(update: Update, context: ContextTypes.DEFAULT_TYP
     
     if success:
         del context.user_data["waiting_for_config"]
-        view_map = {"rules": "regulations_custom"}
+        view_map = {"rules": "regulations_custom", "emergency": "emergency"}
         target_view = view_map.get(section, section)
         await update.message.reply_text(f"✅ {section.replace('_', ' ').title()} updated successfully!", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(f"Back to Settings", callback_data=f"set_view_{target_view}")]]))
     else:

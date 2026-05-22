@@ -200,7 +200,7 @@ DEFAULT_CHAT_SETTINGS = {
     "emergency_start_time": "00:00",
     "emergency_end_time": "23:59",
     "emergency_mode": "daily", # daily, today
-    "emergency_apply_on_freed": False,
+    "emergency_apply_on": "members",
     "blocking_delete_notifications": True,
     "blocking_notification_timer": 30,
     "blocking_custom_text": None,
