@@ -17,11 +17,8 @@ async def psend_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
     
-    # Check command access
-    if not await check_command_access(chat_id, user_id, 'psend', context):
-        await send_bot_response(update, context, "❌ You don't have permission to use the /psend command.")
-        return
-
+    # Permission check removed as per user request (Everyone can use /psend)
+    
     target_user_id, _ = await get_user_id(update, context)
     
     if not target_user_id:
