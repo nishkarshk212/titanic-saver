@@ -162,6 +162,13 @@ async def check_emergency_start_notification(chat_id, context, settings):
         if settings.get("emergency_block_stickers"): blocking_types.append("🖼️ Stickers")
         if settings.get("emergency_block_media"): blocking_types.append("📁 Media")
         if settings.get("emergency_block_links"): blocking_types.append("🔗 Links")
+        if settings.get("emergency_block_premium"): blocking_types.append("💎 Premium Stickers")
+        if settings.get("emergency_block_contact"): blocking_types.append("👤 Contact")
+        if settings.get("emergency_block_location"): blocking_types.append("📍 Location")
+        if settings.get("emergency_block_voice"): blocking_types.append("🎤 Voice")
+        if settings.get("emergency_block_audio"): blocking_types.append("🎵 Audio")
+        if settings.get("emergency_block_forward"): blocking_types.append("🔄 Forward")
+        if settings.get("emergency_block_poll"): blocking_types.append("📊 Poll")
         
         apply_on = settings.get("emergency_apply_on", "members").title()
         end_time = settings.get("emergency_end_time", "23:59")
@@ -297,14 +304,14 @@ async def handle_blocking(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         if (settings.get("block_stickers") or (emergency_active and settings.get("emergency_block_stickers"))) and not await is_user_freed("block_stickers", "stickers"):
             should_delete = True
-        elif is_premium and settings.get("block_premium_sticker") and not await is_user_freed("block_premium_sticker"):
+        elif is_premium and (settings.get("block_premium_sticker") or (emergency_active and settings.get("emergency_block_premium"))) and not await is_user_freed("block_premium_sticker", "premium"):
             should_delete = True
     
     # Check for custom emojis and links in entities
     entities = list(msg.entities or []) + list(msg.caption_entities or [])
     for entity in entities:
         if entity.type == MessageEntity.CUSTOM_EMOJI:
-            if settings.get("block_premium_sticker") and not await is_user_freed("block_premium_sticker"):
+            if (settings.get("block_premium_sticker") or (emergency_active and settings.get("emergency_block_premium"))) and not await is_user_freed("block_premium_sticker", "premium"):
                 should_delete = True
         elif entity.type == MessageEntity.URL:
             if (settings.get("block_link") or (emergency_active and settings.get("emergency_block_links"))) and not await is_user_freed("block_link", "links"):
@@ -340,7 +347,7 @@ async def handle_blocking(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Block forwarded messages (non-channel)
     if is_forwarded and not is_channel_post:
-        if settings.get("block_forward") and not await is_user_freed("block_forward"):
+        if (settings.get("block_forward") or (emergency_active and settings.get("emergency_block_forward"))) and not await is_user_freed("block_forward", "forward"):
             should_delete = True
             
     # Check for commands (block_command)
@@ -355,13 +362,13 @@ async def handle_blocking(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not is_allowed:
                 should_delete = True
             
-    if msg.contact and settings.get("block_contact") and not await is_user_freed("block_contact"):
+    if msg.contact and (settings.get("block_contact") or (emergency_active and settings.get("emergency_block_contact"))) and not await is_user_freed("block_contact", "contact"):
         should_delete = True
         
-    if msg.location and settings.get("block_location") and not await is_user_freed("block_location"):
+    if msg.location and (settings.get("block_location") or (emergency_active and settings.get("emergency_block_location"))) and not await is_user_freed("block_location", "location"):
         should_delete = True
         
-    if msg.voice and settings.get("block_voice") and not await is_user_freed("block_voice"):
+    if msg.voice and (settings.get("block_voice") or (emergency_active and settings.get("emergency_block_voice"))) and not await is_user_freed("block_voice", "voice"):
         should_delete = True
 
     # Block plain text messages
@@ -371,13 +378,13 @@ async def handle_blocking(update: Update, context: ContextTypes.DEFAULT_TYPE):
             should_delete = True
 
     # Block music/audio files
-    if msg.audio and settings.get("block_audio") and not await is_user_freed("block_audio"):
+    if msg.audio and (settings.get("block_audio") or (emergency_active and settings.get("emergency_block_audio"))) and not await is_user_freed("block_audio", "audio"):
         should_delete = True
         
     if msg.video_note and settings.get("block_video_note") and not await is_user_freed("block_video_note"):
         should_delete = True
         
-    if msg.poll and settings.get("block_poll") and not await is_user_freed("block_poll"):
+    if msg.poll and (settings.get("block_poll") or (emergency_active and settings.get("emergency_block_poll"))) and not await is_user_freed("block_poll", "poll"):
         should_delete = True
 
     if msg.dice and settings.get("block_dice") and not await is_user_freed("block_dice"):

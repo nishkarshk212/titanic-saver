@@ -1019,11 +1019,17 @@ def get_time_picker_keyboard(settings, setting_key):
 def get_emergency_settings_keyboard(settings):
     """Get Emergency Mode settings keyboard."""
     enabled = "✅ Enabled" if settings.get("emergency_enabled", False) else "❌ Disabled"
-    text = "✅ Block Text" if settings.get("emergency_block_text", False) else "❌ Block Text"
-    stickers = "✅ Block Stickers" if settings.get("emergency_block_stickers", False) else "❌ Block Stickers"
-    media = "✅ Block Media" if settings.get("emergency_block_media", False) else "❌ Block Media"
-    links = "✅ Block Links" if settings.get("emergency_block_links", False) else "❌ Block Links"
-    apply_on_freed = "✅ Apply on Freed" if settings.get("emergency_apply_on_freed", False) else "❌ Apply on Freed"
+    text = "✅ Text" if settings.get("emergency_block_text", False) else "❌ Text"
+    stickers = "✅ Stickers" if settings.get("emergency_block_stickers", False) else "❌ Stickers"
+    media = "✅ Media" if settings.get("emergency_block_media", False) else "❌ Media"
+    links = "✅ Links" if settings.get("emergency_block_links", False) else "❌ Links"
+    premium = "✅ Premium" if settings.get("emergency_block_premium", False) else "❌ Premium"
+    contact = "✅ Contact" if settings.get("emergency_block_contact", False) else "❌ Contact"
+    location = "✅ Location" if settings.get("emergency_block_location", False) else "❌ Location"
+    voice = "✅ Voice" if settings.get("emergency_block_voice", False) else "❌ Voice"
+    audio = "✅ Audio" if settings.get("emergency_block_audio", False) else "❌ Audio"
+    forward = "✅ Forward" if settings.get("emergency_block_forward", False) else "❌ Forward"
+    poll = "✅ Poll" if settings.get("emergency_block_poll", False) else "❌ Poll"
     
     mode = settings.get("emergency_mode", "daily").title()
     start = settings.get("emergency_start_time", "00:00")
@@ -1036,8 +1042,15 @@ def get_emergency_settings_keyboard(settings):
          InlineKeyboardButton(stickers, callback_data="set_toggle_emergency_block_stickers")],
         [InlineKeyboardButton(media, callback_data="set_toggle_emergency_block_media"),
          InlineKeyboardButton(links, callback_data="set_toggle_emergency_block_links")],
-        [InlineKeyboardButton(f"Mode: {mode}", callback_data="set_toggle_emergency_mode"),
-         InlineKeyboardButton(f"Apply on: {apply_on}", callback_data="set_toggle_emergency_apply_on")],
+        [InlineKeyboardButton(premium, callback_data="set_toggle_emergency_block_premium"),
+         InlineKeyboardButton(contact, callback_data="set_toggle_emergency_block_contact")],
+        [InlineKeyboardButton(location, callback_data="set_toggle_emergency_block_location"),
+         InlineKeyboardButton(voice, callback_data="set_toggle_emergency_block_voice")],
+        [InlineKeyboardButton(audio, callback_data="set_toggle_emergency_block_audio"),
+         InlineKeyboardButton(forward, callback_data="set_toggle_emergency_block_forward")],
+        [InlineKeyboardButton(poll, callback_data="set_toggle_emergency_block_poll"),
+         InlineKeyboardButton(f"Mode: {mode}", callback_data="set_toggle_emergency_mode")],
+        [InlineKeyboardButton(f"Apply on: {apply_on}", callback_data="set_toggle_emergency_apply_on")],
         [InlineKeyboardButton(f"🕒 Start: {start}", callback_data="set_config_emergency_start_time"),
          InlineKeyboardButton(f"🕒 End: {end}", callback_data="set_config_emergency_end_time")],
         [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]

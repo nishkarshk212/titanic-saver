@@ -197,6 +197,13 @@ DEFAULT_CHAT_SETTINGS = {
     "emergency_block_text": False,
     "emergency_block_media": False,
     "emergency_block_links": False,
+    "emergency_block_premium": False,
+    "emergency_block_contact": False,
+    "emergency_block_location": False,
+    "emergency_block_voice": False,
+    "emergency_block_audio": False,
+    "emergency_block_forward": False,
+    "emergency_block_poll": False,
     "emergency_start_time": "00:00",
     "emergency_end_time": "23:59",
     "emergency_mode": "daily", # daily, today
