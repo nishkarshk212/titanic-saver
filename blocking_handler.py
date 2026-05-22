@@ -467,9 +467,9 @@ async def handle_blocking(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if should_delete:
         try:
-            # For custom block list, delete from EVERYONE including owner/admins
-            # For other blocking rules, admins/creator are exempt
-            if not custom_block_matched:
+            # For custom block list OR Emergency Mode, follow the 'apply_on' logic
+            # For other standard blocking rules, admins/creator are usually exempt
+            if not custom_block_matched and not emergency_active:
                 is_admin = await is_admin_or_creator(context, chat_id, update.effective_user.id, msg)
                 if is_admin:
                     return False
