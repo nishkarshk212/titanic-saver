@@ -148,8 +148,8 @@ async def send_blocking_notification(update: Update, context: ContextTypes.DEFAU
     except Exception as e:
         logging.error(f"Error sending blocking notification: {e}")
 
-async def check_emergency_start_notification(chat_id, context, settings):
-    """Checks if emergency mode just started and sends a notification."""
+async def check_emergency_notifications(chat_id, context, settings):
+    """Checks if emergency mode state changed and sends start/end notifications."""
     is_active = is_emergency_active(settings, chat_id)
     
     # Store the last known state in context to detect transitions
@@ -188,6 +188,18 @@ async def check_emergency_start_notification(chat_id, context, settings):
             await context.bot.send_message(chat_id, notif_text, parse_mode='HTML')
         except Exception as e:
             logging.error(f"Error sending emergency start notification: {e}")
+            
+    elif not is_active and last_state:
+        # Emergency mode JUST ended
+        notif_text = (
+            f"✅ <b>Emergency Mode Ended!</b> ✅\n\n"
+            f"ᴀʟʟ ꜱᴄʜᴇᴅᴜʟᴇᴅ ʀᴇꜱᴛʀɪᴄᴛɪᴏɴꜱ ʜᴀᴠᴇ ʙᴇᴇɴ ʟɪꜰᴛᴇᴅ. "
+            f"ᴛʜᴇ ɢʀᴏᴜᴘ ɪꜱ ɴᴏᴡ ʙᴀᴄᴋ ᴛᴏ ꜱᴛᴀɴᴅᴀʀᴅ ᴏᴘᴇʀᴀᴛɪᴏɴꜱ."
+        )
+        try:
+            await context.bot.send_message(chat_id, notif_text, parse_mode='HTML')
+        except Exception as e:
+            logging.error(f"Error sending emergency end notification: {e}")
             
     # Update last known state
     context.chat_data[f"emergency_last_state_{chat_id}"] = is_active
@@ -262,22 +274,28 @@ async def handle_blocking(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Helper to check if user is freed from a specific block
     async def is_user_freed(block_key, emergency_type=None):
-        # Check if user is admin
+        # Check if user is admin/creator/owner
         is_admin = await is_admin_or_creator(context, chat_id, user_id, msg)
+        is_owner = user_id == OWNER_ID
         
         # If emergency is active and this type is blocked in emergency
         if emergency_active and emergency_type:
             if settings.get(f"emergency_block_{emergency_type}"):
                 if apply_on == "everyone":
+                    # Everyone is blocked, even owner
                     return False
                 if apply_on == "admins":
-                    # If it's blocked for admins, everyone is blocked
-                    return False
-                if apply_on == "members":
-                    # If it's for members, admins are freed
+                    # Only admins (and owner) are blocked? 
+                    # User says "apply on set on admin then apply on admin only"
+                    # Usually owner is the highest admin.
                     if is_admin:
-                        return True
-                    return False
+                        return False
+                    return True # Members are freed
+                if apply_on == "members":
+                    # Only members are blocked
+                    if not is_admin:
+                        return False
+                    return True # Admins and Owner are freed
         
         # In user_permissions, True means freed/allowed, False/missing means blocked
         freed = user_perms.get(block_key, False)
@@ -295,7 +313,7 @@ async def handle_blocking(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return False
         
     # Check for Emergency notification transition
-    await check_emergency_start_notification(chat_id, context, settings)
+    await check_emergency_notifications(chat_id, context, settings)
     
     if msg.sticker:
         is_premium = bool(msg.sticker.premium_animation or msg.sticker.custom_emoji_id)
