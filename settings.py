@@ -240,34 +240,68 @@ async def show_settings_panel(query_or_update, context, chat_id, is_private=Fals
         except BadRequest:
             await query.message.edit_text(settings_text, reply_markup=keyboard, parse_mode='HTML')
 
-def get_main_settings_keyboard(chat_id=None):
-    keyboard = [
-        [InlineKeyboardButton("👋 Welcome", callback_data="set_view_welcome")],
-        [InlineKeyboardButton("📏 Msg Length", callback_data="set_view_msg_length"),
-         InlineKeyboardButton("🛡️ Moderation", callback_data="set_view_mod")],
-        [InlineKeyboardButton("🗑️ Cmd Deletion", callback_data="set_view_command_deletion"),
-         InlineKeyboardButton("📌 Pinned Msg", callback_data="set_view_pinned_messages")],
-        [InlineKeyboardButton("🤖 Bot Protection", callback_data="set_view_bot_protection"),
-         InlineKeyboardButton("🔗 Link Spam", callback_data="set_view_link_spam")],
-        [InlineKeyboardButton("🔄 Forward Protect", callback_data="set_view_forward_protection"),
-         InlineKeyboardButton("🔑 Cmd Access", callback_data="set_view_command_access")],
-        [InlineKeyboardButton("🎛️ Command Perms", callback_data="set_view_command_permissions"),
-         InlineKeyboardButton("🌐 Language Filter", callback_data="set_view_language_filter")],
-        [InlineKeyboardButton("🕒 Recurring Msg", callback_data="set_view_recurring"),
-         InlineKeyboardButton("🌊 Anti-Flood", callback_data="set_view_antiflood")],
-        [InlineKeyboardButton("🌙 Night Mode", callback_data="set_view_nightmode"),
-         InlineKeyboardButton("🚫 Banned Words", callback_data="set_view_banned_words"),
-         InlineKeyboardButton("🏷️ Tagger", callback_data="set_view_tagger")],
-        [InlineKeyboardButton("🔗 Group Link", callback_data="set_view_group_link"),
-         InlineKeyboardButton("📜 Regulations", callback_data="set_view_regulations")],
-        [InlineKeyboardButton("👥 Members Mgmt", callback_data="set_view_members_mgmt"),
-         InlineKeyboardButton("🎙 Voice Chat", callback_data="set_view_vc")],
-        [InlineKeyboardButton("🗑️ Deleting Messages", callback_data="set_view_deleting"),
-         InlineKeyboardButton("👥 Manager", callback_data="set_view_manager")],
-        [InlineKeyboardButton("📩 Private Send", callback_data="set_view_psend"),
-         InlineKeyboardButton("📋 Freed Members", callback_data="free_list_members")],
-        [InlineKeyboardButton("❌ Close Menu", callback_data="set_close")]
-    ]
+def get_main_settings_keyboard(chat_id):
+    """Get main settings keyboard with layout support."""
+    settings = get_chat_settings(chat_id)
+    layout_type = settings.get("ui_layout_type", 1)
+    
+    if layout_type == 2:
+        # Compact layout (Small)
+        keyboard = [
+            [InlineKeyboardButton("👋 Welcome", callback_data="set_view_welcome"),
+             InlineKeyboardButton("📏 Length", callback_data="set_view_msg_length")],
+            [InlineKeyboardButton("🛡️ Mod", callback_data="set_view_mod"),
+             InlineKeyboardButton("🤖 BotProt", callback_data="set_view_bot_protection")],
+            [InlineKeyboardButton("🔗 Spam", callback_data="set_view_link_spam"),
+             InlineKeyboardButton("🔄 Fwd", callback_data="set_view_forward_protection")],
+            [InlineKeyboardButton("🔑 Cmd", callback_data="set_view_command_access"),
+             InlineKeyboardButton("🎛️ Perms", callback_data="set_view_command_permissions")],
+            [InlineKeyboardButton("🕒 Recur", callback_data="set_view_recurring"),
+             InlineKeyboardButton("🌊 Flood", callback_data="set_view_antiflood")],
+            [InlineKeyboardButton("🌙 Night", callback_data="set_view_nightmode"),
+             InlineKeyboardButton("🚫 Words", callback_data="set_view_banned_words")],
+            [InlineKeyboardButton("🏷️ Tag", callback_data="set_view_tagger"),
+             InlineKeyboardButton("🔗 Link", callback_data="set_view_group_link")],
+            [InlineKeyboardButton("📜 Rules", callback_data="set_view_regulations"),
+             InlineKeyboardButton("👥 Mem", callback_data="set_view_members_mgmt")],
+            [InlineKeyboardButton("🎙 VC", callback_data="set_view_vc"),
+             InlineKeyboardButton("🗑️ Del", callback_data="set_view_deleting")],
+            [InlineKeyboardButton("👥 Mgr", callback_data="set_view_manager"),
+             InlineKeyboardButton("📩 PSend", callback_data="set_view_psend")],
+            [InlineKeyboardButton("🚨 Emergency", callback_data="set_view_emergency"),
+             InlineKeyboardButton("📋 Freed", callback_data="free_list_members")],
+            [InlineKeyboardButton("🎨 Layout: Small", callback_data="set_toggle_ui_layout")],
+            [InlineKeyboardButton("❌ Close", callback_data="set_close")]
+        ]
+    else:
+        # Standard layout (Large)
+        keyboard = [
+            [InlineKeyboardButton("👋 Welcome", callback_data="set_view_welcome")],
+            [InlineKeyboardButton("📏 Message Length", callback_data="set_view_msg_length"),
+             InlineKeyboardButton("🛡️ Moderation", callback_data="set_view_mod")],
+            [InlineKeyboardButton("🤖 Bot Protection", callback_data="set_view_bot_protection"),
+             InlineKeyboardButton("🔗 Link Spam", callback_data="set_view_link_spam")],
+            [InlineKeyboardButton("🔄 Forward Protect", callback_data="set_view_forward_protection"),
+             InlineKeyboardButton("🔑 Cmd Access", callback_data="set_view_command_access")],
+            [InlineKeyboardButton("🎛️ Command Perms", callback_data="set_view_command_permissions"),
+             InlineKeyboardButton("🌐 Language Filter", callback_data="set_view_language_filter")],
+            [InlineKeyboardButton("🕒 Recurring Msg", callback_data="set_view_recurring"),
+             InlineKeyboardButton("🌊 Anti-Flood", callback_data="set_view_antiflood")],
+            [InlineKeyboardButton("🌙 Night Mode", callback_data="set_view_nightmode"),
+             InlineKeyboardButton("🚫 Banned Words", callback_data="set_view_banned_words"),
+             InlineKeyboardButton("🏷️ Tagger", callback_data="set_view_tagger")],
+            [InlineKeyboardButton("🔗 Group Link", callback_data="set_view_group_link"),
+             InlineKeyboardButton("📜 Regulations", callback_data="set_view_regulations")],
+            [InlineKeyboardButton("👥 Members Mgmt", callback_data="set_view_members_mgmt"),
+             InlineKeyboardButton("🎙 Voice Chat", callback_data="set_view_vc")],
+            [InlineKeyboardButton("🗑️ Deleting Messages", callback_data="set_view_deleting"),
+             InlineKeyboardButton("👥 Manager", callback_data="set_view_manager")],
+            [InlineKeyboardButton("📩 Private Send", callback_data="set_view_psend"),
+             InlineKeyboardButton("🚨 Emergency", callback_data="set_view_emergency")],
+            [InlineKeyboardButton("📋 Freed Members", callback_data="free_list_members")],
+            [InlineKeyboardButton("🎨 Layout: Large", callback_data="set_toggle_ui_layout")],
+            [InlineKeyboardButton("❌ Close Menu", callback_data="set_close")]
+        ]
     return InlineKeyboardMarkup(keyboard)
 
 def get_group_link_keyboard(settings):
@@ -949,6 +983,33 @@ def get_psend_settings_keyboard(settings):
     keyboard = [
         [InlineKeyboardButton(f"Command Access: {access}", callback_data="set_cmd_perm_cmd_access_psend")],
         [InlineKeyboardButton("ℹ️ Rotate: Everyone ➜ Admin ➜ Owner", callback_data="set_none")],
+        [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+def get_emergency_settings_keyboard(settings):
+    """Get Emergency Mode settings keyboard."""
+    enabled = "✅ Enabled" if settings.get("emergency_enabled", False) else "❌ Disabled"
+    text = "✅ Block Text" if settings.get("emergency_block_text", False) else "❌ Block Text"
+    stickers = "✅ Block Stickers" if settings.get("emergency_block_stickers", False) else "❌ Block Stickers"
+    media = "✅ Block Media" if settings.get("emergency_block_media", False) else "❌ Block Media"
+    links = "✅ Block Links" if settings.get("emergency_block_links", False) else "❌ Block Links"
+    apply_on_freed = "✅ Apply on Freed" if settings.get("emergency_apply_on_freed", False) else "❌ Apply on Freed"
+    
+    mode = settings.get("emergency_mode", "daily").title()
+    start = settings.get("emergency_start_time", "00:00")
+    end = settings.get("emergency_end_time", "23:59")
+    
+    keyboard = [
+        [InlineKeyboardButton(enabled, callback_data="set_toggle_emergency_enabled")],
+        [InlineKeyboardButton(text, callback_data="set_toggle_emergency_block_text"),
+         InlineKeyboardButton(stickers, callback_data="set_toggle_emergency_block_stickers")],
+        [InlineKeyboardButton(media, callback_data="set_toggle_emergency_block_media"),
+         InlineKeyboardButton(links, callback_data="set_toggle_emergency_block_links")],
+        [InlineKeyboardButton(f"Mode: {mode}", callback_data="set_toggle_emergency_mode"),
+         InlineKeyboardButton(apply_on_freed, callback_data="set_toggle_emergency_apply_on_freed")],
+        [InlineKeyboardButton(f"🕒 Start: {start}", callback_data="set_config_emergency_start_time"),
+         InlineKeyboardButton(f"🕒 End: {end}", callback_data="set_config_emergency_end_time")],
         [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -1704,6 +1765,68 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 parse_mode='HTML'
             )
         except BadRequest: pass
+        await query.answer()
+        return
+
+    if data == "set_view_emergency":
+        settings = get_chat_settings(chat_id)
+        try:
+            await edit_bot_response(
+                query, context,
+                "🚨 <b>Emergency Mode Settings</b>\n\n"
+                "ꜱᴇᴛ ᴜᴘ ᴀ ꜱᴄʜᴇᴅᴜʟᴇᴅ ʙʟᴏᴄᴋɪɴɢ ᴘᴇʀɪᴏᴅ ꜰᴏʀ ꜱᴘᴇᴄɪꜰɪᴄ ᴄᴏɴᴛᴇɴᴛ ᴛʏᴘᴇꜱ. "
+                "ᴛʜɪꜱ ᴄᴀɴ ʙᴇ ᴀᴘᴘʟɪᴇᴅ ᴅᴀɪʟʏ ᴏʀ ᴊᴜꜱᴛ ꜰᴏʀ ᴛᴏᴅᴀʏ.",
+                reply_markup=get_emergency_settings_keyboard(settings),
+                parse_mode='HTML'
+            )
+        except BadRequest: pass
+        await query.answer()
+        return
+
+    if data == "set_toggle_ui_layout":
+        settings = get_chat_settings(chat_id)
+        current_layout = settings.get("ui_layout_type", 1)
+        new_layout = 2 if current_layout == 1 else 1
+        update_chat_setting(chat_id, "ui_layout_type", new_layout)
+        try:
+            await edit_bot_response(
+                query, context,
+                "🛠 <b>Bot Settings</b>\n\nSelect one of the settings that you want to change:",
+                reply_markup=get_main_settings_keyboard(chat_id),
+                parse_mode='HTML'
+            )
+        except BadRequest: pass
+        await query.answer(f"Layout changed to {'Small' if new_layout == 2 else 'Large'}")
+        return
+
+    # Handle Emergency Toggles
+    if data.startswith("set_toggle_emergency_"):
+        field = data.replace("set_toggle_emergency_", "emergency_")
+        settings = get_chat_settings(chat_id)
+        
+        if field == "emergency_mode":
+            current = settings.get(field, "daily")
+            new_val = "today" if current == "daily" else "daily"
+        else:
+            current = settings.get(field, False)
+            new_val = not current
+            
+        update_chat_setting(chat_id, field, new_val)
+        settings[field] = new_val # Update local copy for keyboard
+        
+        try:
+            await query.edit_message_reply_markup(reply_markup=get_emergency_settings_keyboard(settings))
+        except BadRequest: pass
+        await query.answer("Updated!")
+        return
+
+    if data.startswith("set_config_emergency_"):
+        field = data.replace("set_config_", "")
+        context.chat_data['setting_to_config'] = field
+        context.chat_data['setting_type'] = "text" # We'll treat time as text
+        
+        prompt = f"Please send the new value for <b>{field.replace('_', ' ').title()}</b> (e.g., 09:00):"
+        await query.message.reply_text(prompt, parse_mode='HTML')
         await query.answer()
         return
 

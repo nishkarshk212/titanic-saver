@@ -77,6 +77,36 @@ async def is_admin_or_creator(context, chat_id, user_id, message=None):
     
     return await is_user_admin(chat_id, user_id, context)
 
+def is_emergency_active(settings, chat_id=None):
+    """Checks if emergency mode is currently active based on time and settings."""
+    if not settings.get("emergency_enabled", False):
+        return False
+    
+    now = datetime.now()
+    current_time = now.strftime("%H:%M")
+    start_time = settings.get("emergency_start_time", "00:00")
+    end_time = settings.get("emergency_end_time", "23:59")
+    mode = settings.get("emergency_mode", "daily")
+    
+    # Simple time comparison
+    is_in_time_range = False
+    if start_time <= end_time:
+        is_in_time_range = start_time <= current_time <= end_time
+    else:
+        # Over midnight
+        is_in_time_range = current_time >= start_time or current_time <= end_time
+        
+    # If mode is "today" and time range has passed for the day
+    if mode == "today" and not is_in_time_range and chat_id:
+        # If current time is past end_time, disable it
+        # Note: This is a bit simplistic for "today" over midnight, but works for same-day
+        if start_time <= end_time and current_time > end_time:
+            from settings_manager_mongo import update_chat_setting
+            update_chat_setting(chat_id, "emergency_enabled", False)
+            return False
+
+    return is_in_time_range
+
 async def handle_blocking(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handles all blocking logic for messages."""
     if not update.effective_chat or update.effective_chat.type == "private":
@@ -138,9 +168,24 @@ async def handle_blocking(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Debug logging
     logging.info(f"[BLOCKING] User {user_id}, user_perms={user_perms}")
 
+    # Check for Emergency Mode
+    emergency_active = is_emergency_active(settings, chat_id)
+    apply_on_freed = settings.get("emergency_apply_on_freed", False)
+    
+    if emergency_active:
+        logging.info(f"[BLOCKING] Emergency mode is ACTIVE")
+
     # Helper to check if user is freed from a specific block
-    def is_user_freed(block_key):
+    def is_user_freed(block_key, emergency_type=None):
         # In user_permissions, True means freed/allowed, False/missing means blocked
+        
+        # If emergency is active and this type is blocked in emergency
+        if emergency_active and emergency_type:
+            if settings.get(f"emergency_block_{emergency_type}"):
+                # If apply_on_freed is True, even freed members are blocked
+                if apply_on_freed:
+                    return False
+        
         freed = user_perms.get(block_key, False)
         logging.info(f"[BLOCKING] is_user_freed({block_key}) = {freed}")
         return freed
@@ -151,7 +196,7 @@ async def handle_blocking(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         logging.info(f"[BLOCKING] Sticker detected, block_stickers={settings.get('block_stickers')}, is_premium={is_premium}")
         
-        if settings.get("block_stickers") and not is_user_freed("block_stickers"):
+        if (settings.get("block_stickers") or (emergency_active and settings.get("emergency_block_stickers"))) and not is_user_freed("block_stickers", "stickers"):
             should_delete = True
         elif is_premium and settings.get("block_premium_sticker") and not is_user_freed("block_premium_sticker"):
             should_delete = True
@@ -163,14 +208,14 @@ async def handle_blocking(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if settings.get("block_premium_sticker") and not is_user_freed("block_premium_sticker"):
                 should_delete = True
         elif entity.type == MessageEntity.URL:
-            if settings.get("block_link") and not is_user_freed("block_link"):
+            if (settings.get("block_link") or (emergency_active and settings.get("emergency_block_links"))) and not is_user_freed("block_link", "links"):
                 should_delete = True
         elif entity.type == MessageEntity.TEXT_LINK:
-            if settings.get("block_embed_link") and not is_user_freed("block_embed_link"):
+            if (settings.get("block_embed_link") or (emergency_active and settings.get("emergency_block_links"))) and not is_user_freed("block_embed_link", "links"):
                 should_delete = True
 
     if msg.photo or msg.video or msg.animation:
-        if settings.get("block_media") and not is_user_freed("block_media"):
+        if (settings.get("block_media") or (emergency_active and settings.get("emergency_block_media"))) and not is_user_freed("block_media", "media"):
             should_delete = True
             
     if msg.document:
@@ -221,7 +266,7 @@ async def handle_blocking(update: Update, context: ContextTypes.DEFAULT_TYPE):
         should_delete = True
 
     # Block plain text messages
-    if msg.text and settings.get("block_text") and not is_user_freed("block_text"):
+    if msg.text and (settings.get("block_text") or (emergency_active and settings.get("emergency_block_text"))) and not is_user_freed("block_text", "text"):
         is_command = msg.text.startswith(('/', '!', '.', '#'))
         if not is_command:
             should_delete = True

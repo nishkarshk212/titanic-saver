@@ -190,7 +190,18 @@ DEFAULT_CHAT_SETTINGS = {
     "antiflood_limit": 5,
     "antiflood_window": 3,
     "antiflood_penalty": "mute", # warn, mute, ban, kick
-    "antiflood_apply_on": "members" # members, everyone
+    "antiflood_apply_on": "members", # members, everyone
+    # Emergency settings
+    "emergency_enabled": False,
+    "emergency_block_stickers": False,
+    "emergency_block_text": False,
+    "emergency_block_media": False,
+    "emergency_block_links": False,
+    "emergency_start_time": "00:00",
+    "emergency_end_time": "23:59",
+    "emergency_mode": "daily", # daily, today
+    "emergency_apply_on_freed": False,
+    "ui_layout_type": 1 # 1 (Default/Large), 2 (Small/Compact)
 }
 
 def get_chat_settings(chat_id):
