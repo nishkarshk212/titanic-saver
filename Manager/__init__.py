@@ -23,6 +23,7 @@ from Manager.promote import get_promote_handlers
 from Manager.purge import get_purge_handlers
 from Manager.staff import get_staff_handlers
 from Manager.zombie import get_zombie_handlers
+from Manager.psend import get_psend_handlers
 
 def get_manager_handlers():
     """Return all Manager handlers."""
@@ -36,6 +37,7 @@ def get_manager_handlers():
     handlers.extend(get_purge_handlers())
     handlers.extend(get_staff_handlers())
     handlers.extend(get_zombie_handlers())
+    handlers.extend(get_psend_handlers())
     
     return handlers
 
@@ -50,4 +52,5 @@ __all__ = [
     'get_purge_handlers',
     'get_staff_handlers',
     'get_zombie_handlers',
+    'get_psend_handlers',
 ]

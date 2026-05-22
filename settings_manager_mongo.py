@@ -158,6 +158,7 @@ DEFAULT_CHAT_SETTINGS = {
     "cmd_access_bots": "all",
     "cmd_access_zombies": "admin",
     "cmd_access_mass_actions": "admin",
+    "cmd_access_psend": "admin",
     # Blocking settings
     "blocking_enabled": True,
     "block_stickers": False,

@@ -264,8 +264,9 @@ def get_main_settings_keyboard(chat_id=None):
          InlineKeyboardButton("🎙 Voice Chat", callback_data="set_view_vc")],
         [InlineKeyboardButton("🗑️ Deleting Messages", callback_data="set_view_deleting"),
          InlineKeyboardButton("👥 Manager", callback_data="set_view_manager")],
-        [InlineKeyboardButton("📋 Freed Members", callback_data="free_list_members"),
-         InlineKeyboardButton("❌ Close Menu", callback_data="set_close")]
+        [InlineKeyboardButton("📩 Private Send", callback_data="set_view_psend"),
+         InlineKeyboardButton("📋 Freed Members", callback_data="free_list_members")],
+        [InlineKeyboardButton("❌ Close Menu", callback_data="set_close")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -648,6 +649,7 @@ def get_command_permissions_keyboard(settings):
             ("Promote", "cmd_access_promote"),
             ("Demote", "cmd_access_demote"),
             ("Send", "cmd_access_send"),
+            ("PSend", "cmd_access_psend"),
         ]),
         ("📋 Info & Utilities", [
             ("Staff", "cmd_access_staff"),
@@ -936,6 +938,17 @@ def get_manager_settings_keyboard(settings):
         [InlineKeyboardButton(f"ID Command: {id_status}", callback_data="set_toggle_manager_id_enabled")],
         [InlineKeyboardButton(f"Info Command: {info_status}", callback_data="set_toggle_manager_info_enabled")],
         [InlineKeyboardButton("ℹ️ Toggle to enable/disable commands", callback_data="set_none")],
+        [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+def get_psend_settings_keyboard(settings):
+    """Get Private Send command settings keyboard."""
+    access = settings.get("cmd_access_psend", "admin").title()
+    
+    keyboard = [
+        [InlineKeyboardButton(f"Command Access: {access}", callback_data="set_cmd_perm_cmd_access_psend")],
+        [InlineKeyboardButton("ℹ️ Rotate: Everyone ➜ Admin ➜ Owner", callback_data="set_none")],
         [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -1675,6 +1688,20 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 query, context,
                 "👥 Manager Module Settings\n\nEnable or disable Manager commands:",
                 reply_markup=get_manager_settings_keyboard(settings)
+            )
+        except BadRequest: pass
+        await query.answer()
+        return
+
+    if data == "set_view_psend":
+        settings = get_chat_settings(chat_id)
+        try:
+            await edit_bot_response(
+                query, context,
+                "📩 <b>Private Send Settings</b>\n\n"
+                "ᴄᴏɴꜰɪɢᴜʀᴇ ᴡʜᴏ ᴄᴀɴ ᴜꜱᴇ ᴛʜᴇ /ᴘꜱᴇɴᴅ ᴄᴏᴍᴍᴀɴᴅ ᴛᴏ ꜱᴇɴᴅ ᴘʀɪᴠᴀᴛᴇ ᴍᴇꜱꜱᴀɢᴇꜱ.",
+                reply_markup=get_psend_settings_keyboard(settings),
+                parse_mode='HTML'
             )
         except BadRequest: pass
         await query.answer()
