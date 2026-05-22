@@ -2274,7 +2274,9 @@ async def handle_setting_input(update: Update, context: ContextTypes.DEFAULT_TYP
                 success = True
     elif config_type == "text":
         if update.message.text:
-            update_chat_setting(chat_id, setting_key, update.message.text)
+            # Use text_html to preserve formatting and premium emojis
+            text_to_save = update.message.text_html if update.message.text_html else update.message.text
+            update_chat_setting(chat_id, setting_key, text_to_save)
             success = True
     elif config_type == "buttons_add":
         if update.message.text and "|" in update.message.text:

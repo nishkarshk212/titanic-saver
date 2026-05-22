@@ -782,9 +782,15 @@ async def check_command_permission(update: Update, context: ContextTypes.DEFAULT
         return False
     return True
 
-async def send_rules_message(bot, chat_id, target_chat_id, settings):
+async def send_rules_message(bot, chat_id, target_chat_id, settings, user=None, chat=None):
     """Helper to send the formatted rules message."""
     text = settings.get("rules_text", "No rules have been set for this group yet.")
+    
+    # Format placeholders if user and chat are provided
+    if user and chat:
+        from welcome import format_welcome_message
+        text = format_welcome_message(text, user, chat)
+        
     media = settings.get("rules_media")
     media_type = settings.get("rules_media_type")
     buttons = settings.get("rules_buttons", [])
@@ -793,8 +799,12 @@ async def send_rules_message(bot, chat_id, target_chat_id, settings):
     if buttons:
         keyboard = []
         for btn in buttons:
-            keyboard.append([InlineKeyboardButton(btn['label'], url=btn['url'])])
-        reply_markup = InlineKeyboardMarkup(keyboard)
+            # Handle both 'label' and 'text' keys for compatibility
+            label = btn.get('label') or btn.get('text')
+            if label:
+                keyboard.append([InlineKeyboardButton(label, url=btn['url'])])
+        if keyboard:
+            reply_markup = InlineKeyboardMarkup(keyboard)
         
     try:
         if media:
@@ -802,12 +812,25 @@ async def send_rules_message(bot, chat_id, target_chat_id, settings):
                 await bot.send_photo(target_chat_id, media, caption=text, reply_markup=reply_markup, parse_mode='HTML')
             elif media_type == "video":
                 await bot.send_video(target_chat_id, media, caption=text, reply_markup=reply_markup, parse_mode='HTML')
+            else:
+                await bot.send_message(target_chat_id, text, reply_markup=reply_markup, parse_mode='HTML')
         else:
             await bot.send_message(target_chat_id, text, reply_markup=reply_markup, parse_mode='HTML')
         return True
     except Exception as e:
         logging.error(f"Error sending rules: {e}")
-        return False
+        # Try sending without HTML if it failed
+        try:
+            if media:
+                if media_type == "photo":
+                    await bot.send_photo(target_chat_id, media, caption=text, reply_markup=reply_markup)
+                elif media_type == "video":
+                    await bot.send_video(target_chat_id, media, caption=text, reply_markup=reply_markup)
+            else:
+                await bot.send_message(target_chat_id, text, reply_markup=reply_markup)
+            return True
+        except Exception:
+            return False
 
 async def rules_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Command to show group rules."""
@@ -820,15 +843,22 @@ async def rules_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     settings = get_chat_settings(chat_id)
     perms = settings.get("command_permissions", {})
     
+    user = update.effective_user
+    chat = update.effective_chat
+
     if perms.get("rules") == "private":
         # Send in private
-        success = await send_rules_message(context.bot, chat_id, update.effective_user.id, settings)
+        success = await send_rules_message(context.bot, chat_id, user.id, settings, user, chat)
         if success:
-            await update.message.reply_text("✅ I've sent the rules to you in private chat.")
+            try:
+                await update.message.reply_text("✅ I've sent the rules to you in private chat.")
+            except Exception: pass
         else:
-            await update.message.reply_text("❌ I couldn't send you the rules. Please make sure you've started me in private.")
+            try:
+                await update.message.reply_text("❌ I couldn't send you the rules. Please make sure you've started me in private.")
+            except Exception: pass
     else:
-        await send_rules_message(context.bot, chat_id, chat_id, settings)
+        await send_rules_message(context.bot, chat_id, chat_id, settings, user, chat)
 
 async def me_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Command to show user info."""
