@@ -185,7 +185,14 @@ async def check_emergency_notifications(chat_id, context, settings):
         )
         
         try:
-            await context.bot.send_message(chat_id, notif_text, parse_mode='HTML')
+            sent_msg = await context.bot.send_message(chat_id, notif_text, parse_mode='HTML')
+            # Auto-pin the emergency notification
+            try:
+                await context.bot.pin_chat_message(chat_id, sent_msg.message_id, disable_notification=False)
+                # Store message_id to unpin later
+                context.chat_data[f"emergency_notif_msg_id_{chat_id}"] = sent_msg.message_id
+            except Exception as pin_e:
+                logging.error(f"Error pinning emergency notification: {pin_e}")
         except Exception as e:
             logging.error(f"Error sending emergency start notification: {e}")
             
@@ -197,6 +204,15 @@ async def check_emergency_notifications(chat_id, context, settings):
             f"ᴛʜᴇ ɢʀᴏᴜᴘ ɪꜱ ɴᴏᴡ ʙᴀᴄᴋ ᴛᴏ ꜱᴛᴀɴᴅᴀʀᴅ ᴏᴘᴇʀᴀᴛɪᴏɴꜱ."
         )
         try:
+            # Unpin the start notification if we have the ID
+            msg_id = context.chat_data.get(f"emergency_notif_msg_id_{chat_id}")
+            if msg_id:
+                try:
+                    await context.bot.unpin_chat_message(chat_id, msg_id)
+                    del context.chat_data[f"emergency_notif_msg_id_{chat_id}"]
+                except Exception as unpin_e:
+                    logging.error(f"Error unpinning emergency notification: {unpin_e}")
+            
             await context.bot.send_message(chat_id, notif_text, parse_mode='HTML')
         except Exception as e:
             logging.error(f"Error sending emergency end notification: {e}")
