@@ -62,7 +62,25 @@ async def psend_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode='HTML'
         )
         
-        await send_bot_response(update, context, f"✅ Message sent to <code>{target_user_id}</code>.")
+        # Delete user's command message immediately for privacy
+        try:
+            await update.message.delete()
+        except:
+            pass
+
+        # Send confirmation and delete it after 3 seconds
+        confirm_msg = await update.effective_chat.send_message(f"✅ Message sent to <code>{target_user_id}</code>.", parse_mode='HTML')
+        
+        async def delete_confirm():
+            import asyncio
+            await asyncio.sleep(3)
+            try:
+                await confirm_msg.delete()
+            except:
+                pass
+        
+        import asyncio
+        asyncio.create_task(delete_confirm())
         
     except Exception as e:
         error_msg = str(e)
