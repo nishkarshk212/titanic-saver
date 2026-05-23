@@ -17,17 +17,34 @@ async def psend_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
     
+    # Delete command message immediately for privacy
+    try:
+        await update.message.delete()
+    except:
+        pass
+        
+    async def send_private_response(text):
+        """Helper to send a temporary response and delete it quickly."""
+        try:
+            msg = await context.bot.send_message(chat_id=chat_id, text=text, parse_mode='HTML')
+            import asyncio
+            async def delete_msg():
+                await asyncio.sleep(3)
+                try: await msg.delete()
+                except: pass
+            asyncio.create_task(delete_msg())
+        except:
+            pass
+
     # Permission check removed as per user request (Everyone can use /psend)
     
     target_user_id, _ = await get_user_id(update, context)
     
     if not target_user_id:
-        await send_bot_response(
-            update, context,
+        await send_private_response(
             "❌ <b>Usage:</b>\n"
             "• Reply to a user: <code>/psend [message]</code>\n"
-            "• Use username/ID: <code>/psend [@username/ID] [message]</code>",
-            parse_mode='HTML'
+            "• Use username/ID: <code>/psend [@username/ID] [message]</code>"
         )
         return
 
@@ -39,7 +56,7 @@ async def psend_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         message_text = " ".join(context.args[1:]) if len(context.args) > 1 else ""
 
     if not message_text:
-        await send_bot_response(update, context, "❌ Please provide a message to send.")
+        await send_private_response("❌ Please provide a message to send.")
         return
 
     try:
@@ -62,34 +79,16 @@ async def psend_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode='HTML'
         )
         
-        # Delete user's command message immediately for privacy
-        try:
-            await update.message.delete()
-        except:
-            pass
-
-        # Send confirmation and delete it after 3 seconds
-        confirm_msg = await update.effective_chat.send_message(f"✅ Message sent to <code>{target_user_id}</code>.", parse_mode='HTML')
-        
-        async def delete_confirm():
-            import asyncio
-            await asyncio.sleep(3)
-            try:
-                await confirm_msg.delete()
-            except:
-                pass
-        
-        import asyncio
-        asyncio.create_task(delete_confirm())
+        await send_private_response(f"✅ Message sent to <code>{target_user_id}</code>.")
         
     except Exception as e:
         error_msg = str(e)
         if "bot was blocked" in error_msg.lower():
-            await send_bot_response(update, context, "❌ Could not send message: The user has blocked the bot.")
+            await send_private_response("❌ Could not send message: The user has blocked the bot.")
         elif "chat not found" in error_msg.lower():
-            await send_bot_response(update, context, "❌ Could not send message: The user has not started the bot.")
+            await send_private_response("❌ Could not send message: The user has not started the bot.")
         else:
-            await send_bot_response(update, context, f"❌ Failed to send message: {error_msg}")
+            await send_private_response(f"❌ Failed to send message: {error_msg}")
 
 def get_psend_handlers():
     """Return psend command handlers."""
