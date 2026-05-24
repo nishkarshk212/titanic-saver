@@ -64,16 +64,23 @@ async def can_user_ban(chat_id, user_id, context):
     """Check if a user can ban/unban (Admin with custom ban permission)."""
     # Owner can always ban
     from config import OWNER_ID
+    
+    # Telegram's ID for anonymous admins (Group Anonymous Bot)
+    ANONYMOUS_ADMIN_ID = 1087968824
+    
     if user_id == OWNER_ID:
         logging.info(f"Owner {user_id} can ban in chat {chat_id}")
         return True, None
     
-    # Check if it's an anonymous admin
+    # Check if it's an anonymous admin (via ID)
     if is_anonymous_admin(user_id):
-        logging.info(f"Anonymous admin detected, checking ban permissions for chat {chat_id}")
+        logging.info(f"Anonymous admin detected (ID {user_id}), checking ban permissions for chat {chat_id}")
         has_perm, error_msg = await check_anonymous_admin_ban_permission(chat_id, context)
         logging.info(f"Anonymous admin ban permission result: {has_perm}, error: {error_msg}")
         return has_perm, error_msg
+    
+    # If user_id is 0 or None, it might still be an anonymous admin via sender_chat
+    # This is handled in the command handlers themselves usually, but we check here if possible
     
     try:
         member = await context.bot.get_chat_member(chat_id, user_id)

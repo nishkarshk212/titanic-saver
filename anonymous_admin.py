@@ -39,55 +39,48 @@ async def get_anonymous_admin_permissions(chat_id, context):
             logging.info(f"No anonymous admins found in chat {chat_id}")
             return None
         
-        # When multiple anonymous admins exist, we can't determine which specific one is acting.
-        # The best approach is to check if ANY anonymous admin has the required permissions.
+        # We check if ANY anonymous admin has the required permissions.
         # If at least one anonymous admin has the permission, we allow the action.
-        # This is a reasonable security model since all anonymous admins are trusted by the group.
-        
-        # Combine permissions from ALL anonymous admins.
-        # To be secure, we use AND logic for sensitive actions: 
-        # only allow if ALL anonymous admins have the required permission.
-        # This prevents a low-level admin from hiding behind the anonymous ID 
-        # to perform actions they aren't personally authorized for.
+        # This is more permissive but necessary since we can't distinguish between them.
         
         combined_permissions = {
-            'can_change_info': True,
-            'can_delete_messages': True,
-            'can_restrict_members': True,
-            'can_invite_users': True,
-            'can_pin_messages': True,
-            'can_post_stories': True,
-            'can_edit_stories': True,
-            'can_delete_stories': True,
-            'can_manage_video_chats': True,
-            'can_promote_members': True,
+            'can_change_info': False,
+            'can_delete_messages': False,
+            'can_restrict_members': False,
+            'can_invite_users': False,
+            'can_pin_messages': False,
+            'can_post_stories': False,
+            'can_edit_stories': False,
+            'can_delete_stories': False,
+            'can_manage_video_chats': False,
+            'can_promote_members': False,
             'is_anonymous': True,
         }
         
         for anon_admin in anonymous_admins:
-            # Use AND logic - if any anonymous admin lacks the permission, disable it for all
-            if not anon_admin.can_change_info:
-                combined_permissions['can_change_info'] = False
-            if not anon_admin.can_delete_messages:
-                combined_permissions['can_delete_messages'] = False
-            if not anon_admin.can_restrict_members:
-                combined_permissions['can_restrict_members'] = False
-            if not anon_admin.can_invite_users:
-                combined_permissions['can_invite_users'] = False
-            if not anon_admin.can_pin_messages:
-                combined_permissions['can_pin_messages'] = False
-            if hasattr(anon_admin, 'can_post_stories') and not anon_admin.can_post_stories:
-                combined_permissions['can_post_stories'] = False
-            if hasattr(anon_admin, 'can_edit_stories') and not anon_admin.can_edit_stories:
-                combined_permissions['can_edit_stories'] = False
-            if hasattr(anon_admin, 'can_delete_stories') and not anon_admin.can_delete_stories:
-                combined_permissions['can_delete_stories'] = False
-            if not anon_admin.can_manage_video_chats:
-                combined_permissions['can_manage_video_chats'] = False
-            if not anon_admin.can_promote_members:
-                combined_permissions['can_promote_members'] = False
+            # Use OR logic - if any anonymous admin has the permission, enable it
+            if anon_admin.can_change_info:
+                combined_permissions['can_change_info'] = True
+            if anon_admin.can_delete_messages:
+                combined_permissions['can_delete_messages'] = True
+            if anon_admin.can_restrict_members:
+                combined_permissions['can_restrict_members'] = True
+            if anon_admin.can_invite_users:
+                combined_permissions['can_invite_users'] = True
+            if anon_admin.can_pin_messages:
+                combined_permissions['can_pin_messages'] = True
+            if hasattr(anon_admin, 'can_post_stories') and anon_admin.can_post_stories:
+                combined_permissions['can_post_stories'] = True
+            if hasattr(anon_admin, 'can_edit_stories') and anon_admin.can_edit_stories:
+                combined_permissions['can_edit_stories'] = True
+            if hasattr(anon_admin, 'can_delete_stories') and anon_admin.can_delete_stories:
+                combined_permissions['can_delete_stories'] = True
+            if anon_admin.can_manage_video_chats:
+                combined_permissions['can_manage_video_chats'] = True
+            if anon_admin.can_promote_members:
+                combined_permissions['can_promote_members'] = True
         
-        logging.info(f"Found {len(anonymous_admins)} anonymous admin(s) in chat {chat_id}. Secure combined permissions (AND logic): {combined_permissions}")
+        logging.info(f"Found {len(anonymous_admins)} anonymous admin(s) in chat {chat_id}. Combined permissions (OR logic): {combined_permissions}")
         return combined_permissions
     except Exception as e:
         logging.error(f"Error getting anonymous admin permissions in chat {chat_id}: {e}")

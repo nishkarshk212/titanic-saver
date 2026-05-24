@@ -645,8 +645,13 @@ async def free_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
         
     chat_id = update.effective_chat.id
-    user_id = update.effective_user.id
+    user_id = update.effective_user.id if update.effective_user else 0
     
+    # Handle anonymous admins (sender_chat is the group)
+    if not user_id and update.effective_message and update.effective_message.sender_chat:
+        if update.effective_message.sender_chat.id == chat_id:
+            user_id = 1087968824
+            
     logging.info(f"[FREE] Processing command for chat {chat_id}, user {user_id}")
     
     # Only admins with specific permissions can use this command
@@ -747,9 +752,17 @@ async def free_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def unfree_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Command to remove exemptions from a user."""
+    if not update.effective_chat:
+        return
+        
     chat_id = update.effective_chat.id
-    user_id = update.effective_user.id
+    user_id = update.effective_user.id if update.effective_user else 0
     
+    # Handle anonymous admins (sender_chat is the group)
+    if not user_id and update.effective_message and update.effective_message.sender_chat:
+        if update.effective_message.sender_chat.id == chat_id:
+            user_id = 1087968824
+            
     # Only admins with specific permissions can use this command
     can_ban, error_msg = await can_user_ban(chat_id, user_id, context)
     if not can_ban:
