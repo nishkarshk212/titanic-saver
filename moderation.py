@@ -28,6 +28,10 @@ async def can_user_mute(chat_id, user_id, context):
         logging.info(f"Anonymous admin mute permission result: {has_perm}, error: {error_msg}")
         return has_perm
     
+    # Check if user is a dedicated Muter (role in MongoDB)
+    if check_is_muter(chat_id, user_id):
+        return True
+    
     try:
         member = await context.bot.get_chat_member(chat_id, user_id)
         # Must be admin or creator
@@ -269,7 +273,7 @@ async def promote_muter_command(update: Update, context: ContextTypes.DEFAULT_TY
         
         # Set custom title
         try:
-            await context.bot.set_chat_administrator_custom_title(chat_id, target_id, "Muter")
+            await context.bot.set_chat_administrator_custom_title(chat_id, target_id, "мυтєя")
         except:
             pass
 
@@ -278,7 +282,7 @@ async def promote_muter_command(update: Update, context: ContextTypes.DEFAULT_TY
         from admin_manager_mongo import update_admin_cache
         update_admin_cache(chat_id, target_id, {"can_restrict_members": True})
 
-        await send_bot_response(update, context, f"✅ <b>{target_name}</b> has been promoted to <b>Muter</b>.\nThey can now mute/unmute members.")
+        await send_bot_response(update, context, f"✅ <b>{target_name}</b> has been promoted to <b>мυтєя</b>.\nThey can now mute/unmute members.")
         await log_to_channel(context, f"🔇 #MUTER_PROMOTED\nTarget: {target_name} ({target_id})\nAdmin: {update.effective_user.first_name}")
 
     except Exception as e:
@@ -338,7 +342,7 @@ async def demote_muter_command(update: Update, context: ContextTypes.DEFAULT_TYP
         from admin_manager_mongo import remove_admin_cache
         remove_admin_cache(chat_id, target_id)
 
-        await send_bot_response(update, context, f"✅ <b>{target_name}</b> has been demoted from Muter.")
+        await send_bot_response(update, context, f"✅ <b>{target_name}</b> has been demoted from мυтєя.")
         await log_to_channel(context, f"🔊 #MUTER_DEMOTED\nTarget: {target_name} ({target_id})\nAdmin: {update.effective_user.first_name}")
 
     except Exception as e:
@@ -424,7 +428,7 @@ async def muter_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         await send_bot_response(
             update, context,
-            "🛡️ <b>Muter List:</b>\n" + "\n".join(muter_list),
+            "🛡️ <b>мυтєя List:</b>\n" + "\n".join(muter_list),
             parse_mode=ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Close", callback_data="close_moderation")]])
         )
