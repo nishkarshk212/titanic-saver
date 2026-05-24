@@ -17,7 +17,8 @@ from admin_manager_mongo import sync_admins, update_admin_cache, remove_admin_ca
 PERMISSIONS_MAP = {
     "can_change_info": "Change Group Info",
     "can_delete_messages": "Delete Messages",
-    "can_restrict_members": "Muter/Ban Users",
+    "can_restrict_members": "Muter Permission (Only Mute/Unmute)",
+    "can_ban_users": "Ban Permission (Full Ban/Unban)",
     "can_invite_users": "Invite Users via Link",
     "can_pin_messages": "Pin Messages",
     "can_post_stories": "Post Stories",
@@ -33,6 +34,7 @@ DEFAULT_PERMISSIONS = {
     "can_change_info": False,
     "can_delete_messages": False,
     "can_restrict_members": False,
+    "can_ban_users": False,
     "can_invite_users": False,
     "can_pin_messages": False,
     "can_post_stories": False,

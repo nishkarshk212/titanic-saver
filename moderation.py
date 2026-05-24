@@ -16,6 +16,11 @@ from anonymous_admin import is_anonymous_admin, check_anonymous_admin_ban_permis
 
 async def can_user_mute(chat_id, user_id, context):
     """Check if a user can mute/unmute (Admin or Muter)."""
+    # Owner can always mute
+    from config import OWNER_ID
+    if user_id == OWNER_ID:
+        return True
+
     # Check if it's an anonymous admin
     if is_anonymous_admin(user_id):
         logging.info(f"Anonymous admin detected, checking mute permissions for chat {chat_id}")
@@ -23,9 +28,20 @@ async def can_user_mute(chat_id, user_id, context):
         logging.info(f"Anonymous admin mute permission result: {has_perm}, error: {error_msg}")
         return has_perm
     
-    if await is_user_admin(chat_id, user_id, context):
-        return True
-    return check_is_muter(chat_id, user_id)
+    try:
+        member = await context.bot.get_chat_member(chat_id, user_id)
+        # Must be admin or creator
+        if member.status not in ['administrator', 'creator']:
+            return False
+        
+        # Creator has all permissions
+        if member.status == 'creator':
+            return True
+        
+        # Check if admin has can_restrict_members permission
+        return member.can_restrict_members
+    except:
+        return False
 
 async def can_user_manage_voice_chat(chat_id, user_id, context):
     """Check if a user can manage voice chats (Admin, Muter, or Voice Chat Manager)."""
@@ -41,7 +57,7 @@ async def can_user_manage_voice_chat(chat_id, user_id, context):
     return False
 
 async def can_user_ban(chat_id, user_id, context):
-    """Check if a user can ban/unban (Admin with can_restrict_members permission)."""
+    """Check if a user can ban/unban (Admin with custom ban permission)."""
     # Owner can always ban
     from config import OWNER_ID
     if user_id == OWNER_ID:
@@ -66,10 +82,22 @@ async def can_user_ban(chat_id, user_id, context):
         if member.status == 'creator':
             return True, None
         
-        # Check if admin has can_restrict_members permission
-        if not member.can_restrict_members:
-            return False, "❌ You don't have permission to ban users. You need the 'Ban Users' permission."
-        
+        # Check if admin has custom can_ban_users permission
+        # Note: We use can_ban_users as a custom toggle in the promote panel
+        if not getattr(member, 'can_ban_users', False):
+            # Fallback check if it's not a direct attribute (check database or telegram rights)
+            # Since Telegram doesn't have a separate 'mute' and 'ban' right, 
+            # we rely on our promote panel setting.
+            # If the user has 'can_restrict_members' in Telegram, we check our custom flag.
+            if not member.can_restrict_members:
+                return False, "❌ You don't have permission to ban users. You need the 'Ban Users' permission."
+            
+            # If they have Telegram right but we want to split it, we need to check our cache
+            from admin_manager_mongo import get_admin_cache
+            admin_data = get_admin_cache(chat_id, user_id)
+            if admin_data and not admin_data.get('can_ban_users', False):
+                 return False, "❌ You have Muter permission but not Ban permission."
+
         return True, None
     except Exception as e:
         return False, f"❌ Error checking permissions: {str(e)}"
