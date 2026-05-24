@@ -104,8 +104,8 @@ async def can_user_ban(chat_id, user_id, context):
                 return False, "❌ You don't have permission to ban users. You need the 'Ban Users' permission."
             
             # If they have Telegram right but we want to split it, we need to check our cache
-            from admin_manager_mongo import get_admin_cache
-            admin_data = get_admin_cache(chat_id, user_id)
+            from admin_manager_mongo import get_stored_admin_permissions
+            admin_data = get_stored_admin_permissions(chat_id, user_id)
             if admin_data and not admin_data.get('can_ban_users', False):
                  return False, "❌ You have Muter permission but not Ban permission."
 
@@ -316,8 +316,8 @@ async def demote_muter_command(update: Update, context: ContextTypes.DEFAULT_TYP
         member = await context.bot.get_chat_member(chat_id, target_id)
         
         # Safety check: if they are a real admin (not just a Muter), don't demote
-        from admin_manager_mongo import get_admin_cache
-        admin_data = get_admin_cache(chat_id, target_id)
+        from admin_manager_mongo import get_stored_admin_permissions
+        admin_data = get_stored_admin_permissions(chat_id, target_id)
         
         # If they have permissions other than just restricting, they might be a full admin
         if admin_data:
