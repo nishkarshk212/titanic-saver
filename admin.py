@@ -506,7 +506,7 @@ async def cancel_promotion(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def demote_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Demotes an administrator to a regular user."""
-    # Permission check
+    # Permission check - require 'Add New Admins' (can_promote_members)
     has_perm, error_msg = await check_admin_permission(update, context, 'can_promote_members')
     if not has_perm:
         await send_bot_response(update, context, error_msg)
