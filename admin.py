@@ -17,7 +17,6 @@ from admin_manager_mongo import sync_admins, update_admin_cache, remove_admin_ca
 PERMISSIONS_MAP = {
     "can_change_info": "Change Group Info",
     "can_delete_messages": "Delete Messages",
-    "can_restrict_members": "Muter Permission (Only Mute/Unmute)",
     "can_ban_users": "Ban Permission (Full Ban/Unban)",
     "can_invite_users": "Invite Users via Link",
     "can_pin_messages": "Pin Messages",
@@ -33,7 +32,6 @@ PERMISSIONS_MAP = {
 DEFAULT_PERMISSIONS = {
     "can_change_info": False,
     "can_delete_messages": False,
-    "can_restrict_members": False,
     "can_ban_users": False,
     "can_invite_users": False,
     "can_pin_messages": False,
@@ -307,7 +305,6 @@ def get_promotion_keyboard(user_id, current_perms, back_to_info=False):
     grid_labels = {
         "can_change_info": "Info",
         "can_delete_messages": "Delete",
-        "can_restrict_members": "Mute",
         "can_ban_users": "Ban",
         "can_invite_users": "Invite",
         "can_pin_messages": "Pin",
@@ -429,8 +426,8 @@ async def confirm_promotion(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # We don't return here, we proceed with the rights I DO have
             # or the user can toggle them off.
 
-        # Calculate effective Telegram can_restrict_members (True if either Mute or Ban is requested)
-        effective_can_restrict = final_perms.get('can_restrict_members', False) or final_perms.get('can_ban_users', False)
+        # Calculate effective Telegram can_restrict_members (True if Ban is requested)
+        effective_can_restrict = final_perms.get('can_ban_users', False)
 
         await context.bot.promote_chat_member(
             chat_id=chat_id,

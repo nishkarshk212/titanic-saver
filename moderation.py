@@ -198,15 +198,23 @@ async def unban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     sender_id = update.effective_user.id if update.effective_user else None
     chat_type = update.effective_chat.type
     
-    # Check if user has ban permission (not just admin status)
+    # Check if user has ban permission
     if chat_type != 'channel':
         can_ban, error_msg = await can_user_ban(chat_id, sender_id, context)
         if not can_ban:
             await send_bot_response(update, context, error_msg)
             return
-    
+
+    # Check bot rights
+    has_rights, error_msg = await check_bot_admin_rights(chat_id, context, ['can_restrict_members'])
+    if not has_rights:
+        await send_bot_response(update, context, error_msg)
+        return
+
     target_id, target_name = await get_user_id(update, context)
-    if not target_id: return
+    if not target_id:
+        await send_bot_response(update, context, "Please reply to a user/channel or provide an ID/username to unban.")
+        return
 
     try:
         if str(target_id).startswith('-100'):
@@ -215,10 +223,126 @@ async def unban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await send_bot_response(update, context, f"✅ Unbanned channel {target_name}.")
         else:
             # It's a user
-            await context.bot.unban_chat_member(chat_id, target_id, only_if_banned=True)
+            await context.bot.unban_chat_member(chat_id, target_id)
             await send_bot_response(update, context, f"✅ Unbanned {target_name}.")
+            
+        admin_name = update.effective_user.first_name if update.effective_user else "Channel Admin"
+        await log_to_channel(context, f"🔓 #UNBAN\nTarget: {target_name} ({target_id})\nAdmin: {admin_name}")
     except Exception as e:
         await send_bot_response(update, context, f"Error: {e}")
+
+async def promote_muter_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Promote a member to Muter (can only mute/unmute members)."""
+    chat_id = update.effective_chat.id
+    sender_id = update.effective_user.id
+
+    # Only admins with promote permission can use this
+    from Manager.actions import check_admin_permission
+    has_perm, error_msg = await check_admin_permission(update, context, 'can_promote_members')
+    if not has_perm:
+        await send_bot_response(update, context, error_msg)
+        return
+
+    target_id, target_name = await get_user_id(update, context)
+    if not target_id:
+        await send_bot_response(update, context, "Please reply to a member's message or provide an ID/username to make them a Muter.")
+        return
+
+    try:
+        member = await context.bot.get_chat_member(chat_id, target_id)
+        if member.status in ['administrator', 'creator']:
+            await send_bot_response(update, context, "❌ This command only works on regular members, not admins.")
+            return
+
+        # Check bot rights
+        has_rights, bot_error = await check_bot_admin_rights(chat_id, context, ['can_promote_members', 'can_restrict_members'])
+        if not has_rights:
+            await send_bot_response(update, context, bot_error)
+            return
+
+        # Promote to admin with ONLY restrict_members permission
+        await context.bot.promote_chat_member(
+            chat_id=chat_id,
+            user_id=target_id,
+            can_restrict_members=True
+        )
+        
+        # Set custom title
+        try:
+            await context.bot.set_chat_administrator_custom_title(chat_id, target_id, "Muter")
+        except:
+            pass
+
+        # Update cache/database
+        add_muter(chat_id, target_id)
+        from admin_manager_mongo import update_admin_cache
+        update_admin_cache(chat_id, target_id, {"can_restrict_members": True})
+
+        await send_bot_response(update, context, f"✅ <b>{target_name}</b> has been promoted to <b>Muter</b>.\nThey can now mute/unmute members.")
+        await log_to_channel(context, f"🔇 #MUTER_PROMOTED\nTarget: {target_name} ({target_id})\nAdmin: {update.effective_user.first_name}")
+
+    except Exception as e:
+        await send_bot_response(update, context, f"❌ Failed to promote: {str(e)}")
+
+async def demote_muter_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Demote a Muter back to regular member."""
+    chat_id = update.effective_chat.id
+    sender_id = update.effective_user.id
+
+    # Only admins with promote permission can use this
+    from Manager.actions import check_admin_permission
+    has_perm, error_msg = await check_admin_permission(update, context, 'can_promote_members')
+    if not has_perm:
+        await send_bot_response(update, context, error_msg)
+        return
+
+    target_id, target_name = await get_user_id(update, context)
+    if not target_id:
+        await send_bot_response(update, context, "Please reply to a Muter's message or provide an ID/username to demote them.")
+        return
+
+    try:
+        member = await context.bot.get_chat_member(chat_id, target_id)
+        
+        # Safety check: if they are a real admin (not just a Muter), don't demote
+        from admin_manager_mongo import get_admin_cache
+        admin_data = get_admin_cache(chat_id, target_id)
+        
+        # If they have permissions other than just restricting, they might be a full admin
+        if admin_data:
+            perms_count = sum(1 for v in admin_data.values() if v is True)
+            if perms_count > 1 or (perms_count == 1 and not admin_data.get('can_restrict_members')):
+                await send_bot_response(update, context, "❌ This user appears to be a full administrator. Use /demote instead.")
+                return
+
+        # Check bot rights
+        has_rights, bot_error = await check_bot_admin_rights(chat_id, context, ['can_promote_members'])
+        if not has_rights:
+            await send_bot_response(update, context, bot_error)
+            return
+
+        # Demote to member
+        await context.bot.promote_chat_member(
+            chat_id=chat_id,
+            user_id=target_id,
+            can_change_info=False,
+            can_delete_messages=False,
+            can_restrict_members=False,
+            can_invite_users=False,
+            can_pin_messages=False,
+            can_promote_members=False
+        )
+        
+        # Remove from muter list and cache
+        remove_muter(chat_id, target_id)
+        from admin_manager_mongo import remove_admin_cache
+        remove_admin_cache(chat_id, target_id)
+
+        await send_bot_response(update, context, f"✅ <b>{target_name}</b> has been demoted from Muter.")
+        await log_to_channel(context, f"🔊 #MUTER_DEMOTED\nTarget: {target_name} ({target_id})\nAdmin: {update.effective_user.first_name}")
+
+    except Exception as e:
+        await send_bot_response(update, context, f"❌ Failed to demote: {str(e)}")
 
 async def mute_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Mutes a user by restricting their permissions."""
@@ -274,7 +398,7 @@ async def unmute_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await send_bot_response(update, context, f"Error: {e}")
 
 async def muter_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Command to add or remove a muter."""
+    """Command to list all muters or add/remove a muter."""
     chat_id = update.effective_chat.id
     sender_id = update.effective_user.id
     
@@ -282,7 +406,7 @@ async def muter_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await send_bot_response(update, context, "Admin only command.")
         return
 
-    # Check if we should list all muters
+    # If no arguments and not a reply, list all muters
     if not context.args and not update.message.reply_to_message:
         muter_ids = get_all_muters(chat_id)
         if not muter_ids:
@@ -290,18 +414,11 @@ async def muter_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         
         muter_list = []
-        users_data = load_users()
         for mid in muter_ids:
-            user_name = f"<code>{mid}</code>"
-            # Try to resolve username or use ID
-            found = False
-            for username, info in users_data.items():
-                if str(info["id"]) == str(mid):
-                    user_name = f"{info['name']} (@{username})"
-                    found = True
-                    break
-            if not found:
-                # If not in cache, just show ID
+            try:
+                member = await context.bot.get_chat_member(chat_id, mid)
+                user_name = f"{member.user.first_name} (<code>{mid}</code>)"
+            except:
                 user_name = f"<code>{mid}</code>"
             muter_list.append(f"• {user_name}")
         
@@ -312,6 +429,20 @@ async def muter_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Close", callback_data="close_moderation")]])
         )
         return
+
+    # Otherwise, handle as /muter [promote]
+    await promote_muter_command(update, context)
+
+async def unmuter_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Command to remove a muter specifically (/unmuter)."""
+    chat_id = update.effective_chat.id
+    sender_id = update.effective_user.id
+    
+    if not await is_user_admin(chat_id, sender_id, context):
+        await send_bot_response(update, context, "Admin only command.")
+        return
+
+    await demote_muter_command(update, context)
 
     user_id, user_name = await get_user_id(update, context)
     if not user_id:
