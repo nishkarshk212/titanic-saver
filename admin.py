@@ -413,7 +413,9 @@ async def confirm_promotion(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for key in PERMISSIONS_MAP.keys():
             requested_val = requested_perms.get(key, False)
             # Bot must have the right to grant it
-            bot_has_right = is_creator or getattr(bot_member, key, False)
+            # Special case: can_ban_users maps to can_restrict_members for Telegram's check
+            check_key = "can_restrict_members" if key == "can_ban_users" else key
+            bot_has_right = is_creator or getattr(bot_member, check_key, False)
             
             if requested_val and not bot_has_right:
                 missing_rights.append(PERMISSIONS_MAP[key])
@@ -427,12 +429,15 @@ async def confirm_promotion(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # We don't return here, we proceed with the rights I DO have
             # or the user can toggle them off.
 
+        # Calculate effective Telegram can_restrict_members (True if either Mute or Ban is requested)
+        effective_can_restrict = final_perms.get('can_restrict_members', False) or final_perms.get('can_ban_users', False)
+
         await context.bot.promote_chat_member(
             chat_id=chat_id,
             user_id=user_id,
             can_change_info=final_perms.get('can_change_info', False),
             can_delete_messages=final_perms.get('can_delete_messages', False),
-            can_restrict_members=final_perms.get('can_restrict_members', False),
+            can_restrict_members=effective_can_restrict,
             can_invite_users=final_perms.get('can_invite_users', False),
             can_pin_messages=final_perms.get('can_pin_messages', False),
             can_post_stories=final_perms.get('can_post_stories', False),
