@@ -282,7 +282,7 @@ async def promote_muter_command(update: Update, context: ContextTypes.DEFAULT_TY
         from admin_manager_mongo import update_admin_cache
         update_admin_cache(chat_id, target_id, {"can_restrict_members": True})
 
-        await send_bot_response(update, context, f"✅ <b>{target_name}</b> has been promoted to <b>мυтєя</b>.\nThey can now mute/unmute members.")
+        await send_bot_response(update, context, f"✅ <b>{target_name}</b> ʜᴀs ʙᴇᴇɴ ᴘʀᴏᴍᴏᴛᴇᴅ ᴛᴏ <b>мυтєя</b>.\nᴛʜᴇʏ ᴄᴀɴ ɴᴏᴡ ᴍᴜᴛᴇ/ᴜɴᴍᴜᴛᴇ ᴍᴇᴍʙᴇʀs.")
         await log_to_channel(context, f"🔇 #MUTER_PROMOTED\nTarget: {target_name} ({target_id})\nAdmin: {update.effective_user.first_name}")
 
     except Exception as e:
@@ -342,7 +342,7 @@ async def demote_muter_command(update: Update, context: ContextTypes.DEFAULT_TYP
         from admin_manager_mongo import remove_admin_cache
         remove_admin_cache(chat_id, target_id)
 
-        await send_bot_response(update, context, f"✅ <b>{target_name}</b> has been demoted from мυтєя.")
+        await send_bot_response(update, context, f"✅ <b>{target_name}</b> ʜᴀs ʙᴇᴇɴ ᴅᴇᴍᴏᴛᴇᴅ ғʀᴏᴍ <b>мυтєя</b>.")
         await log_to_channel(context, f"🔊 #MUTER_DEMOTED\nTarget: {target_name} ({target_id})\nAdmin: {update.effective_user.first_name}")
 
     except Exception as e:
