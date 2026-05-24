@@ -1024,12 +1024,16 @@ def get_user_permission_keyboard(chat_id, user_id, settings):
 async def free_permission_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Show permission settings for a freed user."""
     query = update.callback_query
-    admin_id = update.effective_user.id
+    admin_id = update.effective_user.id if update.effective_user else 0
     
     # Callback data format: free_perms_{chat_id}_{user_id}
     parts = query.data.split("_")
     chat_id = int(parts[2])
     target_user_id = int(parts[3])
+    
+    # Handle anonymous admins in callbacks
+    if admin_id == 1087968824 or (not admin_id and query.message and query.message.sender_chat and query.message.sender_chat.id == chat_id):
+        admin_id = 1087968824
     
     # Check permissions
     can_ban, _ = await can_user_ban(chat_id, admin_id, context)
@@ -1063,11 +1067,16 @@ async def free_permission_callback(update: Update, context: ContextTypes.DEFAULT
 async def free_permission_toggle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Toggle a permission for a user and auto-save to database."""
     query = update.callback_query
-    admin_id = update.effective_user.id
+    admin_id = update.effective_user.id if update.effective_user else 0
     
     # Callback data format: free_toggle_{chat_id}_{user_id}_{perm_key}
     parts = query.data.split("_")
     chat_id = int(parts[2])
+    
+    # Handle anonymous admins in callbacks
+    if admin_id == 1087968824 or (not admin_id and query.message and query.message.sender_chat and query.message.sender_chat.id == chat_id):
+        admin_id = 1087968824
+        
     user_id = int(parts[3])
     user_id_str = str(user_id)
     # Join all parts after index 3 to get the full permission key

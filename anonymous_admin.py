@@ -54,8 +54,11 @@ async def get_anonymous_admin_permissions(chat_id, context):
             'can_delete_stories': False,
             'can_manage_video_chats': False,
             'can_promote_members': False,
+            'can_ban_users': False,  # Custom permission
             'is_anonymous': True,
         }
+        
+        from admin_manager_mongo import get_stored_admin_permissions
         
         for anon_admin in anonymous_admins:
             # Use OR logic - if any anonymous admin has the permission, enable it
@@ -79,6 +82,12 @@ async def get_anonymous_admin_permissions(chat_id, context):
                 combined_permissions['can_manage_video_chats'] = True
             if anon_admin.can_promote_members:
                 combined_permissions['can_promote_members'] = True
+            
+            # Check our custom database cache for additional permissions
+            admin_data = get_stored_admin_permissions(chat_id, anon_admin.user.id)
+            if admin_data:
+                if admin_data.get('can_ban_users'):
+                    combined_permissions['can_ban_users'] = True
         
         logging.info(f"Found {len(anonymous_admins)} anonymous admin(s) in chat {chat_id}. Combined permissions (OR logic): {combined_permissions}")
         return combined_permissions
@@ -115,7 +124,16 @@ async def check_anonymous_admin_ban_permission(chat_id, context):
     Returns:
         tuple: (has_permission, error_message)
     """
-    has_perm = await anonymous_admin_has_permission(chat_id, context, 'can_restrict_members')
+    # Check both Telegram's restriction right AND our custom ban permission
+    permissions = await get_anonymous_admin_permissions(chat_id, context)
+    
+    if permissions is None:
+        return False, "❌ No anonymous admins found."
+    
+    # If ANY anonymous admin has the custom ban permission, allow it.
+    # Fallback: if we don't have custom data but they have Telegram restriction right, allow it.
+    has_perm = permissions.get('can_ban_users', False) or permissions.get('can_restrict_members', False)
+    
     logging.info(f"Anonymous admin ban permission check for chat {chat_id}: {has_perm}")
     
     if has_perm:
