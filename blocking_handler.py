@@ -294,6 +294,19 @@ async def handle_blocking(update: Update, context: ContextTypes.DEFAULT_TYPE):
         is_admin = await is_admin_or_creator(context, chat_id, user_id, msg)
         is_owner = user_id == OWNER_ID
         
+        # Check for specific high-level permissions (Ban or Change Info)
+        is_high_level_admin = False
+        if is_admin and not is_owner:
+            try:
+                # For anonymous admins, we can't check specific rights easily, 
+                # so we treat them as high-level to be safe
+                if user_id == 1087968824:
+                    is_high_level_admin = True
+                else:
+                    member = await context.bot.get_chat_member(chat_id, user_id)
+                    is_high_level_admin = member.can_restrict_members or member.can_change_info
+            except: pass
+
         # If emergency is active and this type is blocked in emergency
         if emergency_active and emergency_type:
             if settings.get(f"emergency_block_{emergency_type}"):
@@ -301,10 +314,11 @@ async def handle_blocking(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     # Everyone is blocked, including owner
                     return False
                 if apply_on == "admins":
-                    # ONLY admins are blocked (Owner is exempt unless part of 'everyone')
-                    if is_admin and not is_owner:
+                    # Apply on admins ONLY if they are NOT high-level admins
+                    # If user is admin AND NOT high-level AND NOT owner -> Blocked
+                    if is_admin and not is_high_level_admin and not is_owner:
                         return False
-                    return True # Members and Owner are freed
+                    return True # Members, High-level admins, and Owner are freed
                 if apply_on == "members":
                     # ONLY members are blocked
                     if not is_admin and not is_owner:
@@ -941,6 +955,10 @@ def get_blocking_command_handlers():
 
 async def handle_message_blocking(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Wrapper to handle both blocking and clean service."""
+    # Only process actual messages or edits, ignore reactions and other updates
+    if not update.message and not update.edited_message:
+        return
+
     # Cache user
     if update.effective_user:
         user = update.effective_user

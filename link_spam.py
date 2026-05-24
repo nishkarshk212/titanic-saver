@@ -47,14 +47,27 @@ async def check_link_spam(update: Update, context: ContextTypes.DEFAULT_TYPE):
     is_admin = await is_user_admin(chat_id, user_id, context)
     is_owner = user_id == OWNER_ID
     
+    # Check for specific high-level permissions (Ban or Change Info)
+    is_high_level_admin = False
+    if is_admin and not is_owner:
+        try:
+            # For anonymous admins, treat them as high-level to be safe
+            if user_id == 1087968824:
+                is_high_level_admin = True
+            else:
+                member = await context.bot.get_chat_member(chat_id, user_id)
+                is_high_level_admin = member.can_restrict_members or member.can_change_info
+        except: pass
+
     # Logic for "Apply On"
     if apply_on == "members":
         # Apply ONLY on members (Exempt Admins and Owner)
         if is_admin or is_owner:
             return
     elif apply_on == "admins":
-        # Apply ONLY on admins (Exempt regular members and Owner)
-        if not is_admin or is_owner:
+        # Apply ONLY on admins who are NOT high-level admins (Exempt high-level admins and Owner)
+        # Also exempt regular members
+        if not is_admin or is_high_level_admin or is_owner:
             return
     elif apply_on == "everyone":
         # Apply on EVERYONE including owner
