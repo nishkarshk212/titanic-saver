@@ -199,11 +199,6 @@ async def check_bot_permission(update: Update, context: ContextTypes.DEFAULT_TYP
         logging.error(f"Error checking bot permission: {e}")
         return False, "Error checking bot permissions."
 
-def get_user_from_args(update, context):
-    """Extract user ID and name from command args or reply."""
-    # This is a legacy function, we should use get_user_id from user_manager_mongo
-    return None, None, None
-
 async def ban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Ban a user from the group."""
     chat = update.effective_chat
@@ -225,10 +220,16 @@ async def ban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await update.message.reply_text(bot_error_msg)
     
     user_id, name = await get_user_id(update, context)
-    reason = " ".join(context.args[1:]) if context.args and len(context.args) > 1 else " ".join(context.args) if context.args and not str(context.args[0]).startswith('@') and not str(context.args[0]).isdigit() else None
+    
+    # Extract reason
+    if update.message.reply_to_message:
+        reason = " ".join(context.args) if context.args else None
+    else:
+        # First arg was user ID/username, rest is reason
+        reason = " ".join(context.args[1:]) if len(context.args) > 1 else None
     
     if not user_id:
-        return await update.message.reply_text("Usage: /ban @username or reply to a user with /ban [reason]")
+        return await update.message.reply_text("Usage: /ban @username [reason] or reply to a user with /ban [reason]")
     
     try:
         member = await chat.get_member(user_id)
@@ -276,10 +277,16 @@ async def unban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await update.message.reply_text(bot_error_msg)
     
     user_id, name = await get_user_id(update, context)
-    reason = " ".join(context.args[1:]) if context.args and len(context.args) > 1 else " ".join(context.args) if context.args and not str(context.args[0]).startswith('@') and not str(context.args[0]).isdigit() else None
+    
+    # Extract reason
+    if update.message.reply_to_message:
+        reason = " ".join(context.args) if context.args else None
+    else:
+        # First arg was user ID/username, rest is reason
+        reason = " ".join(context.args[1:]) if len(context.args) > 1 else None
     
     if not user_id:
-        return await update.message.reply_text("Usage: /unban @username or reply to a user with /unban [reason]")
+        return await update.message.reply_text("Usage: /unban @username [reason] or reply to a user with /unban [reason]")
     
     try:
         member = await chat.get_member(user_id)
@@ -622,10 +629,16 @@ async def mute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await update.message.reply_text(bot_error_msg)
     
     user_id, name = await get_user_id(update, context)
-    reason = " ".join(context.args[1:]) if context.args and len(context.args) > 1 else " ".join(context.args) if context.args and not str(context.args[0]).startswith('@') and not str(context.args[0]).isdigit() else None
+    
+    # Extract reason
+    if update.message.reply_to_message:
+        reason = " ".join(context.args) if context.args else None
+    else:
+        # First arg was user ID/username, rest is reason
+        reason = " ".join(context.args[1:]) if len(context.args) > 1 else None
     
     if not user_id:
-        return await update.message.reply_text("Usage: /mute @username or reply to a user with /mute [reason]")
+        return await update.message.reply_text("Usage: /mute @username [reason] or reply to a user with /mute [reason]")
     
     try:
         member = await chat.get_member(user_id)
@@ -675,10 +688,16 @@ async def unmute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await update.message.reply_text(bot_error_msg)
     
     user_id, name = await get_user_id(update, context)
-    reason = " ".join(context.args[1:]) if context.args and len(context.args) > 1 else " ".join(context.args) if context.args and not str(context.args[0]).startswith('@') and not str(context.args[0]).isdigit() else None
+    
+    # Extract reason
+    if update.message.reply_to_message:
+        reason = " ".join(context.args) if context.args else None
+    else:
+        # First arg was user ID/username, rest is reason
+        reason = " ".join(context.args[1:]) if len(context.args) > 1 else None
     
     if not user_id:
-        return await update.message.reply_text("Usage: /unmute @username or reply to a user with /unmute [reason]")
+        return await update.message.reply_text("Usage: /unmute @username [reason] or reply to a user with /unmute [reason]")
     
     try:
         member = await chat.get_member(user_id)
@@ -723,20 +742,21 @@ async def tmute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await update.message.reply_text(bot_error_msg)
     
     user_id, name = await get_user_id(update, context)
-    
+    if not user_id:
+        return await update.message.reply_text("Usage: /tmute @username <time> [reason] or reply with /tmute <time> [reason]")
+
+    # Extract time and reason
     if update.message.reply_to_message:
         if len(context.args) < 1:
             return await update.message.reply_text("Usage: /tmute @username <time> [reason] or reply with /tmute <time> [reason]")
         time_str = context.args[0]
         reason = " ".join(context.args[1:]) if len(context.args) > 1 else None
     else:
+        # First arg was user ID/username, second is time, rest is reason
         if len(context.args) < 2:
             return await update.message.reply_text("Usage: /tmute @username <time> [reason] or reply with /tmute <time> [reason]")
         time_str = context.args[1]
         reason = " ".join(context.args[2:]) if len(context.args) > 2 else None
-    
-    if not user_id:
-        return await update.message.reply_text("User not found.")
     
     try:
         member = await chat.get_member(user_id)

@@ -117,63 +117,71 @@ def resolve_username(username):
         return None, None
 
 async def get_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Extracts user ID or Chat ID from reply, mention, or argument."""
-    # 1. Check if it's a reply
-    if update.message.reply_to_message:
+    """
+    Extracts user ID or Chat ID from reply, mention, or argument.
+    Supports: Reply, Mention (@user), Text Mention, Username (with or without @), and ID number.
+    Returns: (user_id, first_name)
+    """
+    # Method 1: Check if it's a reply
+    if update.message and update.message.reply_to_message:
         reply = update.message.reply_to_message
         # Check if it's a post from a channel or anonymous admin
         if reply.sender_chat:
             return reply.sender_chat.id, reply.sender_chat.title or reply.sender_chat.username
-        user = reply.from_user
-        return user.id, user.first_name
+        if reply.from_user:
+            user = reply.from_user
+            return user.id, user.first_name
     
-    # 2. Check for mentions in entities
-    if update.message.entities:
+    # Method 2: Check for mentions in entities (real-time resolution)
+    if update.message and update.message.entities:
         for entity in update.message.entities:
             if entity.type == 'mention':
                 username_text = update.message.text[entity.offset:entity.offset+entity.length]
                 user_id, user_name = resolve_username(username_text)
                 if user_id: return user_id, user_name
                 
-                # If not in cache, try to get chat info directly
+                # If not in cache, try to get chat info directly from Telegram
                 try:
                     chat = await context.bot.get_chat(username_text)
                     return chat.id, chat.title or chat.username
                 except: pass
             elif entity.type == 'text_mention':
+                # This is for users without usernames
                 return entity.user.id, entity.user.first_name
 
-    # 3. Check arguments (ID or Username)
+    # Method 3: Check arguments (ID or Username)
     if context.args:
         arg = context.args[0]
-        # Safety check: arg could be None
         if arg is None:
             return None, None
             
-        # Check if ID
-        if str(arg).startswith('-') or str(arg).isdigit():
+        # 3a. Try to parse as User/Chat ID (numbers or -100...)
+        clean_arg = str(arg).replace('@', '')
+        if clean_arg.isdigit() or (clean_arg.startswith('-') and clean_arg[1:].isdigit()):
             try:
-                chat_id = int(arg)
-                # Try to get chat info
+                target_id = int(clean_arg)
+                # Try to get info from Telegram for a better name
                 try:
-                    chat = await context.bot.get_chat(chat_id)
-                    return chat.id, chat.title or chat.username or str(chat.id)
+                    chat = await context.bot.get_chat(target_id)
+                    return chat.id, chat.title or chat.first_name or chat.username or str(chat.id)
                 except:
-                    # Fallback to just the ID
-                    return chat_id, str(chat_id)
-            except:
-                pass
-        
-        # If it's a username but not found in entities
-        if str(arg).startswith('@'):
-            user_id, user_name = resolve_username(arg)
-            if user_id: return user_id, user_name
-            
-            # Try to resolve via bot
-            try:
-                chat = await context.bot.get_chat(arg)
-                return chat.id, chat.title or chat.username
+                    # Fallback to cache
+                    uid, name = resolve_username(str(target_id))
+                    if uid: return uid, name
+                    # Last resort: just the ID
+                    return target_id, str(target_id)
             except: pass
+        
+        # 3b. Try to resolve as username (even without @)
+        user_id, user_name = resolve_username(clean_arg)
+        if user_id: return user_id, user_name
+        
+        # 3c. Try to resolve via bot directly (needs @ for usernames)
+        try:
+            lookup_username = f"@{clean_arg}" if not clean_arg.startswith('@') else clean_arg
+            chat = await context.bot.get_chat(lookup_username)
+            return chat.id, chat.title or chat.first_name or chat.username
+        except: pass
             
     return None, None
 

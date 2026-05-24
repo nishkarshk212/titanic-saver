@@ -11,7 +11,7 @@ from telegram.ext import ContextTypes, CommandHandler
 from Manager.actions import parse_time, is_admin, check_admin_permission, check_bot_permission
 from settings_manager_mongo import get_chat_settings
 from anonymous_admin import is_anonymous_admin, check_anonymous_admin_promote_permission
-from admin_manager_mongo import sync_admins, remove_admin_cache
+from user_manager_mongo import sync_admins, remove_admin_cache, get_user_id
 
 # Privilege presets
 LIMITED_PRIVS = ChatAdministratorRights(
@@ -59,26 +59,6 @@ DEMOTE_PRIVS = ChatAdministratorRights(
     can_delete_stories=False,
 )
 
-def get_user_and_title(update, context):
-    """Extract user and title from command."""
-    if update.message.reply_to_message:
-        user = update.message.reply_to_message.from_user
-        title = " ".join(context.args) if context.args else None
-        return user.id, user.full_name, title
-    
-    if not context.args:
-        return None, None, None
-    
-    target = context.args[0]
-    try:
-        if target.isdigit():
-            user_id = int(target)
-            title = " ".join(context.args[1:]) if len(context.args) > 1 else None
-            return user_id, str(user_id), title
-        else:
-            return target, target, " ".join(context.args[1:]) if len(context.args) > 1 else None
-    except:
-        return None, None, None
 
 async def promote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Promote user with limited rights."""
@@ -100,9 +80,16 @@ async def promote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not has_bot_perm:
         return await update.message.reply_text(bot_error_msg)
     
-    user_id, name, title = get_user_and_title(update, context)
+    user_id, name = await get_user_id(update, context)
     if not user_id:
         return await update.message.reply_text("Usage: /promote @username [title] or reply with /promote [title]")
+    
+    # Extract title: if the first arg was the user_id/username, title is the rest.
+    # If it was a reply, title is all arguments.
+    if update.message.reply_to_message:
+        title = " ".join(context.args) if context.args else None
+    else:
+        title = " ".join(context.args[1:]) if len(context.args) > 1 else None
     
     try:
         member = await chat.get_member(user_id)
@@ -155,9 +142,15 @@ async def fullpromote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not has_bot_perm:
         return await update.message.reply_text(bot_error_msg)
     
-    user_id, name, title = get_user_and_title(update, context)
+    user_id, name = await get_user_id(update, context)
     if not user_id:
         return await update.message.reply_text("Usage: /fullpromote @username [title] or reply with /fullpromote [title]")
+    
+    # Extract title
+    if update.message.reply_to_message:
+        title = " ".join(context.args) if context.args else None
+    else:
+        title = " ".join(context.args[1:]) if len(context.args) > 1 else None
     
     try:
         member = await chat.get_member(user_id)
@@ -215,7 +208,7 @@ async def demote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not has_bot_perm:
         return await update.message.reply_text(bot_error_msg)
     
-    user_id, name, _ = get_user_and_title(update, context)
+    user_id, name = await get_user_id(update, context)
     if not user_id:
         return await update.message.reply_text("Usage: /demote @username or reply to a user with /demote")
     
@@ -262,19 +255,20 @@ async def tempadmin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not has_bot_perm:
         return await update.message.reply_text(bot_error_msg)
     
+    user_id, name = await get_user_id(update, context)
+    if not user_id:
+        return await update.message.reply_text("Usage: /tempadmin @username <time> [title] or reply with /tempadmin <time> [title]")
+
+    # Extract time and title
     if update.message.reply_to_message:
         if len(context.args) < 1:
             return await update.message.reply_text("Usage: /tempadmin @username <time> [title] or reply with /tempadmin <time> [title]")
-        target_user = update.message.reply_to_message.from_user
-        user_id = target_user.id
-        name = target_user.full_name
         time_str = context.args[0]
         title = " ".join(context.args[1:]) if len(context.args) > 1 else None
     else:
+        # First arg was user ID/username, second is time, rest is title
         if len(context.args) < 2:
             return await update.message.reply_text("Usage: /tempadmin @username <time> [title] or reply with /tempadmin <time> [title]")
-        user_id = context.args[0]
-        name = user_id
         time_str = context.args[1]
         title = " ".join(context.args[2:]) if len(context.args) > 2 else None
     
