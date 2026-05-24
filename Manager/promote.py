@@ -11,7 +11,8 @@ from telegram.ext import ContextTypes, CommandHandler
 from Manager.actions import parse_time, is_admin, check_admin_permission, check_bot_permission
 from settings_manager_mongo import get_chat_settings
 from anonymous_admin import is_anonymous_admin, check_anonymous_admin_promote_permission
-from user_manager_mongo import sync_admins, remove_admin_cache, get_user_id
+from admin_manager_mongo import sync_admins, remove_admin_cache
+from user_manager_mongo import get_user_id
 
 # Privilege presets
 LIMITED_PRIVS = ChatAdministratorRights(
