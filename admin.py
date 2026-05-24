@@ -17,7 +17,7 @@ from admin_manager_mongo import sync_admins, update_admin_cache, remove_admin_ca
 PERMISSIONS_MAP = {
     "can_change_info": "Change Group Info",
     "can_delete_messages": "Delete Messages",
-    "can_restrict_members": "Ban Users",
+    "can_restrict_members": "Muter/Ban Users",
     "can_invite_users": "Invite Users via Link",
     "can_pin_messages": "Pin Messages",
     "can_post_stories": "Post Stories",
