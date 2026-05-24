@@ -93,21 +93,13 @@ async def can_user_ban(chat_id, user_id, context):
         if member.status == 'creator':
             return True, None
         
-        # Check if admin has custom can_ban_users permission
-        # Note: We use can_ban_users as a custom toggle in the promote panel
-        if not getattr(member, 'can_ban_users', False):
-            # Fallback check if it's not a direct attribute (check database or telegram rights)
-            # Since Telegram doesn't have a separate 'mute' and 'ban' right, 
-            # we rely on our promote panel setting.
-            # If the user has 'can_restrict_members' in Telegram, we check our custom flag.
-            if not member.can_restrict_members:
-                return False, "❌ You don't have permission to ban users. You need the 'Ban Users' permission."
-            
-            # If they have Telegram right but we want to split it, we need to check our cache
-            from admin_manager_mongo import get_stored_admin_permissions
-            admin_data = get_stored_admin_permissions(chat_id, user_id)
-            if admin_data and not admin_data.get('can_ban_users', False):
-                 return False, "❌ You have Muter permission but not Ban permission."
+        # Check if user is explicitly marked as a Muter (role in MongoDB)
+        if check_is_muter(chat_id, user_id):
+            return False, "❌ You have Muter permission but not Ban permission."
+
+        # Check if user has the actual Telegram permission to restrict members (Ban/Mute)
+        if not member.can_restrict_members:
+            return False, "❌ You don't have permission to ban users. You need the 'Ban Users' permission."
 
         return True, None
     except Exception as e:
