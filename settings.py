@@ -252,7 +252,7 @@ def get_main_settings_keyboard(chat_id):
              InlineKeyboardButton("📏 Length", callback_data="set_view_msg_length")],
             [InlineKeyboardButton("🛡️ Mod", callback_data="set_view_mod"),
              InlineKeyboardButton("🤖 BotProt", callback_data="set_view_bot_protection")],
-            [InlineKeyboardButton("🔗 Spam", callback_data="set_view_link_spam"),
+            [InlineKeyboardButton("🔗 LinkProt", callback_data="set_view_link_spam"),
              InlineKeyboardButton("🔄 Fwd", callback_data="set_view_forward_protection")],
             [InlineKeyboardButton("🔑 Cmd", callback_data="set_view_command_access"),
              InlineKeyboardButton("🎛️ Perms", callback_data="set_view_command_permissions")],
@@ -277,7 +277,7 @@ def get_main_settings_keyboard(chat_id):
             [InlineKeyboardButton("📏 Message Length", callback_data="set_view_msg_length"),
              InlineKeyboardButton("🛡️ Moderation", callback_data="set_view_mod")],
             [InlineKeyboardButton("🤖 Bot Protection", callback_data="set_view_bot_protection"),
-             InlineKeyboardButton("🔗 Link Spam", callback_data="set_view_link_spam")],
+             InlineKeyboardButton("🔗 Link Protection", callback_data="set_view_link_spam")],
             [InlineKeyboardButton("🔄 Forward Protect", callback_data="set_view_forward_protection"),
              InlineKeyboardButton("🔑 Cmd Access", callback_data="set_view_command_access")],
             [InlineKeyboardButton("🎛️ Command Perms", callback_data="set_view_command_permissions"),
@@ -727,7 +727,7 @@ def get_link_spam_settings_keyboard(settings):
     status = "✅" if settings.get("link_spam_protection_enabled", False) else "❌"
     apply_on = settings.get("link_spam_apply_on", "members").capitalize()
     keyboard = [
-        [InlineKeyboardButton(f"Link Spam Protection: {status}", callback_data="set_toggle_link_spam_protection_enabled")],
+        [InlineKeyboardButton(f"Link Protection: {status}", callback_data="set_toggle_link_spam_protection_enabled")],
         [InlineKeyboardButton(f"Apply On: {apply_on}", callback_data="set_toggle_link_spam_apply_on")],
         [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
     ]
@@ -1304,8 +1304,9 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             await edit_bot_response(
                 query, context,
-                "🔗 Link Spam Protection Settings\n\nAutomatically delete messages containing links from members:",
-                reply_markup=get_link_spam_settings_keyboard(settings)
+                "🔗 <b>Link Protection Settings</b>\n\nAutomatically delete messages containing links from the selected group:",
+                reply_markup=get_link_spam_settings_keyboard(settings),
+                parse_mode='HTML'
             )
         except BadRequest: pass
         await query.answer()

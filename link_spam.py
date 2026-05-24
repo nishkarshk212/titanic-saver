@@ -44,20 +44,21 @@ async def check_link_spam(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Check "Apply On" setting
     apply_on = settings.get("link_spam_apply_on", "members")
-    is_admin = user_id == OWNER_ID or await is_user_admin(chat_id, user_id, context)
+    is_admin = await is_user_admin(chat_id, user_id, context)
+    is_owner = user_id == OWNER_ID
     
     # Logic for "Apply On"
     if apply_on == "members":
-        if is_admin:
-            return # Skip admins and owner
+        # Apply ONLY on members (Exempt Admins and Owner)
+        if is_admin or is_owner:
+            return
     elif apply_on == "admins":
-        if not is_admin:
-            return # Skip regular members
-        if user_id == OWNER_ID:
-            return # Still skip owner
+        # Apply ONLY on admins (Exempt regular members and Owner)
+        if not is_admin or is_owner:
+            return
     elif apply_on == "everyone":
-        if user_id == OWNER_ID:
-            return # Still skip owner
+        # Apply on EVERYONE including owner
+        pass
     
     # Check if message contains a link
     message_text = update.message.text or update.message.caption or ""

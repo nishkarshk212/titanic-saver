@@ -298,18 +298,16 @@ async def handle_blocking(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if emergency_active and emergency_type:
             if settings.get(f"emergency_block_{emergency_type}"):
                 if apply_on == "everyone":
-                    # Everyone is blocked, even owner
+                    # Everyone is blocked, including owner
                     return False
                 if apply_on == "admins":
-                    # Only admins (and owner) are blocked? 
-                    # User says "apply on set on admin then apply on admin only"
-                    # Usually owner is the highest admin.
-                    if is_admin:
+                    # ONLY admins are blocked (Owner is exempt unless part of 'everyone')
+                    if is_admin and not is_owner:
                         return False
-                    return True # Members are freed
+                    return True # Members and Owner are freed
                 if apply_on == "members":
-                    # Only members are blocked
-                    if not is_admin:
+                    # ONLY members are blocked
+                    if not is_admin and not is_owner:
                         return False
                     return True # Admins and Owner are freed
         
