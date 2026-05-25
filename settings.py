@@ -547,8 +547,11 @@ def get_welcome_button_manage_keyboard(idx):
     """Keyboard for managing a specific welcome button."""
     keyboard = [
         [
-            InlineKeyboardButton("🗑️ Remove", callback_data=f"set_config_welcome_btn_remove_{idx}"),
-            InlineKeyboardButton("✍️ Modify", callback_data=f"set_config_welcome_btn_modify_{idx}")
+            InlineKeyboardButton("🗑️ Remove", callback_data=f"set_config_welcome_btn_remove_{idx}")
+        ],
+        [
+            InlineKeyboardButton("✍️ Modify Text", callback_data=f"set_config_welcome_btn_modtext_{idx}"),
+            InlineKeyboardButton("🔗 Modify Link", callback_data=f"set_config_welcome_btn_modlink_{idx}")
         ],
         [InlineKeyboardButton("🔙 Back", callback_data="set_view_welcome")]
     ]
@@ -2495,6 +2498,32 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     await settings_callback(update, context)
                 return
             
+            elif action == "modtext":
+                if btn_idx < len(welcome_buttons):
+                    context.user_data["waiting_for_config"] = {
+                        "section": "welcome", 
+                        "type": "buttons_modtext", 
+                        "chat_id": chat_id, 
+                        "user_id": user_id,
+                        "btn_idx": btn_idx
+                    }
+                    await query.message.reply_text(f"Please send the NEW text for <b>Button {btn_idx+1}</b>:", parse_mode='HTML')
+                    await query.answer("Please send the new text.")
+                return
+
+            elif action == "modlink":
+                if btn_idx < len(welcome_buttons):
+                    context.user_data["waiting_for_config"] = {
+                        "section": "welcome", 
+                        "type": "buttons_modlink", 
+                        "chat_id": chat_id, 
+                        "user_id": user_id,
+                        "btn_idx": btn_idx
+                    }
+                    await query.message.reply_text(f"Please send the NEW URL for <b>Button {btn_idx+1}</b>:", parse_mode='HTML')
+                    await query.answer("Please send the new link.")
+                return
+
             elif action == "modify":
                 if btn_idx < len(welcome_buttons):
                     # We'll use the same input logic but mark it as a modification
@@ -2633,6 +2662,30 @@ async def handle_setting_input(update: Update, context: ContextTypes.DEFAULT_TYP
                     current_buttons = settings.get(f"{section}_buttons", [])
                     if btn_idx is not None and btn_idx < len(current_buttons):
                         current_buttons[btn_idx] = {"text": btn_text, "url": btn_url}
+                        update_chat_setting(chat_id, f"{section}_buttons", current_buttons)
+                        success = True
+            except Exception: pass
+    elif config_type == "buttons_modtext":
+        if update.message.text:
+            try:
+                btn_idx = config_data.get("btn_idx")
+                settings = get_chat_settings(chat_id)
+                current_buttons = settings.get(f"{section}_buttons", [])
+                if btn_idx is not None and btn_idx < len(current_buttons):
+                    current_buttons[btn_idx]["text"] = update.message.text
+                    update_chat_setting(chat_id, f"{section}_buttons", current_buttons)
+                    success = True
+            except Exception: pass
+    elif config_type == "buttons_modlink":
+        if update.message.text:
+            try:
+                btn_url = update.message.text.strip()
+                if btn_url.startswith("http"):
+                    btn_idx = config_data.get("btn_idx")
+                    settings = get_chat_settings(chat_id)
+                    current_buttons = settings.get(f"{section}_buttons", [])
+                    if btn_idx is not None and btn_idx < len(current_buttons):
+                        current_buttons[btn_idx]["url"] = btn_url
                         update_chat_setting(chat_id, f"{section}_buttons", current_buttons)
                         success = True
             except Exception: pass
