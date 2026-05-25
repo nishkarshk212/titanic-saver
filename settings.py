@@ -2628,7 +2628,7 @@ async def handle_setting_input(update: Update, context: ContextTypes.DEFAULT_TYP
             try:
                 btn_text, btn_url = [x.strip() for x in update.message.text.split("|", 1)]
                 if btn_url.startswith("http"):
-                    btn_idx = waiting_info.get("btn_idx")
+                    btn_idx = config_data.get("btn_idx")
                     settings = get_chat_settings(chat_id)
                     current_buttons = settings.get(f"{section}_buttons", [])
                     if btn_idx is not None and btn_idx < len(current_buttons):
