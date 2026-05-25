@@ -14,6 +14,8 @@ from moderation_manager_mongo import (
 from user_manager_mongo import resolve_username, get_user_id, is_user_admin
 from anonymous_admin import is_anonymous_admin, check_anonymous_admin_ban_permission, check_anonymous_admin_mute_permission
 
+from staff_manager_mongo import increment_staff_stat
+
 async def can_user_mute(chat_id, user_id, context):
     """Check if a user can mute/unmute (Admin or Muter)."""
     # Owner can always mute
@@ -192,6 +194,10 @@ async def ban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
         admin_name = update.effective_user.first_name if update.effective_user else "Channel Admin"
         await log_to_channel(context, f"🔨 #BAN\nTarget: {target_name} ({target_id})\nAdmin: {admin_name}")
+        
+        # Record stats
+        if sender_id:
+            increment_staff_stat(chat_id, sender_id, "ban")
     except Exception as e:
         await send_bot_response(update, context, f"Error: {e}")
 
@@ -231,6 +237,10 @@ async def unban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
         admin_name = update.effective_user.first_name if update.effective_user else "Channel Admin"
         await log_to_channel(context, f"🔓 #UNBAN\nTarget: {target_name} ({target_id})\nAdmin: {admin_name}")
+        
+        # Record stats
+        if sender_id:
+            increment_staff_stat(chat_id, sender_id, "unban")
     except Exception as e:
         await send_bot_response(update, context, f"Error: {e}")
 
@@ -369,6 +379,10 @@ async def mute_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         await context.bot.restrict_chat_member(chat_id, user_id, permissions=ChatPermissions(can_send_messages=False))
         await send_bot_response(update, context, f"🔇 Muted {user_name}.")
+        
+        # Record stats
+        if sender_id:
+            increment_staff_stat(chat_id, sender_id, "mute")
     except Exception as e:
         await send_bot_response(update, context, f"Error: {e}")
 
@@ -397,6 +411,10 @@ async def unmute_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             can_add_web_page_previews=True
         ))
         await send_bot_response(update, context, f"🔊 Unmuted {user_name}.")
+        
+        # Record stats
+        if sender_id:
+            increment_staff_stat(chat_id, sender_id, "unmute")
     except Exception as e:
         await send_bot_response(update, context, f"Error: {e}")
 
@@ -508,6 +526,10 @@ async def warn_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await send_bot_response(update, context, f"⛔ User <code>{user_id}</code> reached warn limit ({limit}/{limit}) and was kicked.", parse_mode=ParseMode.HTML)
     else:
         await send_bot_response(update, context, f"⚠️ User <code>{user_id}</code> has been warned. ({current_warns}/{limit})", parse_mode=ParseMode.HTML)
+    
+    # Record stats
+    if sender_id:
+        increment_staff_stat(chat_id, sender_id, "warn")
 
 async def unwarn_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id

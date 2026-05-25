@@ -10,6 +10,7 @@ from anonymous_admin import (
     check_anonymous_admin_pin_permission, 
     check_anonymous_admin_change_info_permission
 )
+from staff_manager_mongo import get_staff_stats
 from Manager.actions import check_admin_permission, check_bot_permission
 from admin_manager_mongo import sync_admins, update_admin_cache, remove_admin_cache
 
@@ -668,6 +669,54 @@ async def unpin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await send_bot_response(update, context, f"Failed to unpin message: {str(e)}")
 
+async def staffstats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show admin performance analytics."""
+    chat = update.effective_chat
+    user = update.effective_user
+    
+    # Permission check: Change Group Info AND Ban Users
+    # We check them one by one
+    has_info_perm, _ = await check_admin_permission(update, context, 'can_change_info')
+    has_ban_perm, _ = await check_admin_permission(update, context, 'can_restrict_members')
+    
+    if not (has_info_perm and has_ban_perm):
+        return await send_bot_response(update, context, "❌ You need both 'Change Group Info' and 'Ban Users' permissions to view staff statistics.")
+
+    stats = get_staff_stats(chat.id)
+    
+    if not stats:
+        return await send_bot_response(update, context, "📈 No staff statistics recorded yet for this group.")
+
+    text = f"📊 <b>Admin Performance - {chat.title}</b>\n\n"
+    
+    # Show top 10 admins
+    for i, s in enumerate(stats[:10], 1):
+        admin_id = s.get("admin_id")
+        actions = s.get("actions", {})
+        total = s.get("total_actions", 0)
+        
+        # Try to get admin name
+        try:
+            member = await chat.get_member(admin_id)
+            name = member.user.first_name
+        except:
+            name = f"Admin {admin_id}"
+            
+        text += f"{i}. <b>{name}</b> (<code>{admin_id}</code>)\n"
+        text += f"   └ Total Actions: <code>{total}</code>\n"
+        
+        details = []
+        if actions.get("ban"): details.append(f"Bans: {actions['ban']}")
+        if actions.get("mute"): details.append(f"Mutes: {actions['mute']}")
+        if actions.get("warn"): details.append(f"Warns: {actions['warn']}")
+        if actions.get("purge"): details.append(f"Purged: {actions['purge']} msgs")
+        
+        if details:
+            text += f"   └ " + " | ".join(details) + "\n"
+        text += "\n"
+
+    await send_bot_response(update, context, text, parse_mode=ParseMode.HTML)
+
 def get_admin_handlers():
     return [
         CommandHandler("promote", promote_user),
@@ -675,6 +724,7 @@ def get_admin_handlers():
         CommandHandler("reload", reload_command),
         CommandHandler("pin", pin_command),
         CommandHandler("unpin", unpin_command),
+        CommandHandler("staffstats", staffstats_command),
         CommandHandler("setadmintitle", set_admin_title_command),
         CommandHandler("deladmintitle", delete_admin_title_command),
         CallbackQueryHandler(toggle_permission, pattern="^toggle_"),

@@ -39,6 +39,7 @@ def parse_time(time_str):
 from user_manager_mongo import get_user_id
 from voice_chat import remove_user_from_vc
 from database import get_collection, COLLECTIONS
+from staff_manager_mongo import increment_staff_stat
 import uuid
 
 async def is_admin(chat, user_id):
@@ -253,6 +254,9 @@ async def ban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text += f"\nReason: {reason}"
         
         await update.message.reply_text(text)
+        
+        # Record stats
+        increment_staff_stat(chat.id, user.id, "ban")
     except Exception as e:
         await update.message.reply_text(f"Failed to ban user: {str(e)}")
 
@@ -303,6 +307,9 @@ async def unban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text += f"\nReason: {reason}"
         
         await update.message.reply_text(text)
+        
+        # Record stats
+        increment_staff_stat(chat.id, user.id, "unban")
     except Exception as e:
         await update.message.reply_text(f"Failed to unban user: {str(e)}")
 

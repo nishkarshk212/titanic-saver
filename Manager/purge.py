@@ -9,6 +9,7 @@ from telegram.ext import ContextTypes, CommandHandler
 from telegram.error import Forbidden, BadRequest
 from settings_manager_mongo import get_chat_settings
 from Manager.actions import check_admin_permission, check_bot_permission
+from staff_manager_mongo import increment_staff_stat
 
 def divide_chunks(l, n=100):
     """Divide list into chunks."""
@@ -55,6 +56,11 @@ async def purge(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.delete()
         count = len(message_ids)
         confirm = await update.message.reply_text(f"✅ | **Deleted `{count}` messages.**", parse_mode='Markdown')
+        
+        # Record stats
+        if update.effective_user:
+            increment_staff_stat(chat.id, update.effective_user.id, "purge", count)
+            
         await asyncio.sleep(3)
         await confirm.delete()
     except Forbidden:
@@ -95,6 +101,11 @@ async def spurge(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     await asyncio.sleep(int(str(e).split()[-1]))
         
         await update.message.delete()
+        
+        # Record stats
+        if update.effective_user:
+            count = len(message_ids)
+            increment_staff_stat(chat.id, update.effective_user.id, "purge", count)
     except Forbidden:
         await update.message.reply_text("I can't delete messages in this chat.")
     except Exception as e:
@@ -192,6 +203,11 @@ async def purge_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 break
                 
         await status_msg.edit_text(f"✅ **Global purge complete!**\nTotal deleted: `{deleted_count}` messages\nAll service messages, VC invites, and joins have been cleared.", parse_mode='Markdown')
+        
+        # Record stats
+        if update.effective_user:
+            increment_staff_stat(chat.id, update.effective_user.id, "purge", deleted_count)
+            
         await asyncio.sleep(5)
         await status_msg.delete()
     except Exception as e:
