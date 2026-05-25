@@ -528,9 +528,9 @@ def get_welcome_settings_keyboard(settings):
     
     # List added buttons if any
     if welcome_buttons:
-        for idx, btn in enumerate(welcome_buttons, 1):
-            btn_text = btn.get("text", f"Btn {idx}")
-            keyboard.append([InlineKeyboardButton(f"Button {idx}: {btn_text}", callback_data="set_none")])
+        for idx, btn in enumerate(welcome_buttons):
+            btn_text = btn.get("text", f"Btn {idx+1}")
+            keyboard.append([InlineKeyboardButton(f"Button {idx+1}: {btn_text}", callback_data=f"set_config_welcome_btn_manage_{idx}")])
     
     keyboard.extend([
         [InlineKeyboardButton("📝 Set Welcome Text", callback_data="set_config_welcome_text")],
@@ -541,6 +541,17 @@ def get_welcome_settings_keyboard(settings):
         ],
         [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
     ])
+    return InlineKeyboardMarkup(keyboard)
+
+def get_welcome_button_manage_keyboard(idx):
+    """Keyboard for managing a specific welcome button."""
+    keyboard = [
+        [
+            InlineKeyboardButton("🗑️ Remove", callback_data=f"set_config_welcome_btn_remove_{idx}"),
+            InlineKeyboardButton("✍️ Modify", callback_data=f"set_config_welcome_btn_modify_{idx}")
+        ],
+        [InlineKeyboardButton("🔙 Back", callback_data="set_view_welcome")]
+    ]
     return InlineKeyboardMarkup(keyboard)
 
 def get_clean_settings_keyboard(settings):
@@ -2450,6 +2461,58 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data.startswith("set_config_"):
         config_full = data.replace("set_config_", "")
         
+        # Handle welcome button management
+        if config_full.startswith("welcome_btn_"):
+            parts = config_full.split("_")
+            action = parts[2] # manage, remove, modify
+            btn_idx = int(parts[3])
+            
+            settings = get_chat_settings(chat_id)
+            welcome_buttons = settings.get("welcome_buttons", [])
+            
+            if action == "manage":
+                if btn_idx < len(welcome_buttons):
+                    btn = welcome_buttons[btn_idx]
+                    text = (
+                        f"🔧 <b>Manage Welcome Button {btn_idx+1}</b>\n\n"
+                        f"<b>Text:</b> {btn.get('text')}\n"
+                        f"<b>URL:</b> {btn.get('url')}\n\n"
+                        "What do you want to do with this button?"
+                    )
+                    try:
+                        await edit_bot_response(query, context, text, reply_markup=get_welcome_button_manage_keyboard(btn_idx), parse_mode='HTML')
+                    except BadRequest: pass
+                await query.answer()
+                return
+            
+            elif action == "remove":
+                if btn_idx < len(welcome_buttons):
+                    welcome_buttons.pop(btn_idx)
+                    update_chat_setting(chat_id, "welcome_buttons", welcome_buttons)
+                    await query.answer("Button removed!")
+                    # Go back to welcome settings
+                    query.data = "set_view_welcome"
+                    await settings_callback(update, context)
+                return
+            
+            elif action == "modify":
+                if btn_idx < len(welcome_buttons):
+                    # We'll use the same input logic but mark it as a modification
+                    context.user_data["waiting_for_config"] = {
+                        "section": "welcome", 
+                        "type": "buttons_modify", 
+                        "chat_id": chat_id, 
+                        "user_id": user_id,
+                        "btn_idx": btn_idx
+                    }
+                    prompt = (
+                        f"Please send the NEW text and URL for <b>Button {btn_idx+1}</b> in this format:\n"
+                        "`Button Text | https://t.me/yourlink`"
+                    )
+                    await query.message.reply_text(prompt, parse_mode='HTML')
+                    await query.answer("Please send the new button details.")
+                return
+
         # Handle clear buttons separately
         if config_full.endswith("_clear"):
             section = config_full.replace("_buttons_clear", "")
@@ -2559,6 +2622,19 @@ async def handle_setting_input(update: Update, context: ContextTypes.DEFAULT_TYP
                     current_buttons.append({"text": btn_text, "url": btn_url})
                     update_chat_setting(chat_id, f"{section}_buttons", current_buttons)
                     success = True
+            except Exception: pass
+    elif config_type == "buttons_modify":
+        if update.message.text and "|" in update.message.text:
+            try:
+                btn_text, btn_url = [x.strip() for x in update.message.text.split("|", 1)]
+                if btn_url.startswith("http"):
+                    btn_idx = waiting_info.get("btn_idx")
+                    settings = get_chat_settings(chat_id)
+                    current_buttons = settings.get(f"{section}_buttons", [])
+                    if btn_idx is not None and btn_idx < len(current_buttons):
+                        current_buttons[btn_idx] = {"text": btn_text, "url": btn_url}
+                        update_chat_setting(chat_id, f"{section}_buttons", current_buttons)
+                        success = True
             except Exception: pass
     elif config_type == "button":
         if update.message.text and "|" in update.message.text:

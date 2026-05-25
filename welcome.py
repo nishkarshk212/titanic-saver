@@ -147,10 +147,17 @@ async def set_welcome_button(update: Update, context: ContextTypes.DEFAULT_TYPE)
     button_text = args[0]
     button_url = args[1]
     
-    update_chat_setting(chat_id, "welcome_button_text", button_text)
-    update_chat_setting(chat_id, "welcome_button_url", button_url)
+    if not button_url.startswith("http"):
+        await update.message.reply_text("❌ URL must start with http:// or https://")
+        return
+        
+    welcome_buttons = settings.get("welcome_buttons", [])
+    welcome_buttons.append({"text": button_text, "url": button_url})
     
-    await update.message.reply_text(f"Welcome button updated: {button_text} -> {button_url}")
+    update_chat_setting(chat_id, "welcome_buttons", welcome_buttons)
+    update_chat_setting(chat_id, "welcome_button_enabled", True)
+    
+    await update.message.reply_text(f"✅ Button added to welcome message: {button_text} -> {button_url}")
 
 async def send_welcome(chat, user, context: ContextTypes.DEFAULT_TYPE):
     """Sends the welcome message to a specific user in a chat."""
@@ -167,8 +174,6 @@ async def send_welcome(chat, user, context: ContextTypes.DEFAULT_TYPE):
     media_enabled = settings.get('welcome_media_enabled', True)
     button_enabled = settings.get('welcome_button_enabled', True)
     welcome_buttons = settings.get('welcome_buttons', [])
-    button_text = settings.get('welcome_button_text')
-    button_url = settings.get('welcome_button_url')
 
     reply_markup = None
     if button_enabled:
@@ -178,10 +183,6 @@ async def send_welcome(chat, user, context: ContextTypes.DEFAULT_TYPE):
             if btn.get("text") and btn.get("url"):
                 keyboard.append([InlineKeyboardButton(btn["text"], url=btn["url"])])
         
-        # Fallback to single button if no multiple buttons but single button exists
-        if not keyboard and button_text and button_url:
-            keyboard.append([InlineKeyboardButton(button_text, url=button_url)])
-            
         if keyboard:
             reply_markup = InlineKeyboardMarkup(keyboard)
             logging.info(f"Generated welcome keyboard with {len(keyboard)} buttons")
