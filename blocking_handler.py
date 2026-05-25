@@ -328,8 +328,8 @@ async def handle_blocking(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # In user_permissions, True means freed/allowed, False/missing means blocked
         freed = user_perms.get(block_key, False)
         
-        # Admins are always freed from standard blocks (non-emergency)
-        if not emergency_active and is_admin:
+        # Admins are always freed from standard blocks
+        if is_admin:
             return True
             
         logging.info(f"[BLOCKING] is_user_freed({block_key}) = {freed}")
