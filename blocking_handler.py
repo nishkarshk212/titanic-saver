@@ -12,7 +12,7 @@ import httpx
 from config import OWNER_ID, send_bot_response
 from settings_manager_mongo import get_chat_settings, update_chat_setting
 from user_manager_mongo import is_user_admin, cache_user, can_user_configure_settings, get_user_id
-from moderation import can_user_ban
+from moderation import can_user_ban, can_user_mute
 
 # DEFAULT_SETTINGS for blocking (will be merged with MongoDB settings)
 DEFAULT_BLOCKING_SETTINGS = {
@@ -599,10 +599,8 @@ async def free_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logging.info(f"[FREE] Processing command for chat {chat_id}, user {user_id}")
     
     # Only admins with specific permissions can use this command
-    can_ban, error_msg = await can_user_ban(chat_id, user_id, context)
-    logging.info(f"[FREE] Permission check result: {can_ban}, error: {error_msg}")
-    if not can_ban:
-        await send_bot_response(update, context, error_msg or "Only admins with 'Ban Users' permission can use the /free command.")
+    if not await can_user_mute(chat_id, user_id, context):
+        await send_bot_response(update, context, "Only admins with 'Mute Users' permission can use the /free command.")
         return
     
     # Resolve the target user
@@ -699,9 +697,8 @@ async def unfree_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             user_id = 1087968824
             
     # Only admins with specific permissions can use this command
-    can_ban, error_msg = await can_user_ban(chat_id, user_id, context)
-    if not can_ban:
-        await send_bot_response(update, context, error_msg or "Only admins with 'Ban Users' permission can use the /unfree command.")
+    if not await can_user_mute(chat_id, user_id, context):
+        await send_bot_response(update, context, "Only admins with 'Mute Users' permission can use the /unfree command.")
         return
     
     # Resolve target user
@@ -738,8 +735,7 @@ async def list_freed_members(update: Update, context: ContextTypes.DEFAULT_TYPE)
     user_id = update.effective_user.id
     
     # Only admins with specific permissions can use this
-    can_ban, _ = await can_user_ban(chat_id, user_id, context)
-    if not can_ban:
+    if not await can_user_mute(chat_id, user_id, context):
         await query.answer("You don't have permission to view freed members.", show_alert=True)
         return
     
@@ -966,8 +962,7 @@ async def free_permission_callback(update: Update, context: ContextTypes.DEFAULT
         admin_id = 1087968824
     
     # Check permissions
-    can_ban, _ = await can_user_ban(chat_id, admin_id, context)
-    if not can_ban:
+    if not await can_user_mute(chat_id, admin_id, context):
         await query.answer("You don't have permission to manage exemptions.", show_alert=True)
         return
 
@@ -1013,8 +1008,7 @@ async def free_permission_toggle(update: Update, context: ContextTypes.DEFAULT_T
     perm_key = "_".join(parts[4:])
     
     # Check permissions
-    can_ban, _ = await can_user_ban(chat_id, admin_id, context)
-    if not can_ban:
+    if not await can_user_mute(chat_id, admin_id, context):
         await query.answer("You don't have permission to manage exemptions.", show_alert=True)
         return
 
@@ -1069,8 +1063,7 @@ async def free_permission_save(update: Update, context: ContextTypes.DEFAULT_TYP
     user_id_str = str(user_id)
     
     # Check permissions
-    can_ban, _ = await can_user_ban(chat_id, admin_id, context)
-    if not can_ban:
+    if not await can_user_mute(chat_id, admin_id, context):
         await query.answer("You don't have permission to manage exemptions.", show_alert=True)
         return
     

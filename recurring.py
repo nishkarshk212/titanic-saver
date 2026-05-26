@@ -359,6 +359,10 @@ async def count_recurring_messages(update: Update, context: ContextTypes.DEFAULT
     if not update.effective_chat or update.effective_chat.type not in ['group', 'supergroup']:
         return
         
+    # Only count actual new messages, ignore edits and reactions
+    if not update.message:
+        return
+        
     chat_id = update.effective_chat.id
     settings = get_chat_settings(chat_id)
     recurring_messages = settings.get("recurring_messages", [])
