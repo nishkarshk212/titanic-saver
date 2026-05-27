@@ -615,6 +615,11 @@ async def free_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "This will exempt them from all blocking rules.")
         return
     
+    # Check if target is an admin
+    if await is_user_admin(chat_id, target_user_id, context):
+        await send_bot_response(update, context, "❌ I cannot exempt another administrator as they are already freed by default.")
+        return
+    
     # Get current settings
     settings = get_chat_settings(chat_id)
     user_permissions = settings.get("user_permissions", {})
@@ -711,6 +716,11 @@ async def unfree_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "• /unfree <user_id>\n"
             "• /unfree @username\n\n"
             "This will remove all blocking exemptions from them.")
+        return
+    
+    # Check if target is an admin
+    if await is_user_admin(chat_id, target_user_id, context):
+        await send_bot_response(update, context, "❌ This user is an administrator and cannot be restricted by blocking rules.")
         return
     
     # Get current settings

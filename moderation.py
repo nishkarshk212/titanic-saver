@@ -182,6 +182,11 @@ async def ban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await send_bot_response(update, context, "Please reply to a user/channel or provide an ID/username to ban.")
         return
 
+    # Check if target is an admin
+    if await is_user_admin(chat_id, target_id, context):
+        await send_bot_response(update, context, "❌ I cannot ban another administrator.")
+        return
+
     try:
         if str(target_id).startswith('-100'):
             # It's a channel/chat
@@ -376,6 +381,11 @@ async def mute_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id, user_name = await get_user_id(update, context)
     if not user_id: return
 
+    # Check if target is an admin
+    if await is_user_admin(chat_id, user_id, context):
+        await send_bot_response(update, context, "❌ I cannot mute another administrator.")
+        return
+
     try:
         await context.bot.restrict_chat_member(chat_id, user_id, permissions=ChatPermissions(can_send_messages=False))
         await send_bot_response(update, context, f"🔇 Muted {user_name}.")
@@ -505,6 +515,11 @@ async def warn_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id, user_name = await get_user_id(update, context)
     if not user_id: return
+
+    # Check if target is an admin
+    if await is_user_admin(chat_id, user_id, context):
+        await send_bot_response(update, context, "❌ I cannot warn another administrator.")
+        return
 
     settings = get_chat_settings(chat_id)
     limit = settings.get("warn_limit", 3)
