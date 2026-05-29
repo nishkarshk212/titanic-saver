@@ -36,6 +36,10 @@ notification_cache = {}
 # Map call IDs to chat entities
 call_to_chat = {}
 
+# Glitch/Dedox Protection
+vc_glitch_cache = {} # (chat_id, user_id) -> timestamp
+vc_flood_counter = {} # chat_id -> (count, timestamp)
+
 # Pending invites: (chat_id, user_id) -> list of message_ids to delete upon join
 pending_invites = {}
 
@@ -68,6 +72,21 @@ async def start_voice_chat_monitor(application: Application):
         logger.error(f"❌ Failed to start Telethon client: {e}")
         return
     
+    @telethon_client.on(events.Raw(UpdateGroupCall))
+    async def handle_group_call_update(event):
+        """Handles updates to group calls to map call IDs to chat entities."""
+        try:
+            call = event.call
+            if hasattr(event, 'chat_id') and event.chat_id:
+                # For PeerChat/PeerChannel, telethon often provides chat_id
+                try:
+                    entity = await telethon_client.get_entity(event.chat_id)
+                    call_to_chat[call.id] = entity
+                    logger.info(f"📞 Mapped call {call.id} to chat {entity.id}")
+                except: pass
+        except Exception as e:
+            logger.error(f"Error in handle_group_call_update: {e}")
+
     @telethon_client.on(events.Raw(UpdateGroupCallParticipants))
     async def handle_voice_chat_join(event):
         """Handles voice chat join events for Users and Channels."""
@@ -103,24 +122,31 @@ async def auto_ghost_cleaner_task():
 async def _process_vc_join_event(event):
     """Internal function to process VC join events asynchronously."""
     try:
-        # Check if we should even process this based on common flood patterns
-        if len(event.participants) > 5:
-            # High volume of joins, might be a flood or glitch
-            logger.warning(f"High VC activity: {len(event.participants)} joins. Skipping to avoid flood.")
+        call_id = event.call.id
+        chat_entity = call_to_chat.get(call_id)
+        
+        # Glitch/Dedox Safety: Check for massive join events
+        if len(event.participants) > 10:
+            logger.warning(f"⚠️ Massive VC join detected ({len(event.participants)} users). Potential glitch/dedox.")
+            if chat_entity:
+                chat_id = chat_entity.id
+                # If safety is enabled, trigger a clean
+                settings = get_chat_settings(chat_id)
+                if settings.get("vc_safety_enabled", False):
+                    asyncio.create_task(clean_ghost_participants(chat_id))
             return
 
-        chat_entity = call_to_chat.get(event.call.id)
-        
         if not chat_entity:
-            # Instead of iter_dialogs (slow/flood prone), try to use the call info if possible
-            # or just wait for the next event where we might have the entity
+            # Try to resolve call from cache or recently active calls
+            # If still not found, we might need to skip or try get_entity on the call
             pass
 
         for participant in event.participants:
+            # Check if participant is joining (has 'date') or just state update
             if not hasattr(participant, 'date') or participant.date is None:
                 continue
             
-            asyncio.create_task(_process_single_participant(event.call.id, participant, chat_entity))
+            asyncio.create_task(_process_single_participant(call_id, participant, chat_entity))
     except Exception as e:
         logger.error(f"❌ Error in _process_vc_join_event: {e}")
 
@@ -143,8 +169,17 @@ async def _process_single_participant(call_id, participant, chat_entity):
         # Deduplicate and Rate Limit
         cache_key = f"{user_id}_{call_id}"
         now = datetime.datetime.now()
+        
+        # Glitch/Dedox Protection: If user joins too frequently, ignore
+        if cache_key in vc_glitch_cache:
+            last_join = vc_glitch_cache[cache_key]
+            if (now - last_join).total_seconds() < 10: # Joined in last 10 seconds
+                logger.warning(f"🚫 Glitch detected: User {user_id} joining too fast. Ignoring.")
+                return
+        vc_glitch_cache[cache_key] = now
+
         if cache_key in notification_cache:
-            if (now - notification_cache[cache_key]).total_seconds() < 300: # Increase to 5 mins
+            if (now - notification_cache[cache_key]).total_seconds() < 300: # 5 mins cooldown
                 return
         notification_cache[cache_key] = now
 
@@ -154,8 +189,6 @@ async def _process_single_participant(call_id, participant, chat_entity):
                 entity = await asyncio.wait_for(telethon_client.get_entity(peer), timeout=2.0)
                 name = getattr(entity, 'first_name', getattr(entity, 'title', "Unknown"))
             except (ValueError, asyncio.TimeoutError):
-                # If entity not found or timeout, don't crash, just use placeholders or skip
-                # Skipping is better to avoid "Unknown" spam
                 return
 
             if peer_type == "channel":
@@ -164,7 +197,7 @@ async def _process_single_participant(call_id, participant, chat_entity):
                 mention = f'<a href="tg://user?id={user_id}">{name}</a>'
             
             if not chat_entity:
-                # Try to resolve chat from PTB cache if telethon fails
+                # If we don't have chat_entity, we can't send notification to correct chat
                 return
 
             group_name = chat_entity.title if hasattr(chat_entity, 'title') else "the group"
@@ -180,8 +213,29 @@ async def _process_single_participant(call_id, participant, chat_entity):
             if not settings.get("vc_user_join_enabled", True):
                 return
 
-            # Proceed with notification...
-            # (Rest of the logic remains similar but inside this background task)
+            # VC Glitch Safety: Check for flood in this specific chat
+            chat_flood_key = settings_chat_id
+            count, last_ts = vc_flood_counter.get(chat_flood_key, (0, now))
+            if (now - last_ts).total_seconds() < 60:
+                count += 1
+            else:
+                count = 1
+            vc_flood_counter[chat_flood_key] = (count, now)
+            
+            if count > 15: # More than 15 joins in 60 seconds
+                if settings.get("vc_safety_enabled", False):
+                    logger.warning(f"🚨 VC Flood in {settings_chat_id}. Enabling auto-clean.")
+                    asyncio.create_task(clean_ghost_participants(settings_chat_id))
+                return
+
+            # Delete pending invite notifications if they exist
+            invite_key = (settings_chat_id, user_id)
+            if invite_key in pending_invites:
+                msg_ids = pending_invites.pop(invite_key, [])
+                for mid in msg_ids:
+                    try:
+                        await ptb_application.bot.delete_message(chat_id=settings_chat_id, message_id=mid)
+                    except: pass
             
             welcome_text = (
                 f"<blockquote>\n"
