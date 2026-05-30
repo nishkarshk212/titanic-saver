@@ -705,27 +705,38 @@ async def forceban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Ban by user ID or @username even if user is not in the group."""
     chat_id = update.effective_chat.id
     sender_id = update.effective_user.id if update.effective_user else None
+    logger = logging.getLogger(__name__)
     
     if not await check_bot_admin_rights(chat_id, context, ['can_restrict_members']):
+        logger.warning(f"forceban: bot missing restrict rights in {chat_id}")
         return await send_bot_response(update, context, "Bot needs restrict members permission.")
     
     target_id, target_name = await get_user_id(update, context)
+    logger.info(f"forceban: chat={chat_id}, target_id={target_id}, target_name={target_name}, args={context.args}")
+    
     if not target_id:
+        logger.warning(f"forceban: no target resolved")
         return await send_bot_response(update, context, "Provide a user ID or @username.")
     
     try:
+        logger.info(f"forceban: calling ban_chat_member(chat={chat_id}, user={target_id})")
         await context.bot.ban_chat_member(chat_id, target_id)
+        logger.info(f"forceban: SUCCESS - banned {target_id} in {chat_id}")
         await send_bot_response(update, context, f"✅ Banned {target_name} (ID: <code>{target_id}</code>).")
         admin_name = update.effective_user.first_name if update.effective_user else "Admin"
         await log_to_channel(context, f"🔨 #FORCEBAN\nTarget: {target_name} ({target_id})\nAdmin: {admin_name}")
         if sender_id:
             increment_staff_stat(chat_id, sender_id, "ban")
     except BadRequest as e:
+        logger.error(f"forceban: BadRequest - {e}")
         if "user not found" in str(e).lower() or "invalid" in str(e).lower():
             await send_bot_response(update, context, f"Invalid user ID <code>{target_id}</code>. Check the ID and try again.")
+        elif "not enough rights" in str(e).lower() or "need administrator" in str(e).lower():
+            await send_bot_response(update, context, "Bot has no rights to ban members in this group.")
         else:
             await send_bot_response(update, context, f"Error: {e}")
     except Exception as e:
+        logger.error(f"forceban: exception - {type(e).__name__}: {e}")
         await send_bot_response(update, context, f"Error: {e}")
 
 def get_moderation_handlers():
