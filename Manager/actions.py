@@ -7,8 +7,9 @@ import asyncio
 import logging
 from datetime import datetime, timedelta
 from telegram import Update, ChatPermissions, ChatMemberAdministrator, ChatMemberOwner, ChatMemberBanned, ChatMemberRestricted, ReplyParameters, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.error import BadRequest
 from telegram.ext import ContextTypes, CommandHandler, MessageHandler, filters, CallbackQueryHandler
-from telegram.constants import ChatMemberStatus
+from telegram.constants import ChatMemberStatus, ParseMode
 from settings_manager_mongo import get_chat_settings
 from anonymous_admin import (
     is_anonymous_admin, 
@@ -233,27 +234,27 @@ async def ban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await update.message.reply_text("Usage: /ban @username [reason] or reply to a user with /ban [reason]")
     
     try:
-        member = await chat.get_member(user_id)
-        if isinstance(member, (ChatMemberAdministrator, ChatMemberOwner)):
-            return await update.message.reply_text("I cannot ban an admin or the group owner.")
-        
-        if isinstance(member, ChatMemberBanned):
-            return await update.message.reply_text("User is already banned.")
+        try:
+            member = await chat.get_member(user_id)
+            if isinstance(member, (ChatMemberAdministrator, ChatMemberOwner)):
+                return await update.message.reply_text("I cannot ban an admin or the group owner.")
+            if isinstance(member, ChatMemberBanned):
+                return await update.message.reply_text("User is already banned.")
+        except BadRequest as e:
+            if "user not found" not in str(e).lower():
+                raise
+            # User not in group — still allow ban by ID/username
         
         await chat.ban_member(user_id)
         
-        # Remove from VC if safety is enabled
-        if settings.get("vc_safety_enabled", False):
-            await remove_user_from_vc(chat.id, user_id)
-        
         admin_name = user.full_name
         text = f"» Ban a user in {chat.title}\n"
-        text += f" User  : {name}\n"
+        text += f" User  : {name} (ID: <code>{user_id}</code>)\n"
         text += f" Admin : {admin_name}"
         if reason:
             text += f"\nReason: {reason}"
         
-        await update.message.reply_text(text)
+        await update.message.reply_text(text, parse_mode=ParseMode.HTML)
         
         # Record stats
         increment_staff_stat(chat.id, user.id, "ban")
