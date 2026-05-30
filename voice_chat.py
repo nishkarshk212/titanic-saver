@@ -49,6 +49,9 @@ _vc_monitor_start_ts = None
 # Calls we've already resolved but the bot isn't a member — skip resolution next time
 _skipped_calls = set()
 
+# Tracks call_ids whose first post-gate state dump has already been suppressed
+_post_gate_sync_done = set()
+
 async def start_voice_chat_monitor(application: Application):
     """Starts the Telethon client to monitor voice chat events."""
     global telethon_client, ptb_application
@@ -247,6 +250,27 @@ async def _process_vc_join_event(event):
             if chat_entity:
                 cid = chat_entity.id if not isinstance(chat_entity, int) else chat_entity
                 asyncio.create_task(clean_ghost_participants(cid))
+
+        # First event after gate: suppress notifications for all current participants
+        # (state dump of existing VC members — not real joins)
+        if call_id not in _post_gate_sync_done:
+            _post_gate_sync_done.add(call_id)
+            now = datetime.datetime.now()
+            silent_count = 0
+            for participant in event.participants:
+                if not hasattr(participant, 'date') or participant.date is None:
+                    continue
+                peer = participant.peer
+                uid = None
+                if isinstance(peer, PeerUser):
+                    uid = peer.user_id
+                elif isinstance(peer, PeerChannel):
+                    uid = peer.channel_id
+                if uid:
+                    notification_cache[f"{uid}_{call_id}"] = now
+                    silent_count += 1
+            logger.info(f"Pre-populated notification cache for {silent_count} existing participants in call {call_id}")
+            return
 
         for participant in event.participants:
             # Check if participant is joining (has 'date') or just state update
