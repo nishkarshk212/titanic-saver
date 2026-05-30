@@ -43,6 +43,9 @@ vc_flood_counter = {} # chat_id -> (count, timestamp)
 # Pending invites: (chat_id, user_id) -> list of message_ids to delete upon join
 pending_invites = {}
 
+# Timestamp when the monitor started — ignore UpdateGroupCallParticipants for first 15s
+_vc_monitor_start_ts = None
+
 async def start_voice_chat_monitor(application: Application):
     """Starts the Telethon client to monitor voice chat events."""
     global telethon_client, ptb_application
@@ -92,6 +95,8 @@ async def start_voice_chat_monitor(application: Application):
     # Connect and start the client properly
     try:
         await telethon_client.start()
+        global _vc_monitor_start_ts
+        _vc_monitor_start_ts = datetime.datetime.now()
         logger.info("✅ Telethon client started successfully!")
         
         # Register PTB handlers for invite notifications and VC commands
@@ -198,6 +203,12 @@ async def _process_vc_join_event(event):
     """Internal function to process VC join events asynchronously."""
     try:
         call_id = event.call.id
+        
+        # Skip initial state dump events during the first 15 seconds after startup
+        if _vc_monitor_start_ts and (datetime.datetime.now() - _vc_monitor_start_ts).total_seconds() < 15:
+            logger.info(f"Ignoring initial state sync for call {call_id} ({len(event.participants)} participants)")
+            return
+        
         chat_entity = call_to_chat.get(call_id)
         
         # If call_to_chat missing, try resolving the chat from the call itself
