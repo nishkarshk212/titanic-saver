@@ -77,15 +77,21 @@ async def start_voice_chat_monitor(application: Application):
                 return
             logger.info(f"📞 UpdateGroupCall: call_id={call.id}, peer_id={peer_id}")
             try:
-                entity = await telethon_client.get_entity(peer_id)
+                peer_type_name = type(peer).__name__ if peer else "None"
                 peer_full = peer_id if peer_id < 0 else int(f"-100{peer_id}")
                 try:
                     await ptb_application.bot.get_chat(peer_full)
                 except:
                     logger.info(f"📞 Skipping call {call.id}: bot not in chat {peer_full}")
                     return
-                call_to_chat[call.id] = entity
-                logger.info(f"📞 Mapped call {call.id} to chat {entity.id}")
+                # Try to get Telethon entity, but fall back to just the chat ID
+                try:
+                    entity = await telethon_client.get_entity(peer_id)
+                    call_to_chat[call.id] = entity
+                    logger.info(f"📞 Mapped call {call.id} to chat {entity.id} (entity)")
+                except Exception as ent_err:
+                    logger.info(f"📞 Mapped call {call.id} to chat {peer_full} (ID only, get_entity failed: {ent_err})")
+                    call_to_chat[call.id] = peer_full
             except Exception as e:
                 logger.warning(f"Could not get entity for call {call.id} peer {peer_id}: {e}")
         except Exception as e:
