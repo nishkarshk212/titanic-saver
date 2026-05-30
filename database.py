@@ -120,6 +120,7 @@ def close_connection():
 COLLECTIONS = {
     "users": "users",
     "settings": "chat_settings",
+    "SETTINGS": "chat_settings",
     "warns": "warns",
     "muters": "muters",
     "voice_chat_managers": "voice_chat_managers",

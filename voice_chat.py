@@ -54,13 +54,34 @@ async def start_voice_chat_monitor(application: Application):
 
     logger.info("🎙 Starting Voice Chat Monitor...")
     telethon_client = TelegramClient(StringSession(STRING_SESSION), API_ID, API_HASH)
+
+    # Register Telethon event handlers BEFORE connecting to avoid missing events
+    @telethon_client.on(events.Raw(UpdateGroupCall))
+    async def handle_group_call_update(event):
+        """Handles updates to group calls to map call IDs to chat entities."""
+        try:
+            call = event.call
+            if hasattr(event, 'chat_id') and event.chat_id:
+                try:
+                    entity = await telethon_client.get_entity(event.chat_id)
+                    call_to_chat[call.id] = entity
+                    logger.info(f"📞 Mapped call {call.id} to chat {entity.id}")
+                except Exception as e:
+                    logger.warning(f"Could not get entity for call {call.id} chat {event.chat_id}: {e}")
+        except Exception as e:
+            logger.error(f"Error in handle_group_call_update: {e}")
+
+    @telethon_client.on(events.Raw(UpdateGroupCallParticipants))
+    async def handle_voice_chat_join(event):
+        """Handles voice chat join events for Users and Channels."""
+        asyncio.create_task(_process_vc_join_event(event))
     
     # Connect and start the client properly
     try:
         await telethon_client.start()
         logger.info("✅ Telethon client started successfully!")
         
-        # Manually trigger handler registration in case it was missed
+        # Register PTB handlers for invite notifications and VC commands
         handlers = get_voice_chat_handlers()
         for handler in handlers:
             ptb_application.add_handler(handler)
@@ -71,27 +92,6 @@ async def start_voice_chat_monitor(application: Application):
     except Exception as e:
         logger.error(f"❌ Failed to start Telethon client: {e}")
         return
-    
-    @telethon_client.on(events.Raw(UpdateGroupCall))
-    async def handle_group_call_update(event):
-        """Handles updates to group calls to map call IDs to chat entities."""
-        try:
-            call = event.call
-            if hasattr(event, 'chat_id') and event.chat_id:
-                # For PeerChat/PeerChannel, telethon often provides chat_id
-                try:
-                    entity = await telethon_client.get_entity(event.chat_id)
-                    call_to_chat[call.id] = entity
-                    logger.info(f"📞 Mapped call {call.id} to chat {entity.id}")
-                except: pass
-        except Exception as e:
-            logger.error(f"Error in handle_group_call_update: {e}")
-
-    @telethon_client.on(events.Raw(UpdateGroupCallParticipants))
-    async def handle_voice_chat_join(event):
-        """Handles voice chat join events for Users and Channels."""
-        # Process everything in a non-blocking way
-        asyncio.create_task(_process_vc_join_event(event))
 
 async def cleanup_vc_caches():
     """Clean up expired entries from glitch/flood/notification caches."""
@@ -124,7 +124,7 @@ async def auto_ghost_cleaner_task():
             await cleanup_vc_caches()
             
             # Find all chats with vc_safety_enabled = True
-            collection = get_collection(COLLECTIONS['SETTINGS'])
+            collection = get_collection(COLLECTIONS['settings'])
             if collection is None:
                 await asyncio.sleep(1800)
                 continue
@@ -159,9 +159,14 @@ async def _process_vc_join_event(event):
                     asyncio.create_task(clean_ghost_participants(chat_id))
 
         if not chat_entity:
-            # Try to resolve call from cache or recently active calls
-            # If still not found, we might need to skip or try get_entity on the call
-            pass
+            try:
+                group_call = await telethon_client(GetGroupCallRequest(call=event.call, limit=1))
+                if hasattr(group_call, 'chats') and group_call.chats:
+                    chat_entity = group_call.chats[0]
+                    call_to_chat[call_id] = chat_entity
+                    logger.info(f"📞 Resolved call {call_id} to chat {chat_entity.id} via GetGroupCallRequest")
+            except Exception as e:
+                logger.warning(f"Could not resolve chat for call {call_id}: {e}")
 
         for participant in event.participants:
             # Check if participant is joining (has 'date') or just state update
@@ -189,21 +194,23 @@ async def _process_single_participant(call_id, participant, chat_entity):
         if not user_id: return
         
         # Deduplicate and Rate Limit
-        cache_key = f"{user_id}_{call_id}"
         now = datetime.datetime.now()
         
-        # Glitch/Dedox Protection: If user joins too frequently, ignore
-        if cache_key in vc_glitch_cache:
-            last_join = vc_glitch_cache[cache_key]
-            if (now - last_join).total_seconds() < 10: # Joined in last 10 seconds
+        # Glitch/Dedox Protection: Include the participant's join date to distinguish
+        # actual new joins from Telethon re-sending existing participants in state updates
+        glitch_key = f"{user_id}_{call_id}_{participant.date}"
+        if glitch_key in vc_glitch_cache:
+            last_join = vc_glitch_cache[glitch_key]
+            if (now - last_join).total_seconds() < 10:
                 logger.warning(f"🚫 Glitch detected: User {user_id} joining too fast. Ignoring.")
                 return
-        vc_glitch_cache[cache_key] = now
+        vc_glitch_cache[glitch_key] = now
 
-        if cache_key in notification_cache:
-            if (now - notification_cache[cache_key]).total_seconds() < 300: # 5 mins cooldown
+        notif_key = f"{user_id}_{call_id}"
+        if notif_key in notification_cache:
+            if (now - notification_cache[notif_key]).total_seconds() < 300: # 5 mins cooldown
                 return
-        notification_cache[cache_key] = now
+        notification_cache[notif_key] = now
 
         # Use timeout and handle "Entity not found" gracefully
         try:
