@@ -290,7 +290,6 @@ async def _process_single_participant(call_id, participant, chat_entity):
         if notif_key in notification_cache:
             if (now - notification_cache[notif_key]).total_seconds() < 300: # 5 mins cooldown
                 return
-        notification_cache[notif_key] = now
 
         # Use timeout and handle "Entity not found" gracefully
         try:
@@ -398,6 +397,8 @@ async def _process_single_participant(call_id, participant, chat_entity):
                 parse_mode=ParseMode.HTML,
                 disable_web_page_preview=True
             )
+            
+            notification_cache[notif_key] = datetime.datetime.now()
             
             # Auto delete
             async def auto_delete_notification(c_id, m_id):
