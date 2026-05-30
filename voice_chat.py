@@ -61,16 +61,17 @@ async def start_voice_chat_monitor(application: Application):
         """Handles updates to group calls to map call IDs to chat entities."""
         try:
             call = event.call
-            if hasattr(event, 'chat_id') and event.chat_id:
+            chat_id_val = getattr(event, 'chat_id', None)
+            logger.info(f"📞 UpdateGroupCall received: call_id={call.id}, chat_id={chat_id_val}")
+            if chat_id_val:
                 try:
-                    entity = await telethon_client.get_entity(event.chat_id)
+                    entity = await telethon_client.get_entity(chat_id_val)
                     call_to_chat[call.id] = entity
                     logger.info(f"📞 Mapped call {call.id} to chat {entity.id}")
                 except Exception as e:
-                    logger.warning(f"Could not get entity for call {call.id} chat {event.chat_id}: {e}")
-                    # Store raw chat_id as fallback
-                    call_to_chat[call.id] = event.chat_id
-                    logger.info(f"📞 Stored raw chat_id {event.chat_id} for call {call.id}")
+                    logger.warning(f"Could not get entity for call {call.id} chat {chat_id_val}: {e}")
+                    call_to_chat[call.id] = chat_id_val
+                    logger.info(f"📞 Stored raw chat_id {chat_id_val} for call {call.id}")
         except Exception as e:
             logger.error(f"Error in handle_group_call_update: {e}")
 
@@ -167,17 +168,28 @@ async def _process_vc_join_event(event):
                     asyncio.create_task(clean_ghost_participants(chat_id))
 
         if not chat_entity:
-            logger.info(f"📞 Attempting GetGroupCallRequest for call {call_id}...")
+            logger.info(f"📞 Resolving chat for call {call_id} by querying known groups...")
             try:
-                group_call = await telethon_client(GetGroupCallRequest(call=event.call, limit=1))
-                if hasattr(group_call, 'chats') and group_call.chats:
-                    chat_entity = group_call.chats[0]
-                    call_to_chat[call_id] = chat_entity
-                    logger.info(f"📞 Resolved call {call_id} to chat {chat_entity.id} via GetGroupCallRequest")
-                else:
-                    logger.warning(f"GetGroupCallResponse has no chats: {type(group_call)} attrs={dir(group_call) if hasattr(group_call, '__dir__') else 'N/A'}")
+                settings_col = get_collection(COLLECTIONS['settings'])
+                if settings_col:
+                    all_chats = await settings_col.find({}).to_list(length=None)
+                    for chat_doc in all_chats:
+                        cid = chat_doc.get("chat_id")
+                        if not cid:
+                            continue
+                        try:
+                            clean_id = int(str(cid).replace('-100', ''))
+                            full = await telethon_client(GetFullChannelRequest(channel=clean_id))
+                            if (hasattr(full, 'full_chat') and hasattr(full.full_chat, 'call')
+                                    and full.full_chat.call and full.full_chat.call.id == call_id):
+                                chat_entity = await telethon_client.get_entity(clean_id)
+                                call_to_chat[call_id] = chat_entity
+                                logger.info(f"📞 Resolved call {call_id} to group {clean_id} via scan")
+                                break
+                        except:
+                            continue
             except Exception as e:
-                logger.warning(f"Could not resolve chat for call {call_id}: {type(e).__name__}: {e}")
+                logger.warning(f"Chat scan failed for call {call_id}: {e}")
 
         for participant in event.participants:
             # Check if participant is joining (has 'date') or just state update
@@ -408,6 +420,20 @@ async def voice_chat_invite_handler(update: Update, context: ContextTypes.DEFAUL
     
     chat_id = update.effective_chat.id
     settings = get_chat_settings(chat_id)
+    
+    # Pre-populate call_to_chat mapping for this chat
+    if telethon_client and telethon_client.is_connected():
+        try:
+            tele_chat_id = int(str(chat_id).replace('-100', ''))
+            full = await telethon_client(GetFullChannelRequest(channel=tele_chat_id))
+            if hasattr(full, 'full_chat') and hasattr(full.full_chat, 'call') and full.full_chat.call:
+                call_id = full.full_chat.call.id
+                if call_id not in call_to_chat:
+                    chat_entity = await telethon_client.get_entity(tele_chat_id)
+                    call_to_chat[call_id] = chat_entity
+                    logger.info(f"📞 Pre-mapped call {call_id} to chat {chat_id} via invite handler")
+        except Exception as e:
+            logger.warning(f"Could not pre-map call for chat {chat_id}: {e}")
     
     enabled = settings.get("vc_invite_notification_enabled", True)
     logger.info(f"VC invite notification enabled: {enabled}")
