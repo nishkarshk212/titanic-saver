@@ -200,6 +200,17 @@ async def _process_vc_join_event(event):
         call_id = event.call.id
         chat_entity = call_to_chat.get(call_id)
         
+        # If call_to_chat missing, try resolving the chat from the call itself
+        if not chat_entity:
+            try:
+                result = await telethon_client(GetGroupCallRequest(call=event.call, limit=1))
+                if result.chats:
+                    chat_entity = result.chats[0]
+                    call_to_chat[call_id] = chat_entity
+                    logger.info(f"Resolved call {call_id} -> chat {chat_entity.id}")
+            except Exception as resolve_err:
+                logger.warning(f"Could not resolve chat for call {call_id}: {resolve_err}")
+        
         # Glitch/Dedox Safety: Massive join events
         if len(event.participants) > 10:
             logger.warning(f"⚠️ Massive VC join event ({len(event.participants)} users).")
