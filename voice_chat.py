@@ -155,7 +155,7 @@ async def scan_active_vcs():
     try:
         logger.info("🔍 Scanning groups for active VCs...")
         collection = get_collection(COLLECTIONS['settings'])
-        if not collection:
+        if collection is None:
             return
         all_chats = await collection.find({}).to_list(length=None)
         count = 0
@@ -184,45 +184,14 @@ async def _process_vc_join_event(event):
     """Internal function to process VC join events asynchronously."""
     try:
         call_id = event.call.id
-        call_access_hash = getattr(event.call, 'access_hash', 'N/A')
         chat_entity = call_to_chat.get(call_id)
-        
-        logger.info(f"📞 _process_vc_join_event: call_id={call_id}, chat_entity={'YES' if chat_entity else 'NO'}, participants={len(event.participants)}, call_to_chat_size={len(call_to_chat)}")
         
         # Glitch/Dedox Safety: Massive join events
         if len(event.participants) > 10:
-            logger.warning(f"⚠️ Massive VC join event ({len(event.participants)} users). Potential glitch/dedox.")
-            if isinstance(chat_entity, int):
-                asyncio.create_task(clean_ghost_participants(chat_entity))
-            elif chat_entity:
-                chat_id = chat_entity.id
-                settings = get_chat_settings(chat_id)
-                if settings.get("vc_safety_enabled", False):
-                    asyncio.create_task(clean_ghost_participants(chat_id))
-
-        if not chat_entity:
-            logger.info(f"📞 Resolving chat for call {call_id} by querying known groups...")
-            try:
-                settings_col = get_collection(COLLECTIONS['settings'])
-                if settings_col:
-                    all_chats = await settings_col.find({}).to_list(length=None)
-                    for chat_doc in all_chats:
-                        cid = chat_doc.get("chat_id")
-                        if not cid:
-                            continue
-                        try:
-                            clean_id = int(str(cid).replace('-100', ''))
-                            full = await telethon_client(GetFullChannelRequest(channel=clean_id))
-                            if (hasattr(full, 'full_chat') and hasattr(full.full_chat, 'call')
-                                    and full.full_chat.call and full.full_chat.call.id == call_id):
-                                chat_entity = await telethon_client.get_entity(clean_id)
-                                call_to_chat[call_id] = chat_entity
-                                logger.info(f"📞 Resolved call {call_id} to group {clean_id} via scan")
-                                break
-                        except:
-                            continue
-            except Exception as e:
-                logger.warning(f"Chat scan failed for call {call_id}: {e}")
+            logger.warning(f"⚠️ Massive VC join event ({len(event.participants)} users).")
+            if chat_entity:
+                cid = chat_entity.id if not isinstance(chat_entity, int) else chat_entity
+                asyncio.create_task(clean_ghost_participants(cid))
 
         for participant in event.participants:
             # Check if participant is joining (has 'date') or just state update
