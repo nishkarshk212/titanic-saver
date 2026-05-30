@@ -12,6 +12,7 @@ from moderation_manager_mongo import (
     add_voice_chat_manager, remove_voice_chat_manager, get_all_voice_chat_managers
 )
 from user_manager_mongo import resolve_username, get_user_id, is_user_admin
+import voice_chat
 from anonymous_admin import is_anonymous_admin, check_anonymous_admin_ban_permission, check_anonymous_admin_mute_permission
 
 from staff_manager_mongo import increment_staff_stat
@@ -713,6 +714,17 @@ async def forceban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     target_id, target_name = await get_user_id(update, context)
     logger.info(f"forceban: chat={chat_id}, target_id={target_id}, target_name={target_name}, args={context.args}")
+    
+    if not target_id and context.args:
+        raw = context.args[0].replace('@', '')
+        if not raw.isdigit() and voice_chat.telethon_client and voice_chat.telethon_client.is_connected():
+            try:
+                entity = await voice_chat.telethon_client.get_entity(raw)
+                target_id = entity.id
+                target_name = f"@{raw}"
+                logger.info(f"forceban: resolved via Telethon: {target_id}")
+            except Exception as tele_e:
+                logger.warning(f"forceban: Telethon resolution failed for {raw}: {tele_e}")
     
     if not target_id:
         logger.warning(f"forceban: no target resolved")
