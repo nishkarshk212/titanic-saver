@@ -702,45 +702,47 @@ async def edit_protection_callback(update: Update, context: ContextTypes.DEFAULT
             await query.answer(f"🔄 Reset warns for {user_id}")
             await query.edit_message_text(f"🔄 Warnings for {user_name} have been reset by an admin.", parse_mode='HTML')
 
+async def _resolve_telethon_target(update, context, logger):
+    """Fallback: resolve a @username via Telethon when get_user_id fails."""
+    if not context.args:
+        return None, None
+    raw = context.args[0].replace('@', '')
+    if raw.isdigit():
+        return None, None
+    if not voice_chat.telethon_client or not voice_chat.telethon_client.is_connected():
+        return None, None
+    try:
+        entity = await voice_chat.telethon_client.get_entity(raw)
+        logger.info(f"_resolve_telethon_target: resolved {raw} -> {entity.id}")
+        return entity.id, f"@{raw}"
+    except Exception as e:
+        logger.warning(f"_resolve_telethon_target: failed for {raw}: {e}")
+        return None, None
+
 async def forceban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Ban by user ID or @username even if user is not in the group."""
     chat_id = update.effective_chat.id
     sender_id = update.effective_user.id if update.effective_user else None
     logger = logging.getLogger(__name__)
-    
+
     if not await check_bot_admin_rights(chat_id, context, ['can_restrict_members']):
-        logger.warning(f"forceban: bot missing restrict rights in {chat_id}")
         return await send_bot_response(update, context, "Bot needs restrict members permission.")
-    
+
     target_id, target_name = await get_user_id(update, context)
-    logger.info(f"forceban: chat={chat_id}, target_id={target_id}, target_name={target_name}, args={context.args}")
-    
-    if not target_id and context.args:
-        raw = context.args[0].replace('@', '')
-        if not raw.isdigit() and voice_chat.telethon_client and voice_chat.telethon_client.is_connected():
-            try:
-                entity = await voice_chat.telethon_client.get_entity(raw)
-                target_id = entity.id
-                target_name = f"@{raw}"
-                logger.info(f"forceban: resolved via Telethon: {target_id}")
-            except Exception as tele_e:
-                logger.warning(f"forceban: Telethon resolution failed for {raw}: {tele_e}")
-    
     if not target_id:
-        logger.warning(f"forceban: no target resolved")
+        target_id, target_name = await _resolve_telethon_target(update, context, logger)
+
+    if not target_id:
         return await send_bot_response(update, context, "Provide a user ID or @username.")
-    
+
     try:
-        logger.info(f"forceban: calling ban_chat_member(chat={chat_id}, user={target_id})")
         await context.bot.ban_chat_member(chat_id, target_id)
-        logger.info(f"forceban: SUCCESS - banned {target_id} in {chat_id}")
         await send_bot_response(update, context, f"✅ Banned {target_name} (ID: <code>{target_id}</code>).", parse_mode=ParseMode.HTML)
         admin_name = update.effective_user.first_name if update.effective_user else "Admin"
         await log_to_channel(context, f"🔨 #FORCEBAN\nTarget: {target_name} ({target_id})\nAdmin: {admin_name}")
         if sender_id:
             increment_staff_stat(chat_id, sender_id, "ban")
     except BadRequest as e:
-        logger.error(f"forceban: BadRequest - {e}")
         if "user not found" in str(e).lower() or "invalid" in str(e).lower():
             await send_bot_response(update, context, f"Invalid user ID <code>{target_id}</code>. Check the ID and try again.", parse_mode=ParseMode.HTML)
         elif "not enough rights" in str(e).lower() or "need administrator" in str(e).lower():
@@ -748,13 +750,119 @@ async def forceban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await send_bot_response(update, context, f"Error: {e}")
     except Exception as e:
-        logger.error(f"forceban: exception - {type(e).__name__}: {e}")
+        await send_bot_response(update, context, f"Error: {e}")
+
+async def forceunban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Unban by user ID or @username even if user is not in the group."""
+    chat_id = update.effective_chat.id
+    sender_id = update.effective_user.id if update.effective_user else None
+    logger = logging.getLogger(__name__)
+
+    if not await check_bot_admin_rights(chat_id, context, ['can_restrict_members']):
+        return await send_bot_response(update, context, "Bot needs restrict members permission.")
+
+    target_id, target_name = await get_user_id(update, context)
+    if not target_id:
+        target_id, target_name = await _resolve_telethon_target(update, context, logger)
+
+    if not target_id:
+        return await send_bot_response(update, context, "Provide a user ID or @username.")
+
+    try:
+        await context.bot.unban_chat_member(chat_id, target_id)
+        await send_bot_response(update, context, f"✅ Unbanned {target_name} (ID: <code>{target_id}</code>).", parse_mode=ParseMode.HTML)
+        admin_name = update.effective_user.first_name if update.effective_user else "Admin"
+        await log_to_channel(context, f"🔓 #FORCEUNBAN\nTarget: {target_name} ({target_id})\nAdmin: {admin_name}")
+        if sender_id:
+            increment_staff_stat(chat_id, sender_id, "unban")
+    except BadRequest as e:
+        if "user not found" in str(e).lower() or "invalid" in str(e).lower():
+            await send_bot_response(update, context, f"Invalid user ID <code>{target_id}</code>. Check the ID and try again.", parse_mode=ParseMode.HTML)
+        else:
+            await send_bot_response(update, context, f"Error: {e}")
+    except Exception as e:
+        await send_bot_response(update, context, f"Error: {e}")
+
+async def forcemute_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Mute by user ID or @username even if user is not currently a member."""
+    chat_id = update.effective_chat.id
+    sender_id = update.effective_user.id if update.effective_user else None
+    logger = logging.getLogger(__name__)
+
+    if not await check_bot_admin_rights(chat_id, context, ['can_restrict_members']):
+        return await send_bot_response(update, context, "Bot needs restrict members permission.")
+
+    target_id, target_name = await get_user_id(update, context)
+    if not target_id:
+        target_id, target_name = await _resolve_telethon_target(update, context, logger)
+
+    if not target_id:
+        return await send_bot_response(update, context, "Provide a user ID or @username.")
+
+    try:
+        await context.bot.restrict_chat_member(chat_id, target_id, permissions=ChatPermissions(can_send_messages=False))
+        await send_bot_response(update, context, f"🔇 Muted {target_name} (ID: <code>{target_id}</code>).", parse_mode=ParseMode.HTML)
+        admin_name = update.effective_user.first_name if update.effective_user else "Admin"
+        await log_to_channel(context, f"🔇 #FORCEMUTE\nTarget: {target_name} ({target_id})\nAdmin: {admin_name}")
+        if sender_id:
+            increment_staff_stat(chat_id, sender_id, "mute")
+    except BadRequest as e:
+        if "user not found" in str(e).lower() or "invalid" in str(e).lower():
+            await send_bot_response(update, context, f"Invalid user ID <code>{target_id}</code>. Check the ID and try again.", parse_mode=ParseMode.HTML)
+        else:
+            await send_bot_response(update, context, f"Error: {e}")
+    except Exception as e:
+        await send_bot_response(update, context, f"Error: {e}")
+
+async def forceunmute_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Unmute by user ID or @username even if user is not currently a member."""
+    chat_id = update.effective_chat.id
+    sender_id = update.effective_user.id if update.effective_user else None
+    logger = logging.getLogger(__name__)
+
+    if not await check_bot_admin_rights(chat_id, context, ['can_restrict_members']):
+        return await send_bot_response(update, context, "Bot needs restrict members permission.")
+
+    target_id, target_name = await get_user_id(update, context)
+    if not target_id:
+        target_id, target_name = await _resolve_telethon_target(update, context, logger)
+
+    if not target_id:
+        return await send_bot_response(update, context, "Provide a user ID or @username.")
+
+    try:
+        await context.bot.restrict_chat_member(chat_id, target_id, permissions=ChatPermissions(
+            can_send_messages=True,
+            can_send_audios=True,
+            can_send_documents=True,
+            can_send_photos=True,
+            can_send_videos=True,
+            can_send_video_notes=True,
+            can_send_voice_notes=True,
+            can_send_polls=True,
+            can_send_other_messages=True,
+            can_add_web_page_previews=True
+        ))
+        await send_bot_response(update, context, f"🔊 Unmuted {target_name} (ID: <code>{target_id}</code>).", parse_mode=ParseMode.HTML)
+        admin_name = update.effective_user.first_name if update.effective_user else "Admin"
+        await log_to_channel(context, f"🔊 #FORCEUNMUTE\nTarget: {target_name} ({target_id})\nAdmin: {admin_name}")
+        if sender_id:
+            increment_staff_stat(chat_id, sender_id, "unmute")
+    except BadRequest as e:
+        if "user not found" in str(e).lower() or "invalid" in str(e).lower():
+            await send_bot_response(update, context, f"Invalid user ID <code>{target_id}</code>. Check the ID and try again.", parse_mode=ParseMode.HTML)
+        else:
+            await send_bot_response(update, context, f"Error: {e}")
+    except Exception as e:
         await send_bot_response(update, context, f"Error: {e}")
 
 def get_moderation_handlers():
     return [
         CommandHandler("ban", ban_command),
         CommandHandler("forceban", forceban_command),
+        CommandHandler("forceunban", forceunban_command),
+        CommandHandler("forcemute", forcemute_command),
+        CommandHandler("forceunmute", forceunmute_command),
         CommandHandler("unban", unban_command),
         CommandHandler("mute", mute_command),
         CommandHandler("unmute", unmute_command),
