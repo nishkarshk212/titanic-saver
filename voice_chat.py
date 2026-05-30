@@ -93,6 +93,9 @@ async def start_voice_chat_monitor(application: Application):
         
         # Start automatic ghost cleaner
         asyncio.create_task(auto_ghost_cleaner_task())
+        
+        # Pre-scan active VCs to populate call_to_chat mapping
+        asyncio.create_task(scan_active_vcs())
     except Exception as e:
         logger.error(f"❌ Failed to start Telethon client: {e}")
         return
@@ -146,6 +149,36 @@ async def auto_ghost_cleaner_task():
             logger.error(f"Error in auto_ghost_cleaner_task: {e}")
             
         await asyncio.sleep(3600) # Run every hour
+
+async def scan_active_vcs():
+    """Pre-scan all groups for active VCs to populate call_to_chat mapping."""
+    try:
+        logger.info("🔍 Scanning groups for active VCs...")
+        collection = get_collection(COLLECTIONS['settings'])
+        if not collection:
+            return
+        all_chats = await collection.find({}).to_list(length=None)
+        count = 0
+        for chat_doc in all_chats:
+            cid = chat_doc.get("chat_id")
+            if not cid:
+                continue
+            try:
+                clean_id = int(str(cid).replace('-100', ''))
+                full = await telethon_client(GetFullChannelRequest(channel=clean_id))
+                if hasattr(full, 'full_chat') and hasattr(full.full_chat, 'call') and full.full_chat.call:
+                    call_id = full.full_chat.call.id
+                    if call_id not in call_to_chat:
+                        entity = await telethon_client.get_entity(clean_id)
+                        call_to_chat[call_id] = entity
+                        count += 1
+                        logger.info(f"🔍 Pre-scanned active VC: call {call_id} in group {cid}")
+                await asyncio.sleep(2)
+            except:
+                continue
+        logger.info(f"🔍 Pre-scan complete: mapped {count} active VCs")
+    except Exception as e:
+        logger.error(f"Error in scan_active_vcs: {e}")
 
 async def _process_vc_join_event(event):
     """Internal function to process VC join events asynchronously."""
