@@ -68,6 +68,9 @@ async def start_voice_chat_monitor(application: Application):
                     logger.info(f"📞 Mapped call {call.id} to chat {entity.id}")
                 except Exception as e:
                     logger.warning(f"Could not get entity for call {call.id} chat {event.chat_id}: {e}")
+                    # Store raw chat_id as fallback
+                    call_to_chat[call.id] = event.chat_id
+                    logger.info(f"📞 Stored raw chat_id {event.chat_id} for call {call.id}")
         except Exception as e:
             logger.error(f"Error in handle_group_call_update: {e}")
 
@@ -147,26 +150,34 @@ async def _process_vc_join_event(event):
     """Internal function to process VC join events asynchronously."""
     try:
         call_id = event.call.id
+        call_access_hash = getattr(event.call, 'access_hash', 'N/A')
         chat_entity = call_to_chat.get(call_id)
+        
+        logger.info(f"📞 _process_vc_join_event: call_id={call_id}, chat_entity={'YES' if chat_entity else 'NO'}, participants={len(event.participants)}, call_to_chat_size={len(call_to_chat)}")
         
         # Glitch/Dedox Safety: Massive join events
         if len(event.participants) > 10:
             logger.warning(f"⚠️ Massive VC join event ({len(event.participants)} users). Potential glitch/dedox.")
-            if chat_entity:
+            if isinstance(chat_entity, int):
+                asyncio.create_task(clean_ghost_participants(chat_entity))
+            elif chat_entity:
                 chat_id = chat_entity.id
                 settings = get_chat_settings(chat_id)
                 if settings.get("vc_safety_enabled", False):
                     asyncio.create_task(clean_ghost_participants(chat_id))
 
         if not chat_entity:
+            logger.info(f"📞 Attempting GetGroupCallRequest for call {call_id}...")
             try:
                 group_call = await telethon_client(GetGroupCallRequest(call=event.call, limit=1))
                 if hasattr(group_call, 'chats') and group_call.chats:
                     chat_entity = group_call.chats[0]
                     call_to_chat[call_id] = chat_entity
                     logger.info(f"📞 Resolved call {call_id} to chat {chat_entity.id} via GetGroupCallRequest")
+                else:
+                    logger.warning(f"GetGroupCallResponse has no chats: {type(group_call)} attrs={dir(group_call) if hasattr(group_call, '__dir__') else 'N/A'}")
             except Exception as e:
-                logger.warning(f"Could not resolve chat for call {call_id}: {e}")
+                logger.warning(f"Could not resolve chat for call {call_id}: {type(e).__name__}: {e}")
 
         for participant in event.participants:
             # Check if participant is joining (has 'date') or just state update
@@ -226,11 +237,21 @@ async def _process_single_participant(call_id, participant, chat_entity):
                 mention = f'<a href="tg://user?id={user_id}">{name}</a>'
             
             if not chat_entity:
-                # If we don't have chat_entity, we can't send notification to correct chat
                 return
 
-            group_name = chat_entity.title if hasattr(chat_entity, 'title') else "the group"
-            chat_id = chat_entity.id
+            if isinstance(chat_entity, int):
+                chat_id = chat_entity
+                settings_chat_id = chat_id
+                if not str(chat_id).startswith('-100'):
+                    settings_chat_id = int(f"-100{chat_id}")
+                try:
+                    chat = await ptb_application.bot.get_chat(settings_chat_id)
+                    group_name = chat.title or "the group"
+                except:
+                    group_name = "the group"
+            else:
+                group_name = chat_entity.title if hasattr(chat_entity, 'title') else "the group"
+                chat_id = chat_entity.id
             
             # Normalize chat_id
             settings_chat_id = chat_id
