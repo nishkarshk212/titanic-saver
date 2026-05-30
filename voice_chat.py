@@ -61,17 +61,23 @@ async def start_voice_chat_monitor(application: Application):
         """Handles updates to group calls to map call IDs to chat entities."""
         try:
             call = event.call
-            chat_id_val = getattr(event, 'chat_id', None)
-            logger.info(f"📞 UpdateGroupCall received: call_id={call.id}, chat_id={chat_id_val}")
-            if chat_id_val:
-                try:
-                    entity = await telethon_client.get_entity(chat_id_val)
-                    call_to_chat[call.id] = entity
-                    logger.info(f"📞 Mapped call {call.id} to chat {entity.id}")
-                except Exception as e:
-                    logger.warning(f"Could not get entity for call {call.id} chat {chat_id_val}: {e}")
-                    call_to_chat[call.id] = chat_id_val
-                    logger.info(f"📞 Stored raw chat_id {chat_id_val} for call {call.id}")
+            peer = getattr(event, 'peer', None)
+            if peer is None:
+                logger.info(f"📞 UpdateGroupCall: call={call.id}, no peer (flags missing)")
+                return
+            peer_id = getattr(peer, 'channel_id', None) or getattr(peer, 'chat_id', None) or getattr(peer, 'user_id', None)
+            if peer_id is None:
+                logger.info(f"📞 UpdateGroupCall: call={call.id}, peer={type(peer).__name__} with no id")
+                return
+            logger.info(f"📞 UpdateGroupCall: call_id={call.id}, peer_id={peer_id}")
+            try:
+                entity = await telethon_client.get_entity(peer_id)
+                call_to_chat[call.id] = entity
+                logger.info(f"📞 Mapped call {call.id} to chat {entity.id}")
+            except Exception as e:
+                logger.warning(f"Could not get entity for call {call.id} peer {peer_id}: {e}")
+                call_to_chat[call.id] = peer_id
+                logger.info(f"📞 Stored raw peer_id {peer_id} for call {call.id}")
         except Exception as e:
             logger.error(f"Error in handle_group_call_update: {e}")
 
@@ -136,7 +142,7 @@ async def auto_ghost_cleaner_task():
                 await asyncio.sleep(1800)
                 continue
                 
-            chats_with_safety = await collection.find({"vc_safety_enabled": True}).to_list(length=None)
+            chats_with_safety = list(collection.find({"vc_safety_enabled": True}))
             
             for chat_doc in chats_with_safety:
                 chat_id = chat_doc.get("chat_id")
@@ -157,7 +163,7 @@ async def scan_active_vcs():
         collection = get_collection(COLLECTIONS['settings'])
         if collection is None:
             return
-        all_chats = await collection.find({}).to_list(length=None)
+        all_chats = list(collection.find({}))
         count = 0
         for chat_doc in all_chats:
             cid = chat_doc.get("chat_id")
