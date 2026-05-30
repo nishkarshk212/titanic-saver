@@ -72,12 +72,15 @@ async def start_voice_chat_monitor(application: Application):
             logger.info(f"📞 UpdateGroupCall: call_id={call.id}, peer_id={peer_id}")
             try:
                 entity = await telethon_client.get_entity(peer_id)
+                try:
+                    await ptb_application.bot.get_chat(peer_id)
+                except:
+                    logger.info(f"📞 Skipping call {call.id}: bot not in chat {peer_id}")
+                    return
                 call_to_chat[call.id] = entity
                 logger.info(f"📞 Mapped call {call.id} to chat {entity.id}")
             except Exception as e:
                 logger.warning(f"Could not get entity for call {call.id} peer {peer_id}: {e}")
-                call_to_chat[call.id] = peer_id
-                logger.info(f"📞 Stored raw peer_id {peer_id} for call {call.id}")
         except Exception as e:
             logger.error(f"Error in handle_group_call_update: {e}")
 
@@ -175,6 +178,11 @@ async def scan_active_vcs():
                 if hasattr(full, 'full_chat') and hasattr(full.full_chat, 'call') and full.full_chat.call:
                     call_id = full.full_chat.call.id
                     if call_id not in call_to_chat:
+                        try:
+                            await ptb_application.bot.get_chat(cid)
+                        except:
+                            logger.info(f"🔍 Skipping group {cid}: bot not a member")
+                            continue
                         entity = await telethon_client.get_entity(clean_id)
                         call_to_chat[call_id] = entity
                         count += 1
@@ -360,6 +368,8 @@ async def _process_single_participant(call_id, participant, chat_entity):
             asyncio.create_task(auto_delete_notification(settings_chat_id, sent_message.message_id))
             
         except Exception as e:
+            if "Chat not found" in str(e):
+                call_to_chat.pop(call_id, None)
             logger.error(f"Error in _process_single_participant: {e}")
     except Exception as e:
         logger.error(f"❌ Error processing participant: {e}")
