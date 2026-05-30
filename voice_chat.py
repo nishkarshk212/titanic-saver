@@ -93,12 +93,36 @@ async def start_voice_chat_monitor(application: Application):
         # Process everything in a non-blocking way
         asyncio.create_task(_process_vc_join_event(event))
 
+async def cleanup_vc_caches():
+    """Clean up expired entries from glitch/flood/notification caches."""
+    now = datetime.datetime.now()
+    
+    # Clean vc_glitch_cache entries older than 30 seconds
+    expired_glitch = [k for k, ts in vc_glitch_cache.items() if (now - ts).total_seconds() > 30]
+    for k in expired_glitch:
+        del vc_glitch_cache[k]
+    if expired_glitch:
+        logger.debug(f"Cleaned {len(expired_glitch)} expired glitch cache entries")
+    
+    # Clean notification_cache entries older than 6 minutes (buffer above 5min cooldown)
+    expired_notif = [k for k, ts in notification_cache.items() if (now - ts).total_seconds() > 360]
+    for k in expired_notif:
+        del notification_cache[k]
+    
+    # Clean flood counter entries older than 90 seconds
+    expired_flood = [k for k, (c, ts) in vc_flood_counter.items() if (now - ts).total_seconds() > 90]
+    for k in expired_flood:
+        del vc_flood_counter[k]
+
 async def auto_ghost_cleaner_task():
-    """Periodically cleans up ghost participants in groups with VC Safety enabled."""
+    """Periodically cleans up ghost participants and VC caches."""
     await asyncio.sleep(60) # Initial delay
     
     while True:
         try:
+            # Clean up expired cache entries first
+            await cleanup_vc_caches()
+            
             # Find all chats with vc_safety_enabled = True
             collection = get_collection(COLLECTIONS['SETTINGS'])
             if collection is None:
@@ -125,16 +149,14 @@ async def _process_vc_join_event(event):
         call_id = event.call.id
         chat_entity = call_to_chat.get(call_id)
         
-        # Glitch/Dedox Safety: Check for massive join events
+        # Glitch/Dedox Safety: Massive join events
         if len(event.participants) > 10:
-            logger.warning(f"⚠️ Massive VC join detected ({len(event.participants)} users). Potential glitch/dedox.")
+            logger.warning(f"⚠️ Massive VC join event ({len(event.participants)} users). Potential glitch/dedox.")
             if chat_entity:
                 chat_id = chat_entity.id
-                # If safety is enabled, trigger a clean
                 settings = get_chat_settings(chat_id)
                 if settings.get("vc_safety_enabled", False):
                     asyncio.create_task(clean_ghost_participants(chat_id))
-            return
 
         if not chat_entity:
             # Try to resolve call from cache or recently active calls
@@ -293,10 +315,6 @@ async def _process_single_participant(call_id, participant, chat_entity):
             logger.error(f"Error in _process_single_participant: {e}")
     except Exception as e:
         logger.error(f"❌ Error processing participant: {e}")
-
-
-    await telethon_client.start()
-    logger.info("✅ Telethon client started successfully!")
 
 async def vc_join_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handles the 'Join Voice Chat' button click for old messages."""
