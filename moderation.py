@@ -734,7 +734,7 @@ async def forceban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.info(f"forceban: calling ban_chat_member(chat={chat_id}, user={target_id})")
         await context.bot.ban_chat_member(chat_id, target_id)
         logger.info(f"forceban: SUCCESS - banned {target_id} in {chat_id}")
-        await send_bot_response(update, context, f"✅ Banned {target_name} (ID: <code>{target_id}</code>).")
+        await send_bot_response(update, context, f"✅ Banned {target_name} (ID: <code>{target_id}</code>).", parse_mode=ParseMode.HTML)
         admin_name = update.effective_user.first_name if update.effective_user else "Admin"
         await log_to_channel(context, f"🔨 #FORCEBAN\nTarget: {target_name} ({target_id})\nAdmin: {admin_name}")
         if sender_id:
@@ -742,7 +742,7 @@ async def forceban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except BadRequest as e:
         logger.error(f"forceban: BadRequest - {e}")
         if "user not found" in str(e).lower() or "invalid" in str(e).lower():
-            await send_bot_response(update, context, f"Invalid user ID <code>{target_id}</code>. Check the ID and try again.")
+            await send_bot_response(update, context, f"Invalid user ID <code>{target_id}</code>. Check the ID and try again.", parse_mode=ParseMode.HTML)
         elif "not enough rights" in str(e).lower() or "need administrator" in str(e).lower():
             await send_bot_response(update, context, "Bot has no rights to ban members in this group.")
         else:
