@@ -315,12 +315,12 @@ async def _process_single_participant(call_id, participant, chat_entity):
                         await ptb_application.bot.delete_message(chat_id=settings_chat_id, message_id=mid)
                     except: pass
             
+            username_str = f"@{entity.username}" if getattr(entity, 'username', None) else "—"
             welcome_text = (
                 f"<blockquote>\n"
-                f"ωєℓ¢σмє тσ {group_name}'s νσι¢є ¢нαт\n"
-                f"</blockquote>\n"
-                f"<blockquote>\n"
-                f"ι∂ : <code>{user_id}</code>\n"
+                f"𝚴𝛂ϻ𝛆 ➛ {mention}\n"
+                f"𝚰𝛛 ➛ <code>{user_id}</code>\n"
+                f"𝐔𝛅𝛆𝛑𝛈𝛂ϻ𝛆 ➛ {username_str}\n"
                 f"</blockquote>"
             )
             
