@@ -46,6 +46,9 @@ pending_invites = {}
 # Timestamp when the monitor started — ignore UpdateGroupCallParticipants for first 15s
 _vc_monitor_start_ts = None
 
+# Calls we've already resolved but the bot isn't a member — skip resolution next time
+_skipped_calls = set()
+
 async def start_voice_chat_monitor(application: Application):
     """Starts the Telethon client to monitor voice chat events."""
     global telethon_client, ptb_application
@@ -75,10 +78,11 @@ async def start_voice_chat_monitor(application: Application):
             logger.info(f"📞 UpdateGroupCall: call_id={call.id}, peer_id={peer_id}")
             try:
                 entity = await telethon_client.get_entity(peer_id)
+                peer_full = peer_id if peer_id < 0 else int(f"-100{peer_id}")
                 try:
-                    await ptb_application.bot.get_chat(peer_id)
+                    await ptb_application.bot.get_chat(peer_full)
                 except:
-                    logger.info(f"📞 Skipping call {call.id}: bot not in chat {peer_id}")
+                    logger.info(f"📞 Skipping call {call.id}: bot not in chat {peer_full}")
                     return
                 call_to_chat[call.id] = entity
                 logger.info(f"📞 Mapped call {call.id} to chat {entity.id}")
@@ -212,13 +216,22 @@ async def _process_vc_join_event(event):
         chat_entity = call_to_chat.get(call_id)
         
         # If call_to_chat missing, try resolving the chat from the call itself
-        if not chat_entity:
+        if not chat_entity and call_id not in _skipped_calls:
             try:
                 result = await telethon_client(GetGroupCallRequest(call=event.call, limit=1))
                 if result.chats:
-                    chat_entity = result.chats[0]
-                    call_to_chat[call_id] = chat_entity
-                    logger.info(f"Resolved call {call_id} -> chat {chat_entity.id}")
+                    raw_entity = result.chats[0]
+                    # Verify bot is a member before storing
+                    raw_id = raw_entity.id
+                    bot_check_id = raw_id if raw_id < 0 else int(f"-100{raw_id}")
+                    try:
+                        await ptb_application.bot.get_chat(bot_check_id)
+                        chat_entity = raw_entity
+                        call_to_chat[call_id] = chat_entity
+                        logger.info(f"Resolved call {call_id} -> chat {raw_id}")
+                    except:
+                        _skipped_calls.add(call_id)
+                        logger.info(f"Skipping call {call_id}: bot not in chat {bot_check_id}")
             except Exception as resolve_err:
                 logger.warning(f"Could not resolve chat for call {call_id}: {resolve_err}")
         
