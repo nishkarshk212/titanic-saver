@@ -203,6 +203,11 @@ async def ban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Record stats
         if sender_id:
             increment_staff_stat(chat_id, sender_id, "ban")
+    except BadRequest as e:
+        if "user not found" in str(e).lower() or "invalid" in str(e).lower():
+            await send_bot_response(update, context, f"Invalid user/ID. Make sure the user exists and the ID is correct.")
+        else:
+            await send_bot_response(update, context, f"Error: {e}")
     except Exception as e:
         await send_bot_response(update, context, f"Error: {e}")
 
@@ -696,9 +701,37 @@ async def edit_protection_callback(update: Update, context: ContextTypes.DEFAULT
             await query.answer(f"🔄 Reset warns for {user_id}")
             await query.edit_message_text(f"🔄 Warnings for {user_name} have been reset by an admin.", parse_mode='HTML')
 
+async def forceban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Ban by user ID or @username even if user is not in the group."""
+    chat_id = update.effective_chat.id
+    sender_id = update.effective_user.id if update.effective_user else None
+    
+    if not await check_bot_admin_rights(chat_id, context, ['can_restrict_members']):
+        return await send_bot_response(update, context, "Bot needs restrict members permission.")
+    
+    target_id, target_name = await get_user_id(update, context)
+    if not target_id:
+        return await send_bot_response(update, context, "Provide a user ID or @username.")
+    
+    try:
+        await context.bot.ban_chat_member(chat_id, target_id)
+        await send_bot_response(update, context, f"✅ Banned {target_name} (ID: <code>{target_id}</code>).")
+        admin_name = update.effective_user.first_name if update.effective_user else "Admin"
+        await log_to_channel(context, f"🔨 #FORCEBAN\nTarget: {target_name} ({target_id})\nAdmin: {admin_name}")
+        if sender_id:
+            increment_staff_stat(chat_id, sender_id, "ban")
+    except BadRequest as e:
+        if "user not found" in str(e).lower() or "invalid" in str(e).lower():
+            await send_bot_response(update, context, f"Invalid user ID <code>{target_id}</code>. Check the ID and try again.")
+        else:
+            await send_bot_response(update, context, f"Error: {e}")
+    except Exception as e:
+        await send_bot_response(update, context, f"Error: {e}")
+
 def get_moderation_handlers():
     return [
         CommandHandler("ban", ban_command),
+        CommandHandler("forceban", forceban_command),
         CommandHandler("unban", unban_command),
         CommandHandler("mute", mute_command),
         CommandHandler("unmute", unmute_command),
