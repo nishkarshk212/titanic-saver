@@ -367,29 +367,35 @@ async def _process_single_participant(call_id, participant, chat_entity, is_join
         # Use timeout and handle "Entity not found" gracefully
         try:
             try:
-                entity = await asyncio.wait_for(telethon_client.get_entity(peer), timeout=2.0)
+                logger.info(f"🔍 Getting entity for {peer_type} {user_id}...")
+                entity = await asyncio.wait_for(telethon_client.get_entity(peer), timeout=5.0)
                 name = getattr(entity, 'first_name', getattr(entity, 'title', "Unknown"))
-            except (ValueError, asyncio.TimeoutError):
+                logger.info(f"✅ Found entity: {name}")
+            except (ValueError, asyncio.TimeoutError) as e:
+                logger.warning(f"❌ Failed to get entity for {user_id}: {e}")
                 return
 
             if peer_type == "channel":
                 mention = f'<a href="https://t.me/{entity.username}">{name}</a>' if getattr(entity, 'username', None) else f"<b>{name}</b>"
+            elif peer_type == "chat":
+                mention = f"<b>{name}</b>"
             else:
                 mention = f'<a href="tg://user?id={user_id}">{name}</a>'
             
             if not chat_entity:
+                logger.warning(f"❌ No chat_entity for call {call_id}. Cannot send notification.")
                 return
 
             if isinstance(chat_entity, int):
                 chat_id = chat_entity
-                settings_chat_id = chat_id
-                if not str(chat_id).startswith('-100'):
-                    settings_chat_id = int(f"-100{chat_id}")
             else:
                 chat_id = chat_entity.id
-                settings_chat_id = chat_id
-                if not str(chat_id).startswith('-100'):
-                    settings_chat_id = int(f"-100{chat_id}")
+            
+            settings_chat_id = chat_id
+            if not str(chat_id).startswith('-100'):
+                settings_chat_id = int(f"-100{chat_id}")
+            
+            logger.info(f"📱 Target chat: {settings_chat_id}")
 
             # Check settings
             settings = get_chat_settings(settings_chat_id)
@@ -479,6 +485,7 @@ async def _process_single_participant(call_id, participant, chat_entity, is_join
                 parse_mode=ParseMode.HTML,
                 disable_web_page_preview=True
             )
+            logger.info(f"📤 Sent notification for {user_id} to chat {settings_chat_id}")
             
             if is_join:
                 notification_cache[notif_key] = datetime.datetime.now()
