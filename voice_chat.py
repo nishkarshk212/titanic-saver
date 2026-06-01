@@ -285,22 +285,14 @@ async def _process_vc_join_event(event):
             if is_leave: leaves.append(p)
             elif is_join: joins.append(p)
 
-        # Detect switches: If we have both leaves and joins in the same batch,
-        # it's highly likely to be identity switches.
         is_batch_switch = len(leaves) > 0 and len(joins) > 0
-
-        # Process leaves first to clear caches
-        if leaves:
-            logger.info(f"🔄 Processing {len(leaves)} leave events for call {call_id} (Switch suspected: {is_batch_switch})")
+        
+        # Process participants in parallel tasks to avoid blocking the loop
         for participant in leaves:
-            await _process_single_participant(call_id, participant, chat_entity, is_join=False, is_switch=is_batch_switch)
+            asyncio.create_task(_process_single_participant(call_id, participant, chat_entity, is_join=False, is_switch=is_batch_switch))
             
-        # Process joins
-        if joins:
-            logger.info(f"🔄 Processing {len(joins)} join events for call {call_id} (Switch suspected: {is_batch_switch})")
         for participant in joins:
-            # Pass a flag if we suspect a switch to customize the notification
-            await _process_single_participant(call_id, participant, chat_entity, is_join=True, is_switch=is_batch_switch)
+            asyncio.create_task(_process_single_participant(call_id, participant, chat_entity, is_join=True, is_switch=is_batch_switch))
     except Exception as e:
         logger.error(f"❌ Error in _process_vc_join_event: {e}")
 
@@ -322,68 +314,16 @@ async def _process_single_participant(call_id, participant, chat_entity, is_join
             peer_type = "chat"
         
         if not user_id: 
-            logger.debug(f"Skipping participant in call {call_id}: no user_id found")
+            logger.info(f"⚠️ Skipping participant in call {call_id}: no user_id found in peer {type(peer).__name__}")
             return
         
-        logger.info(f"👤 Processing participant {user_id} in call {call_id} (Join: {is_join}, Switch: {is_switch})")
+        logger.info(f"👤 [START] Processing {user_id} in call {call_id} (Join: {is_join}, Switch: {is_switch})")
         
-        # Glitch/Dedox Protection
-        now = datetime.datetime.now()
-        if is_join:
-            # Glitch/Dedox Protection: Include the participant's join date to distinguish
-            # actual new joins from Telethon re-sending existing participants in state updates
-            glitch_key = f"{user_id}_{call_id}_{participant.date}"
-            if glitch_key in vc_glitch_cache:
-                last_join = vc_glitch_cache[glitch_key]
-                if (now - last_join).total_seconds() < 10:
-                    logger.warning(f"🚫 Glitch detected: User {user_id} joining too fast. Ignoring.")
-                    return
-            vc_glitch_cache[glitch_key] = now
-
-            notif_key = f"{user_id}_{call_id}"
-            if notif_key in notification_cache:
-                if (now - notification_cache[notif_key]).total_seconds() < 300: # 5 mins cooldown
-                    logger.info(f"⏸ Cooldown active for {user_id} in call {call_id}. Skipping notification.")
-                    return
-        else:
-            # For leaves, we use a different cache key or just don't cache as strictly
-            leave_cache_key = f"leave_{user_id}_{call_id}"
-            if leave_cache_key in notification_cache:
-                if (now - notification_cache[leave_cache_key]).total_seconds() < 10:
-                    logger.info(f"⏸ Leave cooldown active for {user_id} in call {call_id}. Skipping notification.")
-                    return
-            notification_cache[leave_cache_key] = now
-            
-            # CRITICAL: Clear join cache when user leaves so they can be notified if they re-join
-            # or switch back to this identity quickly.
-            join_notif_key = f"{user_id}_{call_id}"
-            notification_cache.pop(join_notif_key, None)
-            logger.info(f"🗑 Cleared join cache for {user_id} in call {call_id} (Left)")
-
-            # If it's a switch, don't send a "Left" notification to avoid spam
-            if is_switch:
-                return
-
         # Use timeout and handle "Entity not found" gracefully
         try:
-            try:
-                logger.info(f"🔍 Getting entity for {peer_type} {user_id}...")
-                entity = await asyncio.wait_for(telethon_client.get_entity(peer), timeout=5.0)
-                name = getattr(entity, 'first_name', getattr(entity, 'title', "Unknown"))
-                logger.info(f"✅ Found entity: {name}")
-            except (ValueError, asyncio.TimeoutError) as e:
-                logger.warning(f"❌ Failed to get entity for {user_id}: {e}")
-                return
-
-            if peer_type == "channel":
-                mention = f'<a href="https://t.me/{entity.username}">{name}</a>' if getattr(entity, 'username', None) else f"<b>{name}</b>"
-            elif peer_type == "chat":
-                mention = f"<b>{name}</b>"
-            else:
-                mention = f'<a href="tg://user?id={user_id}">{name}</a>'
-            
+            # 1. Check Chat Entity
             if not chat_entity:
-                logger.warning(f"❌ No chat_entity for call {call_id}. Cannot send notification.")
+                logger.warning(f"❌ [STOP] No chat_entity for {user_id} in call {call_id}")
                 return
 
             if isinstance(chat_entity, int):
@@ -394,69 +334,94 @@ async def _process_single_participant(call_id, participant, chat_entity, is_join
             settings_chat_id = chat_id
             if not str(chat_id).startswith('-100'):
                 settings_chat_id = int(f"-100{chat_id}")
-            
-            logger.info(f"📱 Target chat: {settings_chat_id}")
 
-            # Check settings
-            settings = get_chat_settings(settings_chat_id)
-            if is_join and not settings.get("vc_user_join_enabled", True):
-                logger.info(f"🔇 Join notification disabled for chat {settings_chat_id}")
-                return
-            if not is_join and not settings.get("vc_user_leave_enabled", True):
-                logger.info(f"🔇 Leave notification disabled for chat {settings_chat_id}")
-                return
-
-            # VC Glitch Safety: Only for joins
+            # 2. Check Cooldowns/Glitches
+            now = datetime.datetime.now()
             if is_join:
-                chat_flood_key = settings_chat_id
-                # Check if DDoS protection is currently active for this chat
-                ddos_expiry = vc_ddos_active.get(chat_flood_key)
-                is_under_ddos = False
-                if ddos_expiry and now < ddos_expiry:
-                    is_under_ddos = True
-                    
-                count, last_ts = vc_flood_counter.get(chat_flood_key, (0, now))
-                if (now - last_ts).total_seconds() < 60:
-                    count += 1
-                else:
-                    count = 1
-                vc_flood_counter[chat_flood_key] = (count, now)
+                # Glitch check
+                glitch_key = f"{user_id}_{call_id}_{participant.date}"
+                if glitch_key in vc_glitch_cache:
+                    if (now - vc_glitch_cache[glitch_key]).total_seconds() < 10:
+                        logger.warning(f"🚫 [STOP] Glitch detected for {user_id}")
+                        return
+                vc_glitch_cache[glitch_key] = now
+
+                # Cooldown check
+                notif_key = f"{user_id}_{call_id}"
+                if notif_key in notification_cache:
+                    if (now - notification_cache[notif_key]).total_seconds() < 300:
+                        logger.info(f"⏸ [STOP] Cooldown active for {user_id}")
+                        return
+            else:
+                leave_cache_key = f"leave_{user_id}_{call_id}"
+                if leave_cache_key in notification_cache:
+                    if (now - notification_cache[leave_cache_key]).total_seconds() < 10:
+                        logger.info(f"⏸ [STOP] Leave cooldown active for {user_id}")
+                        return
+                notification_cache[leave_cache_key] = now
                 
-                # DDoS Protection Thresholds
-                flood_threshold = 15
-                if settings.get("vc_ddos_protection_enabled", False) or is_under_ddos:
-                    flood_threshold = 5 # Stricter limit during DDoS or if protection is enabled
+                # Clear join cache
+                join_notif_key = f"{user_id}_{call_id}"
+                notification_cache.pop(join_notif_key, None)
                 
-                if count > flood_threshold:
-                    if settings.get("vc_safety_enabled", False) or settings.get("vc_ddos_protection_enabled", False):
-                        logger.warning(f"🚨 VC Flood/DDoS detected in {settings_chat_id}. Triggering safety measures.")
-                        if not is_under_ddos:
-                            vc_ddos_active[chat_flood_key] = now + datetime.timedelta(minutes=10)
-                        asyncio.create_task(clean_ghost_participants(settings_chat_id))
-                        if count > 30 and settings.get("vc_panic_mode_enabled", False):
-                            logger.critical(f"😱 PANIC MODE: Severe DDoS in {settings_chat_id}. Ending call.")
-                            asyncio.create_task(end_group_call(settings_chat_id))
+                if is_switch:
+                    logger.info(f"🔄 [STOP] Identity switch for {user_id} - suppressing 'Left' notification")
                     return
 
-                # Delete pending invite notifications if they exist
-                invite_key = (settings_chat_id, user_id)
-                if invite_key in pending_invites:
-                    msg_ids = pending_invites.pop(invite_key, [])
-                    for mid in msg_ids:
-                        try:
-                            await ptb_application.bot.delete_message(chat_id=settings_chat_id, message_id=mid)
-                        except: pass
-            
+            # 3. Get Entity
+            try:
+                logger.info(f"🔍 [GET_ENTITY] Fetching {peer_type} {user_id}...")
+                entity = await asyncio.wait_for(telethon_client.get_entity(peer), timeout=10.0)
+                name = getattr(entity, 'first_name', getattr(entity, 'title', "Unknown"))
+                logger.info(f"✅ [ENTITY_FOUND] Name: {name}")
+            except Exception as e:
+                logger.warning(f"❌ [ENTITY_FAILED] {user_id}: {e}")
+                return
+
+            # 4. Check Settings
+            settings = get_chat_settings(settings_chat_id)
+            if is_join and not settings.get("vc_user_join_enabled", True):
+                logger.info(f"🔇 [STOP] Join notifs disabled in {settings_chat_id}")
+                return
+            if not is_join and not settings.get("vc_user_leave_enabled", True):
+                logger.info(f"🔇 [STOP] Leave notifs disabled in {settings_chat_id}")
+                return
+
+            # 5. Flood Protection (Join only)
+            if is_join:
+                chat_flood_key = settings_chat_id
+                ddos_expiry = vc_ddos_active.get(chat_flood_key)
+                is_under_ddos = ddos_expiry and now < ddos_expiry
+                    
+                count, last_ts = vc_flood_counter.get(chat_flood_key, (0, now))
+                if (now - last_ts).total_seconds() < 60: count += 1
+                else: count = 1
+                vc_flood_counter[chat_flood_key] = (count, now)
+                
+                flood_threshold = 5 if (settings.get("vc_ddos_protection_enabled", False) or is_under_ddos) else 15
+                
+                if count > flood_threshold:
+                    logger.warning(f"🚨 [FLOOD] chat {settings_chat_id} count {count}")
+                    if not is_under_ddos:
+                        vc_ddos_active[chat_flood_key] = now + datetime.timedelta(minutes=10)
+                    asyncio.create_task(clean_ghost_participants(settings_chat_id))
+                    return
+
+            # 6. Send Message
             username_str = f"@{entity.username}" if getattr(entity, 'username', None) else "—"
-            
-            # Format display ID for channels and chats
             display_id = user_id
             if peer_type in ["channel", "chat"] and not str(user_id).startswith("-100"):
                 display_id = f"-100{user_id}"
             
+            if peer_type == "channel":
+                mention = f'<a href="https://t.me/{entity.username}">{name}</a>' if getattr(entity, 'username', None) else f"<b>{name}</b>"
+            elif peer_type == "chat":
+                mention = f"<b>{name}</b>"
+            else:
+                mention = f'<a href="tg://user?id={user_id}">{name}</a>'
+
             status_text = "Joined ✅" if is_join else "Left ❌"
-            if is_join and is_switch:
-                status_text = "Switched Identity 🔄"
+            if is_join and is_switch: status_text = "Switched Identity 🔄"
             
             notification_text = (
                 f"<blockquote>\n"
@@ -468,14 +433,10 @@ async def _process_single_participant(call_id, participant, chat_entity, is_join
             )
             
             bot_info = await ptb_application.bot.get_me()
-            add_url = f"https://t.me/{bot_info.username}?startgroup=true"
-            
-            # Use the specific join link provided by the user
             join_link = "https://t.me/Titanic_world_chatting_zonee?videochat"
-            
             keyboard = InlineKeyboardMarkup([
                 [InlineKeyboardButton("ᴊᴏɪɴ ᴠᴏɪᴄᴇ ᴄʜᴀᴛ", url=join_link)],
-                [InlineKeyboardButton(to_small_caps("+ ᴀᴅᴅ ᴍᴇ ɪɴ ɢʀᴏᴜᴘ +"), url=add_url)]
+                [InlineKeyboardButton(to_small_caps("+ ᴀᴅᴅ ᴍᴇ ɪɴ ɢʀᴏᴜᴘ +"), url=f"https://t.me/{bot_info.username}?startgroup=true")]
             ])
             
             sent_message = await ptb_application.bot.send_message(
@@ -485,26 +446,23 @@ async def _process_single_participant(call_id, participant, chat_entity, is_join
                 parse_mode=ParseMode.HTML,
                 disable_web_page_preview=True
             )
-            logger.info(f"📤 Sent notification for {user_id} to chat {settings_chat_id}")
+            logger.info(f"📤 [SENT] {user_id} to {settings_chat_id}")
             
             if is_join:
-                notification_cache[notif_key] = datetime.datetime.now()
+                notification_cache[f"{user_id}_{call_id}"] = datetime.datetime.now()
             
             # Auto delete
             async def auto_delete_notification(c_id, m_id):
                 await asyncio.sleep(5)
-                try:
-                    await ptb_application.bot.delete_message(chat_id=c_id, message_id=m_id)
+                try: await ptb_application.bot.delete_message(chat_id=c_id, message_id=m_id)
                 except: pass
             
             asyncio.create_task(auto_delete_notification(settings_chat_id, sent_message.message_id))
             
         except Exception as e:
-            if "Chat not found" in str(e):
-                call_to_chat.pop(call_id, None)
-            logger.error(f"Error in _process_single_participant: {e}")
+            logger.error(f"❌ [CRASH] _process_single_participant: {e}")
     except Exception as e:
-        logger.error(f"❌ Error processing participant: {e}")
+        logger.error(f"❌ [CRASH] _process_single_participant outer: {e}")
 
 async def vc_join_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handles the 'Join Voice Chat' button click for old messages."""
