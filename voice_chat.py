@@ -204,7 +204,11 @@ async def scan_active_vcs():
                 continue
             try:
                 clean_id = int(str(cid).replace('-100', ''))
-                full = await telethon_client(GetFullChannelRequest(channel=clean_id))
+                try:
+                    full = await telethon_client(GetFullChannelRequest(channel=clean_id))
+                except:
+                    full = await telethon_client(GetFullChatRequest(chat_id=clean_id))
+                    
                 if hasattr(full, 'full_chat') and hasattr(full.full_chat, 'call') and full.full_chat.call:
                     call_id = full.full_chat.call.id
                     if call_id not in call_to_chat:
@@ -243,15 +247,15 @@ async def _process_vc_join_event(event):
         # Try resolution if missing, and haven't failed recently (cooldown 10 mins)
         if not chat_entity and (not last_failed or (now - last_failed).total_seconds() > 600):
             try:
+                logger.info(f"🔍 Attempting to resolve call {call_id} via GetGroupCallRequest...")
                 result = await telethon_client(GetGroupCallRequest(call=event.call, limit=1))
-                if result.chats:
+                if result and result.chats:
                     raw_entity = result.chats[0]
                     raw_id = raw_entity.id
+                    logger.info(f"📡 Found raw_entity {raw_id} for call {call_id}")
                     
                     # Determine PTB compatible ID
-                    # Telethon Channel/Supergroup ID -> -100 + ID
-                    # Telethon Chat (regular group) ID -> -ID
-                    from telethon.tl.types import Channel, Chat
+                    from telethon.tl.types import Channel
                     if isinstance(raw_entity, Channel):
                         bot_check_id = int(f"-100{raw_id}")
                     else:
@@ -262,10 +266,13 @@ async def _process_vc_join_event(event):
                         chat_entity = raw_entity
                         call_to_chat[call_id] = chat_entity
                         _failed_resolutions.pop(call_id, None)
-                        logger.info(f"✅ Resolved call {call_id} -> chat {bot_check_id} ({type(raw_entity).__name__})")
+                        logger.info(f"✅ Successfully resolved call {call_id} -> chat {bot_check_id} ({type(raw_entity).__name__})")
                     except Exception as e:
                         _failed_resolutions[call_id] = now
                         logger.info(f"❌ Skipping call {call_id}: bot not in chat {bot_check_id} or error: {e}")
+                else:
+                    _failed_resolutions[call_id] = now
+                    logger.info(f"❓ GetGroupCallRequest returned no chats for call {call_id}")
             except Exception as resolve_err:
                 _failed_resolutions[call_id] = now
                 logger.warning(f"⚠️ Could not resolve chat for call {call_id}: {resolve_err}")
