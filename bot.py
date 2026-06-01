@@ -1257,12 +1257,16 @@ def main():
         except Exception as e:
             print(f"❌ Failed to register commands: {e}")
 
-        # Wait 5 seconds for bot to fully initialize
-        await asyncio.sleep(5)
-        await startup_notification(application.bot)
-        
-        # Start voice chat monitor (Telethon)
+        # Start voice chat monitor (Telethon) immediately
+        print("🎙 Starting Voice Chat Monitor...")
         asyncio.create_task(start_voice_chat_monitor(application))
+
+        # Run startup notification in background after a short delay
+        async def delayed_startup():
+            await asyncio.sleep(2)
+            await startup_notification(application.bot)
+        
+        asyncio.create_task(delayed_startup())
     
     async def post_stop(application):
         """Called after bot stops."""

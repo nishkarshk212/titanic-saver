@@ -32,11 +32,12 @@ async def get_total_zombies_count(bot):
         for group in groups:
             chat_id = int(group["chat_id"])
             try:
-                # Count deleted accounts in this group
+                # PTB Bots cannot get all members easily. 
+                # This function is not possible with PTB and should be removed or refactored to use MTProto.
                 zombie_count = 0
-                async for member in bot.get_chat_members(chat_id):
-                    if member.user.is_deleted:
-                        zombie_count += 1
+                # async for member in bot.get_chat_members(chat_id):
+                #     if member.user.is_deleted:
+                #         zombie_count += 1
                 
                 total_zombies += zombie_count
                 groups_checked += 1
@@ -85,15 +86,16 @@ def mention_html(user):
     return f'<a href="tg://user?id={user.id}">{name}</a>'
 
 async def scan_deleted_members(bot, chat_id) -> List:
-    """Scan for deleted accounts."""
-    users = []
-    try:
-        async for member in bot.get_chat_members(chat_id):
-            if member.user.is_deleted:
-                users.append(member.user)
-    except Exception:
-        return []
-    return users
+    """Scan for deleted accounts (Not possible for bots in PTB)."""
+    return []
+    # users = []
+    # try:
+    #     async for member in bot.get_chat_members(chat_id):
+    #         if member.user.is_deleted:
+    #             users.append(member.user)
+    # except Exception:
+    #     return []
+    # return users
 
 async def scan_bots(bot, chat_id) -> List:
     """Scan for bots."""
