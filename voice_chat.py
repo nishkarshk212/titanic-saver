@@ -274,16 +274,19 @@ async def _process_vc_join_event(event):
             return
 
         for participant in event.participants:
-            # Check if participant is joining (has 'date') or just state update
-            if not hasattr(participant, 'date') or participant.date is None:
+            # Check if participant is joining or leaving
+            is_join = hasattr(participant, 'date') and participant.date is not None and not getattr(participant, 'left', False)
+            is_leave = getattr(participant, 'left', False)
+            
+            if not is_join and not is_leave:
                 continue
             
-            asyncio.create_task(_process_single_participant(call_id, participant, chat_entity))
+            asyncio.create_task(_process_single_participant(call_id, participant, chat_entity, is_join=is_join))
     except Exception as e:
         logger.error(f"❌ Error in _process_vc_join_event: {e}")
 
-async def _process_single_participant(call_id, participant, chat_entity):
-    """Process a single VC participant join."""
+async def _process_single_participant(call_id, participant, chat_entity, is_join=True):
+    """Process a single VC participant join or leave."""
     try:
         peer = participant.peer
         user_id = None
@@ -301,20 +304,29 @@ async def _process_single_participant(call_id, participant, chat_entity):
         # Deduplicate and Rate Limit
         now = datetime.datetime.now()
         
-        # Glitch/Dedox Protection: Include the participant's join date to distinguish
-        # actual new joins from Telethon re-sending existing participants in state updates
-        glitch_key = f"{user_id}_{call_id}_{participant.date}"
-        if glitch_key in vc_glitch_cache:
-            last_join = vc_glitch_cache[glitch_key]
-            if (now - last_join).total_seconds() < 10:
-                logger.warning(f"🚫 Glitch detected: User {user_id} joining too fast. Ignoring.")
-                return
-        vc_glitch_cache[glitch_key] = now
+        # Glitch/Dedox Protection
+        if is_join:
+            # Glitch/Dedox Protection: Include the participant's join date to distinguish
+            # actual new joins from Telethon re-sending existing participants in state updates
+            glitch_key = f"{user_id}_{call_id}_{participant.date}"
+            if glitch_key in vc_glitch_cache:
+                last_join = vc_glitch_cache[glitch_key]
+                if (now - last_join).total_seconds() < 10:
+                    logger.warning(f"🚫 Glitch detected: User {user_id} joining too fast. Ignoring.")
+                    return
+            vc_glitch_cache[glitch_key] = now
 
-        notif_key = f"{user_id}_{call_id}"
-        if notif_key in notification_cache:
-            if (now - notification_cache[notif_key]).total_seconds() < 300: # 5 mins cooldown
-                return
+            notif_key = f"{user_id}_{call_id}"
+            if notif_key in notification_cache:
+                if (now - notification_cache[notif_key]).total_seconds() < 300: # 5 mins cooldown
+                    return
+        else:
+            # For leaves, we use a different cache key or just don't cache as strictly
+            leave_cache_key = f"leave_{user_id}_{call_id}"
+            if leave_cache_key in notification_cache:
+                if (now - notification_cache[leave_cache_key]).total_seconds() < 10:
+                    return
+            notification_cache[leave_cache_key] = now
 
         # Use timeout and handle "Entity not found" gracefully
         try:
@@ -337,91 +349,94 @@ async def _process_single_participant(call_id, participant, chat_entity):
                 settings_chat_id = chat_id
                 if not str(chat_id).startswith('-100'):
                     settings_chat_id = int(f"-100{chat_id}")
-                try:
-                    chat = await ptb_application.bot.get_chat(settings_chat_id)
-                    group_name = chat.title or "the group"
-                except:
-                    group_name = "the group"
             else:
-                group_name = chat_entity.title if hasattr(chat_entity, 'title') else "the group"
                 chat_id = chat_entity.id
-            
-            # Normalize chat_id
-            settings_chat_id = chat_id
-            if not str(chat_id).startswith('-100'):
-                settings_chat_id = int(f"-100{chat_id}")
+                settings_chat_id = chat_id
+                if not str(chat_id).startswith('-100'):
+                    settings_chat_id = int(f"-100{chat_id}")
 
             # Check settings
             settings = get_chat_settings(settings_chat_id)
             if not settings.get("vc_user_join_enabled", True):
                 return
 
-            # VC Glitch Safety: Check for flood in this specific chat
-            chat_flood_key = settings_chat_id
-            
-            # Check if DDoS protection is currently active for this chat
-            ddos_expiry = vc_ddos_active.get(chat_flood_key)
-            is_under_ddos = False
-            if ddos_expiry and now < ddos_expiry:
-                is_under_ddos = True
+            # VC Glitch Safety: Only for joins
+            if is_join:
+                chat_flood_key = settings_chat_id
+                # Check if DDoS protection is currently active for this chat
+                ddos_expiry = vc_ddos_active.get(chat_flood_key)
+                is_under_ddos = False
+                if ddos_expiry and now < ddos_expiry:
+                    is_under_ddos = True
+                    
+                count, last_ts = vc_flood_counter.get(chat_flood_key, (0, now))
+                if (now - last_ts).total_seconds() < 60:
+                    count += 1
+                else:
+                    count = 1
+                vc_flood_counter[chat_flood_key] = (count, now)
                 
-            count, last_ts = vc_flood_counter.get(chat_flood_key, (0, now))
-            if (now - last_ts).total_seconds() < 60:
-                count += 1
-            else:
-                count = 1
-            vc_flood_counter[chat_flood_key] = (count, now)
-            
-            # DDoS Protection Thresholds
-            flood_threshold = 15
-            if settings.get("vc_ddos_protection_enabled", False) or is_under_ddos:
-                flood_threshold = 5 # Stricter limit during DDoS or if protection is enabled
-            
-            if count > flood_threshold:
-                if settings.get("vc_safety_enabled", False) or settings.get("vc_ddos_protection_enabled", False):
-                    logger.warning(f"🚨 VC Flood/DDoS detected in {settings_chat_id}. Triggering safety measures.")
-                    
-                    # If not already marked, activate DDoS mode for 10 minutes
-                    if not is_under_ddos:
-                        vc_ddos_active[chat_flood_key] = now + datetime.timedelta(minutes=10)
-                        
-                    asyncio.create_task(clean_ghost_participants(settings_chat_id))
-                    
-                    # In extreme DDoS, we might want to end the call if it's very severe
-                    if count > 30 and settings.get("vc_panic_mode_enabled", False):
-                        logger.critical(f"😱 PANIC MODE: Severe DDoS in {settings_chat_id}. Ending call.")
-                        asyncio.create_task(end_group_call(settings_chat_id))
-                return
+                # DDoS Protection Thresholds
+                flood_threshold = 15
+                if settings.get("vc_ddos_protection_enabled", False) or is_under_ddos:
+                    flood_threshold = 5 # Stricter limit during DDoS or if protection is enabled
+                
+                if count > flood_threshold:
+                    if settings.get("vc_safety_enabled", False) or settings.get("vc_ddos_protection_enabled", False):
+                        logger.warning(f"🚨 VC Flood/DDoS detected in {settings_chat_id}. Triggering safety measures.")
+                        if not is_under_ddos:
+                            vc_ddos_active[chat_flood_key] = now + datetime.timedelta(minutes=10)
+                        asyncio.create_task(clean_ghost_participants(settings_chat_id))
+                        if count > 30 and settings.get("vc_panic_mode_enabled", False):
+                            logger.critical(f"😱 PANIC MODE: Severe DDoS in {settings_chat_id}. Ending call.")
+                            asyncio.create_task(end_group_call(settings_chat_id))
+                    return
 
-            # Delete pending invite notifications if they exist
-            invite_key = (settings_chat_id, user_id)
-            if invite_key in pending_invites:
-                msg_ids = pending_invites.pop(invite_key, [])
-                for mid in msg_ids:
-                    try:
-                        await ptb_application.bot.delete_message(chat_id=settings_chat_id, message_id=mid)
-                    except: pass
+                # Delete pending invite notifications if they exist
+                invite_key = (settings_chat_id, user_id)
+                if invite_key in pending_invites:
+                    msg_ids = pending_invites.pop(invite_key, [])
+                    for mid in msg_ids:
+                        try:
+                            await ptb_application.bot.delete_message(chat_id=settings_chat_id, message_id=mid)
+                        except: pass
             
             username_str = f"@{entity.username}" if getattr(entity, 'username', None) else "—"
-            welcome_text = (
-                f"<blockquote>\n"
-                f"𝚴𝛂ϻ𝛆 ➛ {mention}\n"
-                f"𝚰𝛛 ➛ <code>{user_id}</code>\n"
-                f"𝐔𝛅𝛆𝛑𝛈𝛂ϻ𝛆 ➛ {username_str}\n"
-                f"</blockquote>"
-            )
+            
+            if is_join:
+                header = "#נσιηνσι¢є¢нαт"
+                welcome_text = (
+                    f"<b>{header}</b>\n"
+                    f"<blockquote>\n"
+                    f"𝚴𝛂ϻ𝛆 ➛ {mention}\n"
+                    f"𝚰𝛛 ➛ <code>{user_id}</code>\n"
+                    f"𝐔𝛅𝛆𝛑𝛈𝛂ϻ𝛆 ➛ {username_str}\n"
+                    f"</blockquote>"
+                )
+            else:
+                header = "#ℓєανєνσι¢є¢нαт"
+                welcome_text = (
+                    f"<b>{header}</b>\n"
+                    f"<blockquote>\n"
+                    f"𝚴𝛂ϻ𝛆 ➛ {mention}\n"
+                    f"𝚰𝛛 ➛ <code>{user_id}</code>\n"
+                    f"𝐔𝛅𝛆𝛑𝛈𝛂ϻ𝛆 ➛ {username_str}\n"
+                    f"</blockquote>"
+                )
             
             bot_info = await ptb_application.bot.get_me()
             add_url = f"https://t.me/{bot_info.username}?startgroup=true"
             
             # Construct join link
             try:
-                # Cache chat username for join link
-                if not hasattr(chat_entity, 'username') or not chat_entity.username:
+                if not isinstance(chat_entity, int) and (not hasattr(chat_entity, 'username') or not chat_entity.username):
                     chat_info = await ptb_application.bot.get_chat(settings_chat_id)
                     username = chat_info.username
-                else:
+                elif not isinstance(chat_entity, int):
                     username = chat_entity.username
+                else:
+                    chat_info = await ptb_application.bot.get_chat(settings_chat_id)
+                    username = chat_info.username
                     
                 if username:
                     join_link = f"https://t.me/{username}?videochat"
@@ -445,7 +460,8 @@ async def _process_single_participant(call_id, participant, chat_entity):
                 disable_web_page_preview=True
             )
             
-            notification_cache[notif_key] = datetime.datetime.now()
+            if is_join:
+                notification_cache[notif_key] = datetime.datetime.now()
             
             # Auto delete
             async def auto_delete_notification(c_id, m_id):
