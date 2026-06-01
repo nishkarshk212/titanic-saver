@@ -404,9 +404,7 @@ async def _process_single_participant(call_id, participant, chat_entity, is_join
             username_str = f"@{entity.username}" if getattr(entity, 'username', None) else "—"
             
             if is_join:
-                header = "#נσιηνσι¢є¢нαт"
                 welcome_text = (
-                    f"<b>{header}</b>\n"
                     f"<blockquote>\n"
                     f"𝚴𝛂ϻ𝛆 ➛ {mention}\n"
                     f"𝚰𝛛 ➛ <code>{user_id}</code>\n"
@@ -414,9 +412,7 @@ async def _process_single_participant(call_id, participant, chat_entity, is_join
                     f"</blockquote>"
                 )
             else:
-                header = "#ℓєανєνσι¢є¢нαт"
                 welcome_text = (
-                    f"<b>{header}</b>\n"
                     f"<blockquote>\n"
                     f"𝚴𝛂ϻ𝛆 ➛ {mention}\n"
                     f"𝚰𝛛 ➛ <code>{user_id}</code>\n"
