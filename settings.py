@@ -924,6 +924,7 @@ def get_nightmode_hour_grid(user_id, is_start=True):
 def get_vc_settings_keyboard(settings):
     """Get Voice Chat settings keyboard."""
     vc_user_join_status = "✅" if settings.get("vc_user_join_enabled", True) else "❌"
+    vc_user_leave_status = "✅" if settings.get("vc_user_leave_enabled", True) else "❌"
     vc_invite_status = "✅" if settings.get("vc_invite_notification_enabled", True) else "❌"
     vc_safety_status = "✅" if settings.get("vc_safety_enabled", False) else "❌"
     vc_ddos_status = "✅" if settings.get("vc_ddos_protection_enabled", False) else "❌"
@@ -931,6 +932,7 @@ def get_vc_settings_keyboard(settings):
     
     keyboard = [
         [InlineKeyboardButton(f"User Join Notification: {vc_user_join_status}", callback_data="set_toggle_vc_user_join_enabled")],
+        [InlineKeyboardButton(f"User Leave Notification: {vc_user_leave_status}", callback_data="set_toggle_vc_user_leave_enabled")],
         [InlineKeyboardButton(f"Invite Notification: {vc_invite_status}", callback_data="set_toggle_vc_invite_notification_enabled")],
         [InlineKeyboardButton(f"VC Safety (Anti-Ghost): {vc_safety_status}", callback_data="set_toggle_vc_safety_enabled")],
         [InlineKeyboardButton(f"VC DDoS Protection: {vc_ddos_status}", callback_data="set_toggle_vc_ddos_protection_enabled")],

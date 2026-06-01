@@ -357,7 +357,9 @@ async def _process_single_participant(call_id, participant, chat_entity, is_join
 
             # Check settings
             settings = get_chat_settings(settings_chat_id)
-            if not settings.get("vc_user_join_enabled", True):
+            if is_join and not settings.get("vc_user_join_enabled", True):
+                return
+            if not is_join and not settings.get("vc_user_leave_enabled", True):
                 return
 
             # VC Glitch Safety: Only for joins
@@ -403,45 +405,22 @@ async def _process_single_participant(call_id, participant, chat_entity, is_join
             
             username_str = f"@{entity.username}" if getattr(entity, 'username', None) else "—"
             
-            if is_join:
-                welcome_text = (
-                    f"<blockquote>\n"
-                    f"𝚴𝛂ϻ𝛆 ➛ {mention}\n"
-                    f"𝚰𝛛 ➛ <code>{user_id}</code>\n"
-                    f"𝐔𝛅𝛆𝛑𝛈𝛂ϻ𝛆 ➛ {username_str}\n"
-                    f"</blockquote>"
-                )
-            else:
-                welcome_text = (
-                    f"<blockquote>\n"
-                    f"𝚴𝛂ϻ𝛆 ➛ {mention}\n"
-                    f"𝚰𝛛 ➛ <code>{user_id}</code>\n"
-                    f"𝐔𝛅𝛆𝛑𝛈𝛂ϻ𝛆 ➛ {username_str}\n"
-                    f"</blockquote>"
-                )
+            status_text = "Joined ✅" if is_join else "Left ❌"
+            
+            notification_text = (
+                f"<blockquote>\n"
+                f"𝚴𝛂ϻ𝛆 ➛ {mention}\n"
+                f"𝚰𝛛 ➛ <code>{user_id}</code>\n"
+                f"𝐔𝛅𝛆𝛑𝛈𝛂ϻ𝛆 ➛ {username_str}\n"
+                f"Status ➛ {status_text}\n"
+                f"</blockquote>"
+            )
             
             bot_info = await ptb_application.bot.get_me()
             add_url = f"https://t.me/{bot_info.username}?startgroup=true"
             
-            # Construct join link
-            try:
-                if not isinstance(chat_entity, int) and (not hasattr(chat_entity, 'username') or not chat_entity.username):
-                    chat_info = await ptb_application.bot.get_chat(settings_chat_id)
-                    username = chat_info.username
-                elif not isinstance(chat_entity, int):
-                    username = chat_entity.username
-                else:
-                    chat_info = await ptb_application.bot.get_chat(settings_chat_id)
-                    username = chat_info.username
-                    
-                if username:
-                    join_link = f"https://t.me/{username}?videochat"
-                else:
-                    clean_id = str(settings_chat_id).replace("-100", "")
-                    join_link = f"https://t.me/c/{clean_id}?videochat"
-            except:
-                clean_id = str(settings_chat_id).replace("-100", "")
-                join_link = f"https://t.me/c/{clean_id}?videochat"
+            # Use the specific join link provided by the user
+            join_link = "https://t.me/Titanic_world_chatting_zonee?videochat"
             
             keyboard = InlineKeyboardMarkup([
                 [InlineKeyboardButton("ᴊᴏɪɴ ᴠᴏɪᴄᴇ ᴄʜᴀᴛ", url=join_link)],
@@ -450,7 +429,7 @@ async def _process_single_participant(call_id, participant, chat_entity, is_join
             
             sent_message = await ptb_application.bot.send_message(
                 chat_id=settings_chat_id,
-                text=welcome_text,
+                text=notification_text,
                 reply_markup=keyboard,
                 parse_mode=ParseMode.HTML,
                 disable_web_page_preview=True
@@ -489,13 +468,8 @@ async def vc_join_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
         chat_id = int(data_parts[2])
         
-        # Construct the join link
-        chat = await context.bot.get_chat(chat_id)
-        if chat.username:
-            join_link = f"https://t.me/{chat.username}?videochat"
-        else:
-            clean_id = str(chat_id).replace("-100", "")
-            join_link = f"https://t.me/c/{clean_id}/1?videochat"
+        # Use the specific join link provided by the user
+        join_link = "https://t.me/Titanic_world_chatting_zonee?videochat"
 
         # Check if call is active using Telethon (if available)
         is_active = True # Default to True to allow users to try joining

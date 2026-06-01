@@ -31,6 +31,7 @@ DEFAULT_CHAT_SETTINGS = {
     "clean_title": True,
     "clean_photo": True,
     "vc_user_join_enabled": True,
+    "vc_user_leave_enabled": True,
     "vc_invite_notification_enabled": True,
     "auto_delete_enabled": False,
     "auto_delete_time": 60,
