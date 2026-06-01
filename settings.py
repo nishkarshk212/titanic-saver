@@ -619,7 +619,11 @@ def get_msg_length_settings_keyboard(settings):
     status = f"{current_limit} chars" if current_limit > 0 else "Disabled"
     
     keyboard = [
-        [InlineKeyboardButton(f"Current Limit: {status}", callback_data="set_none")],
+        [
+            InlineKeyboardButton("-", callback_data="set_msg_length_minus"),
+            InlineKeyboardButton(f"Limit: {status}", callback_data="set_none"),
+            InlineKeyboardButton("+", callback_data="set_msg_length_plus")
+        ],
         [
             InlineKeyboardButton("100", callback_data="set_msg_length_100"),
             InlineKeyboardButton("200", callback_data="set_msg_length_200"),
@@ -2298,7 +2302,17 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if data.startswith("set_msg_length_"):
-        new_limit = int(data.replace("set_msg_length_", ""))
+        val = data.replace("set_msg_length_", "")
+        settings = get_chat_settings(chat_id)
+        current_limit = settings.get("msg_length_limit", 0)
+        
+        if val == "plus":
+            new_limit = current_limit + 50
+        elif val == "minus":
+            new_limit = max(0, current_limit - 50)
+        else:
+            new_limit = int(val)
+            
         update_chat_setting(chat_id, "msg_length_limit", new_limit)
         new_settings = get_chat_settings(chat_id)
         try:
