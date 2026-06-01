@@ -104,6 +104,7 @@ async def start_voice_chat_monitor(application: Application):
     @telethon_client.on(events.Raw(UpdateGroupCallParticipants))
     async def handle_voice_chat_join(event):
         """Handles voice chat join events for Users and Channels."""
+        logger.info(f"📥 Received UpdateGroupCallParticipants for call {event.call.id} with {len(event.participants)} participants")
         asyncio.create_task(_process_vc_join_event(event))
     
     # Connect and start the client properly
@@ -289,10 +290,14 @@ async def _process_vc_join_event(event):
         is_batch_switch = len(leaves) > 0 and len(joins) > 0
 
         # Process leaves first to clear caches
+        if leaves:
+            logger.info(f"🔄 Processing {len(leaves)} leave events for call {call_id} (Switch suspected: {is_batch_switch})")
         for participant in leaves:
-            await _process_single_participant(call_id, participant, chat_entity, is_join=False)
+            await _process_single_participant(call_id, participant, chat_entity, is_join=False, is_switch=is_batch_switch)
             
         # Process joins
+        if joins:
+            logger.info(f"🔄 Processing {len(joins)} join events for call {call_id} (Switch suspected: {is_batch_switch})")
         for participant in joins:
             # Pass a flag if we suspect a switch to customize the notification
             await _process_single_participant(call_id, participant, chat_entity, is_join=True, is_switch=is_batch_switch)
@@ -316,12 +321,14 @@ async def _process_single_participant(call_id, participant, chat_entity, is_join
             user_id = peer.chat_id
             peer_type = "chat"
         
-        if not user_id: return
+        if not user_id: 
+            logger.debug(f"Skipping participant in call {call_id}: no user_id found")
+            return
         
-        # Deduplicate and Rate Limit
-        now = datetime.datetime.now()
+        logger.info(f"👤 Processing participant {user_id} in call {call_id} (Join: {is_join}, Switch: {is_switch})")
         
         # Glitch/Dedox Protection
+        now = datetime.datetime.now()
         if is_join:
             # Glitch/Dedox Protection: Include the participant's join date to distinguish
             # actual new joins from Telethon re-sending existing participants in state updates
@@ -336,12 +343,14 @@ async def _process_single_participant(call_id, participant, chat_entity, is_join
             notif_key = f"{user_id}_{call_id}"
             if notif_key in notification_cache:
                 if (now - notification_cache[notif_key]).total_seconds() < 300: # 5 mins cooldown
+                    logger.info(f"⏸ Cooldown active for {user_id} in call {call_id}. Skipping notification.")
                     return
         else:
             # For leaves, we use a different cache key or just don't cache as strictly
             leave_cache_key = f"leave_{user_id}_{call_id}"
             if leave_cache_key in notification_cache:
                 if (now - notification_cache[leave_cache_key]).total_seconds() < 10:
+                    logger.info(f"⏸ Leave cooldown active for {user_id} in call {call_id}. Skipping notification.")
                     return
             notification_cache[leave_cache_key] = now
             
@@ -385,8 +394,10 @@ async def _process_single_participant(call_id, participant, chat_entity, is_join
             # Check settings
             settings = get_chat_settings(settings_chat_id)
             if is_join and not settings.get("vc_user_join_enabled", True):
+                logger.info(f"🔇 Join notification disabled for chat {settings_chat_id}")
                 return
             if not is_join and not settings.get("vc_user_leave_enabled", True):
+                logger.info(f"🔇 Leave notification disabled for chat {settings_chat_id}")
                 return
 
             # VC Glitch Safety: Only for joins
