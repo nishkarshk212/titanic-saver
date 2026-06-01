@@ -267,6 +267,8 @@ async def _process_vc_join_event(event):
                     uid = peer.user_id
                 elif isinstance(peer, PeerChannel):
                     uid = peer.channel_id
+                elif isinstance(peer, PeerChat):
+                    uid = peer.chat_id
                 if uid:
                     notification_cache[f"{uid}_{call_id}"] = now
                     silent_count += 1
@@ -298,6 +300,9 @@ async def _process_single_participant(call_id, participant, chat_entity, is_join
         elif isinstance(peer, PeerChannel):
             user_id = peer.channel_id
             peer_type = "channel"
+        elif isinstance(peer, PeerChat):
+            user_id = peer.chat_id
+            peer_type = "chat"
         
         if not user_id: return
         
@@ -327,6 +332,12 @@ async def _process_single_participant(call_id, participant, chat_entity, is_join
                 if (now - notification_cache[leave_cache_key]).total_seconds() < 10:
                     return
             notification_cache[leave_cache_key] = now
+            
+            # CRITICAL: Clear join cache when user leaves so they can be notified if they re-join
+            # or switch back to this identity quickly.
+            join_notif_key = f"{user_id}_{call_id}"
+            notification_cache.pop(join_notif_key, None)
+            logger.info(f"🗑 Cleared join cache for {user_id} in call {call_id} (Left)")
 
         # Use timeout and handle "Entity not found" gracefully
         try:
@@ -405,12 +416,17 @@ async def _process_single_participant(call_id, participant, chat_entity, is_join
             
             username_str = f"@{entity.username}" if getattr(entity, 'username', None) else "—"
             
+            # Format display ID for channels and chats
+            display_id = user_id
+            if peer_type in ["channel", "chat"] and not str(user_id).startswith("-100"):
+                display_id = f"-100{user_id}"
+            
             status_text = "Joined ✅" if is_join else "Left ❌"
             
             notification_text = (
                 f"<blockquote>\n"
                 f"𝚴𝛂ϻ𝛆 ➛ {mention}\n"
-                f"𝚰𝛛 ➛ <code>{user_id}</code>\n"
+                f"𝚰𝛛 ➛ <code>{display_id}</code>\n"
                 f"𝐔𝛅𝛆𝛑𝛈𝛂ϻ𝛆 ➛ {username_str}\n"
                 f"Status ➛ {status_text}\n"
                 f"</blockquote>"
