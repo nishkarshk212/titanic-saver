@@ -275,19 +275,31 @@ async def _process_vc_join_event(event):
             logger.info(f"Pre-populated notification cache for {silent_count} existing participants in call {call_id}")
             return
 
-        for participant in event.participants:
-            # Check if participant is joining or leaving
-            is_join = hasattr(participant, 'date') and participant.date is not None and not getattr(participant, 'left', False)
-            is_leave = getattr(participant, 'left', False)
+        # Analyze batch for switches
+        leaves = []
+        joins = []
+        for p in event.participants:
+            is_join = hasattr(p, 'date') and p.date is not None and not getattr(p, 'left', False)
+            is_leave = getattr(p, 'left', False)
+            if is_leave: leaves.append(p)
+            elif is_join: joins.append(p)
+
+        # Detect switches: If we have both leaves and joins in the same batch,
+        # it's highly likely to be identity switches.
+        is_batch_switch = len(leaves) > 0 and len(joins) > 0
+
+        # Process leaves first to clear caches
+        for participant in leaves:
+            await _process_single_participant(call_id, participant, chat_entity, is_join=False)
             
-            if not is_join and not is_leave:
-                continue
-            
-            asyncio.create_task(_process_single_participant(call_id, participant, chat_entity, is_join=is_join))
+        # Process joins
+        for participant in joins:
+            # Pass a flag if we suspect a switch to customize the notification
+            await _process_single_participant(call_id, participant, chat_entity, is_join=True, is_switch=is_batch_switch)
     except Exception as e:
         logger.error(f"❌ Error in _process_vc_join_event: {e}")
 
-async def _process_single_participant(call_id, participant, chat_entity, is_join=True):
+async def _process_single_participant(call_id, participant, chat_entity, is_join=True, is_switch=False):
     """Process a single VC participant join or leave."""
     try:
         peer = participant.peer
@@ -338,6 +350,10 @@ async def _process_single_participant(call_id, participant, chat_entity, is_join
             join_notif_key = f"{user_id}_{call_id}"
             notification_cache.pop(join_notif_key, None)
             logger.info(f"🗑 Cleared join cache for {user_id} in call {call_id} (Left)")
+
+            # If it's a switch, don't send a "Left" notification to avoid spam
+            if is_switch:
+                return
 
         # Use timeout and handle "Entity not found" gracefully
         try:
@@ -422,6 +438,8 @@ async def _process_single_participant(call_id, participant, chat_entity, is_join
                 display_id = f"-100{user_id}"
             
             status_text = "Joined ✅" if is_join else "Left ❌"
+            if is_join and is_switch:
+                status_text = "Switched Identity 🔄"
             
             notification_text = (
                 f"<blockquote>\n"
