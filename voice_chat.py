@@ -26,6 +26,8 @@ API_ID = int(os.getenv("API_ID", 0))
 API_HASH = os.getenv("API_HASH", "")
 STRING_SESSION = os.getenv("STRING_SESSION", "")
 
+print(f"DEBUG: voice_chat.py loaded. API_ID={API_ID}, API_HASH={'SET' if API_HASH else 'NOT SET'}, STRING_SESSION={'SET' if STRING_SESSION else 'NOT SET'}")
+
 # Initialize Telethon Client
 telethon_client = None
 ptb_application = None
@@ -55,6 +57,7 @@ _post_gate_sync_done = set()
 
 async def start_voice_chat_monitor(application: Application):
     """Starts the Telethon client to monitor voice chat events."""
+    print("DEBUG: start_voice_chat_monitor called")
     global telethon_client, ptb_application
     ptb_application = application
     
