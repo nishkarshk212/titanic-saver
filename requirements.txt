@@ -6,3 +6,4 @@ pytz
 httpx
 apscheduler
 timezonefinder
+python-dotenv

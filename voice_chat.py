@@ -39,6 +39,7 @@ call_to_chat = {}
 # Glitch/Dedox Protection
 vc_glitch_cache = {} # (chat_id, user_id) -> timestamp
 vc_flood_counter = {} # chat_id -> (count, timestamp)
+vc_ddos_active = {} # chat_id -> (expiry_timestamp)
 
 # Pending invites: (chat_id, user_id) -> list of message_ids to delete upon join
 pending_invites = {}
@@ -357,6 +358,13 @@ async def _process_single_participant(call_id, participant, chat_entity):
 
             # VC Glitch Safety: Check for flood in this specific chat
             chat_flood_key = settings_chat_id
+            
+            # Check if DDoS protection is currently active for this chat
+            ddos_expiry = vc_ddos_active.get(chat_flood_key)
+            is_under_ddos = False
+            if ddos_expiry and now < ddos_expiry:
+                is_under_ddos = True
+                
             count, last_ts = vc_flood_counter.get(chat_flood_key, (0, now))
             if (now - last_ts).total_seconds() < 60:
                 count += 1
@@ -364,10 +372,25 @@ async def _process_single_participant(call_id, participant, chat_entity):
                 count = 1
             vc_flood_counter[chat_flood_key] = (count, now)
             
-            if count > 15: # More than 15 joins in 60 seconds
-                if settings.get("vc_safety_enabled", False):
-                    logger.warning(f"🚨 VC Flood in {settings_chat_id}. Enabling auto-clean.")
+            # DDoS Protection Thresholds
+            flood_threshold = 15
+            if settings.get("vc_ddos_protection_enabled", False) or is_under_ddos:
+                flood_threshold = 5 # Stricter limit during DDoS or if protection is enabled
+            
+            if count > flood_threshold:
+                if settings.get("vc_safety_enabled", False) or settings.get("vc_ddos_protection_enabled", False):
+                    logger.warning(f"🚨 VC Flood/DDoS detected in {settings_chat_id}. Triggering safety measures.")
+                    
+                    # If not already marked, activate DDoS mode for 10 minutes
+                    if not is_under_ddos:
+                        vc_ddos_active[chat_flood_key] = now + datetime.timedelta(minutes=10)
+                        
                     asyncio.create_task(clean_ghost_participants(settings_chat_id))
+                    
+                    # In extreme DDoS, we might want to end the call if it's very severe
+                    if count > 30 and settings.get("vc_panic_mode_enabled", False):
+                        logger.critical(f"😱 PANIC MODE: Severe DDoS in {settings_chat_id}. Ending call.")
+                        asyncio.create_task(end_group_call(settings_chat_id))
                 return
 
             # Delete pending invite notifications if they exist
@@ -710,12 +733,77 @@ async def vcclean_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"Error executing vcclean: {e}")
         await status_msg.edit_text(f"❌ Error: {str(e)}")
 
+async def end_group_call(chat_id):
+    """Forcefully ends a group call in the chat."""
+    if not telethon_client or not telethon_client.is_connected():
+        return False
+        
+    try:
+        from telethon.tl.functions.phone import DiscardGroupCallRequest
+        
+        # Normalize chat_id for Telethon
+        tele_chat_id = int(str(chat_id).replace('-100', ''))
+        
+        # Get full chat/channel info to find the call
+        if str(chat_id).startswith('-100'):
+            full = await telethon_client(GetFullChannelRequest(channel=tele_chat_id))
+        else:
+            full = await telethon_client(GetFullChatRequest(chat_id=tele_chat_id))
+            
+        if not hasattr(full, 'full_chat') or not hasattr(full.full_chat, 'call') or not full.full_chat.call:
+            return False
+            
+        call = full.full_chat.call
+        
+        # End the call
+        await telethon_client(DiscardGroupCallRequest(call=call))
+        logger.info(f"🛑 Group call ended in chat {chat_id} due to safety measures.")
+        
+        # Notify the group
+        try:
+            await ptb_application.bot.send_message(
+                chat_id=chat_id,
+                text="🚨 <b>DDoS Protection Triggered:</b> Voice chat has been ended due to suspicious activity."
+            )
+        except: pass
+        
+        return True
+    except Exception as e:
+        logger.error(f"Failed to end group call: {e}")
+        return False
+
+async def vcdos_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin command to toggle DDoS protection."""
+    if not update.effective_chat or update.effective_chat.type == 'private':
+        return
+        
+    if not await is_user_admin(update.effective_chat.id, update.effective_user.id, context):
+        return await update.message.reply_text("❌ Only admins can use this command.")
+        
+    chat_id = update.effective_chat.id
+    settings = get_chat_settings(chat_id)
+    current = settings.get("vc_ddos_protection_enabled", False)
+    
+    from settings_manager_mongo import update_chat_setting
+    new_status = not current
+    await update_chat_setting(chat_id, "vc_ddos_protection_enabled", new_status)
+    
+    status_text = "ENABLED ✅" if new_status else "DISABLED ❌"
+    msg = f"🛡 <b>VC DDoS Protection:</b> {status_text}\n\n"
+    if new_status:
+        msg += "Stricter join limits and automatic cleaning are now active."
+    else:
+        msg += "Standard safety limits are now active."
+        
+    await update.message.reply_text(msg, parse_mode=ParseMode.HTML)
+
 def get_voice_chat_handlers():
     """Returns handlers for voice chat events."""
     return [
         CallbackQueryHandler(vc_join_callback, pattern="^join_vc_"),
         MessageHandler(filters.StatusUpdate.VIDEO_CHAT_PARTICIPANTS_INVITED, voice_chat_invite_handler),
-        CommandHandler("vcclean", vcclean_command)
+        CommandHandler("vcclean", vcclean_command),
+        CommandHandler("vcdos", vcdos_command)
     ]
 
 async def stop_voice_chat_monitor():
