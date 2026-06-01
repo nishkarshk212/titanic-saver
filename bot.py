@@ -1,7 +1,9 @@
 import logging
 import os
+import sys
 import html
 import random
+import fcntl
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, ChatPermissions
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes, MessageReactionHandler
 from telegram.constants import ParseMode
@@ -997,6 +999,14 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
 
 def main():
     """Main function to run the bot."""
+    # Prevent multiple instances
+    lock_file = open('/tmp/bot.lock', 'w')
+    try:
+        fcntl.lockf(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except IOError:
+        print("❌ Another instance of the bot is already running. Exiting.")
+        sys.exit(0)
+
     if not BOT_TOKEN:
         print("BOT_TOKEN not found in .env file. Please add it.")
         return

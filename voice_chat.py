@@ -687,7 +687,7 @@ async def clean_ghost_participants(chat_id):
                     await telethon_client(EditGroupCallParticipantRequest(
                         call=call,
                         participant=user_peer,
-                        removed=True
+                        left=True
                     ))
                     cleaned_count += 1
                     await asyncio.sleep(0.5) # Avoid flood
@@ -697,7 +697,7 @@ async def clean_ghost_participants(chat_id):
                     await telethon_client(EditGroupCallParticipantRequest(
                         call=call,
                         participant=user_peer,
-                        removed=True
+                        left=True
                     ))
                     cleaned_count += 1
                     await asyncio.sleep(0.5)
@@ -734,7 +734,7 @@ async def remove_user_from_vc(chat_id, user_id):
         await telethon_client(EditGroupCallParticipantRequest(
             call=call,
             participant=PeerUser(user_id=int(user_id)),
-            removed=True
+            left=True
         ))
         logger.info(f"✅ User {user_id} removed from VC in chat {chat_id}")
         return True
