@@ -449,7 +449,7 @@ async def _process_single_participant(call_id, participant, chat_entity):
             
             # Auto delete
             async def auto_delete_notification(c_id, m_id):
-                await asyncio.sleep(60)
+                await asyncio.sleep(5)
                 try:
                     await ptb_application.bot.delete_message(chat_id=c_id, message_id=m_id)
                 except: pass
