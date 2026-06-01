@@ -2724,6 +2724,13 @@ async def handle_setting_input(update: Update, context: ContextTypes.DEFAULT_TYP
             text_to_save = update.message.text_html if update.message.text_html else update.message.text
             update_chat_setting(chat_id, setting_key, text_to_save)
             success = True
+    elif config_type == "limit":
+        if section == "msg_length":
+            # Explicitly fail for custom message length as requested
+            success = False
+        elif update.message.text and update.message.text.isdigit():
+            update_chat_setting(chat_id, setting_key, int(update.message.text))
+            success = True
     elif section == "group_link":
         update_chat_setting(chat_id, "group_link", update.message.text)
         success = True
