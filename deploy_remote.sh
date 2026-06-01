@@ -42,7 +42,7 @@ $SSH_CMD "cd $BOT_DIR && pip3 install -r requirements.txt"
 # 5. Run the bot using screen
 echo "🤖 Starting the bot in screen..."
 $SSH_CMD "screen -XS bot quit || true" # Kill existing screen if any
-$SSH_CMD "cd $BOT_DIR && screen -dmS bot python3 bot.py"
+$SSH_CMD "cd $BOT_DIR && screen -dmS bot bash -c 'python3 bot.py 2>&1 | tee bot.log'"
 
 echo "✅ Deployment successful!"
-echo "You can check the bot status by logging into the server and running: screen -r bot"
+echo "You can check the bot status by logging into the server and running: tail -f $BOT_DIR/bot.log"

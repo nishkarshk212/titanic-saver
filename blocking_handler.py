@@ -417,9 +417,10 @@ async def handle_blocking(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if msg.voice and (settings.get("block_voice") or (emergency_active and settings.get("emergency_block_voice"))) and not await is_user_freed("block_voice", "voice"):
         should_delete = True
 
-    # Block plain text messages
-    if msg.text and (settings.get("block_text") or (emergency_active and settings.get("emergency_block_text"))) and not await is_user_freed("block_text", "text"):
-        is_command = msg.text.startswith(('/', '!', '.', '#'))
+    # Block plain text messages (including captions)
+    if (msg.text or msg.caption) and (settings.get("block_text") or (emergency_active and settings.get("emergency_block_text"))) and not await is_user_freed("block_text", "text"):
+        content = msg.text or msg.caption
+        is_command = content.startswith(('/', '!', '.', '#'))
         if not is_command:
             should_delete = True
 
@@ -582,6 +583,48 @@ async def handle_clean_service(update: Update, context: ContextTypes.DEFAULT_TYP
             logging.error(f"Error deleting service message: {e}")
             
     return False
+
+async def block_text_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Command to toggle text message blocking."""
+    if not update.effective_chat or update.effective_chat.type == "private":
+        return
+        
+    chat_id = update.effective_chat.id
+    user_id = update.effective_user.id
+    
+    if not await can_user_ban(chat_id, user_id, context):
+        await send_bot_response(update, context, "Only admins with ban permission can use this command.")
+        return
+        
+    settings = get_chat_settings(chat_id)
+    current = settings.get("block_text", False)
+    new_status = not current
+    
+    update_chat_setting(chat_id, "block_text", new_status)
+    
+    status_text = "ENABLED ✅" if new_status else "DISABLED ❌"
+    await send_bot_response(update, context, f"🚫 <b>Block Text Messages:</b> {status_text}\n\nAll non-command text messages will now be {'deleted' if new_status else 'allowed'}.")
+
+async def block_reactions_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Command to toggle reaction blocking."""
+    if not update.effective_chat or update.effective_chat.type == "private":
+        return
+        
+    chat_id = update.effective_chat.id
+    user_id = update.effective_user.id
+    
+    if not await can_user_ban(chat_id, user_id, context):
+        await send_bot_response(update, context, "Only admins with ban permission can use this command.")
+        return
+        
+    settings = get_chat_settings(chat_id)
+    current = settings.get("block_reactions", False)
+    new_status = not current
+    
+    update_chat_setting(chat_id, "block_reactions", new_status)
+    
+    status_text = "ENABLED ✅" if new_status else "DISABLED ❌"
+    await send_bot_response(update, context, f"⚡ <b>Block Reactions:</b> {status_text}\n\nAll reactions from non-admins will now be {'deleted immediately' if new_status else 'allowed'}.")
 
 async def free_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Command to exempt a user from specific blocking rules."""
@@ -894,6 +937,8 @@ def get_blocking_handlers():
 def get_blocking_command_handlers():
     """Return blocking command and callback handlers for Group 0."""
     return [
+        CommandHandler("blocktext", block_text_command),
+        CommandHandler("blockreaction", block_reactions_command),
         CommandHandler("free", free_command),
         CommandHandler("unfree", unfree_command),
         CallbackQueryHandler(free_permission_callback, pattern=r"^free_perms_"),

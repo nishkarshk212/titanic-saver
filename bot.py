@@ -1249,6 +1249,8 @@ def main():
             BotCommand("psend", "Send protected message"),
             BotCommand("report", "Report a message to admins"),
             BotCommand("settings", "Bot settings (Admins only)"),
+            BotCommand("blocktext", "Toggle text blocking (Admins only)"),
+            BotCommand("blockreaction", "Toggle reaction blocking (Admins only)"),
             BotCommand("free", "Exempt a user (Admins only)"),
         ]
         try:
