@@ -158,7 +158,7 @@ async def info_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             banned = is_channel_banned(chat_id, user_id)
             channel_status = "Banned ⛔" if banned else "Active ✅"
             
-            channel_link = f"• <b>Channel Link:</b> <a href='https://t.me/{chat.username}'>Direct Link</a>\n" if chat.username else ""
+            channel_link = f"• <b>Channel Link:</b> <a href=\"https://t.me/{chat.username}\">Direct Link</a>\n" if chat.username else ""
             info_text = (
                 f"📢 <b>Channel Information</b>\n\n"
                 f"• <b>Title:</b> {html.escape(chat.title)}\n"
@@ -227,12 +227,23 @@ async def info_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logging.error(f"Error getting member status for info: {e}")
 
+    # Link formatting - ensure user_id is positive for tg://user?id=
+    # For channels/groups, we use the t.me link if available
+    user_link = f"tg://user?id={user_id}"
+    if is_channel and username:
+        user_link = f"https://t.me/{username}"
+    elif is_channel:
+        # For private channels by ID, there's no direct t.me link without a message ID
+        # but we can try the c/ format if we strip -100
+        clean_id = str(user_id).replace("-100", "")
+        user_link = f"https://t.me/c/{clean_id}/1"
+
     info_text = (
         f"👤 <b>User Information</b>\n\n"
         f"• <b>Name:</b> {html.escape(first_name)}\n"
         f"• <b>Username:</b> @{username if username else 'None'}\n"
         f"• <b>User ID:</b> <code>{user_id}</code>\n"
-        f"• <b>User Link:</b> <a href='tg://user?id={user_id}'>Direct Link</a>\n"
+        f"• <b>User Link:</b> <a href=\"{user_link}\">Direct Link</a>\n"
         f"• <b>Status:</b> {user_status}\n"
         f"• <b>Role:</b> {user_role}\n"
         f"• <b>Muted:</b> {'Yes 🔇' if is_muted else 'No 🔊'}\n"
@@ -657,7 +668,7 @@ async def info_callback_handler(update: Update, context: ContextTypes.DEFAULT_TY
         if is_channel:
             try:
                 chat = await context.bot.get_chat(user_id)
-                channel_link = f"• <b>Channel Link:</b> <a href='https://t.me/{chat.username}'>Direct Link</a>\n" if chat.username else ""
+                channel_link = f"• <b>Channel Link:</b> <a href=\"https://t.me/{chat.username}\">Direct Link</a>\n" if chat.username else ""
                 info_text = (
                     f"📢 <b>Channel Information</b>\n\n"
                     f"• <b>Title:</b> {html.escape(chat.title)}\n"
@@ -709,12 +720,21 @@ async def info_callback_handler(update: Update, context: ContextTypes.DEFAULT_TY
             elif status == 'kicked': user_status = "Banned"; user_role = "None"
         except: pass
 
+        # Link formatting
+        is_channel = str(user_id).startswith('-100')
+        user_link = f"tg://user?id={user_id}"
+        if is_channel and username:
+            user_link = f"https://t.me/{username}"
+        elif is_channel:
+            clean_id = str(user_id).replace("-100", "")
+            user_link = f"https://t.me/c/{clean_id}/1"
+
         info_text = (
             f"👤 <b>User Information</b>\n\n"
             f"• <b>Name:</b> {html.escape(stats.get('name', 'Unknown')) if stats else 'Unknown'}\n"
             f"• <b>Username:</b> @{username if username else 'None'}\n"
             f"• <b>User ID:</b> <code>{user_id}</code>\n"
-            f"• <b>User Link:</b> <a href='tg://user?id={user_id}'>Direct Link</a>\n"
+            f"• <b>User Link:</b> <a href=\"{user_link}\">Direct Link</a>\n"
             f"• <b>Status:</b> {user_status}\n"
             f"• <b>Role:</b> {user_role}\n"
             f"• <b>Muted:</b> {'Yes 🔇' if is_muted else 'No 🔊'}\n"
