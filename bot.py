@@ -158,11 +158,13 @@ async def info_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             banned = is_channel_banned(chat_id, user_id)
             channel_status = "Banned ⛔" if banned else "Active ✅"
             
+            channel_link = f"• <b>Channel Link:</b> <a href='https://t.me/{chat.username}'>Direct Link</a>\n" if chat.username else ""
             info_text = (
                 f"📢 <b>Channel Information</b>\n\n"
                 f"• <b>Title:</b> {html.escape(chat.title)}\n"
                 f"• <b>Username:</b> @{chat.username if chat.username else 'None'}\n"
                 f"• <b>Channel ID:</b> <code>{user_id}</code>\n"
+                f"{channel_link}"
                 f"• <b>Status:</b> {channel_status}\n"
                 f"• <b>Type:</b> Channel\n"
                 f"• <b>Description:</b> {html.escape(chat.description) if chat.description else 'None'}"
@@ -230,6 +232,7 @@ async def info_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"• <b>Name:</b> {html.escape(first_name)}\n"
         f"• <b>Username:</b> @{username if username else 'None'}\n"
         f"• <b>User ID:</b> <code>{user_id}</code>\n"
+        f"• <b>User Link:</b> <a href='tg://user?id={user_id}'>Direct Link</a>\n"
         f"• <b>Status:</b> {user_status}\n"
         f"• <b>Role:</b> {user_role}\n"
         f"• <b>Muted:</b> {'Yes 🔇' if is_muted else 'No 🔊'}\n"
@@ -654,11 +657,13 @@ async def info_callback_handler(update: Update, context: ContextTypes.DEFAULT_TY
         if is_channel:
             try:
                 chat = await context.bot.get_chat(user_id)
+                channel_link = f"• <b>Channel Link:</b> <a href='https://t.me/{chat.username}'>Direct Link</a>\n" if chat.username else ""
                 info_text = (
                     f"📢 <b>Channel Information</b>\n\n"
                     f"• <b>Title:</b> {html.escape(chat.title)}\n"
                     f"• <b>Username:</b> @{chat.username if chat.username else 'None'}\n"
                     f"• <b>Channel ID:</b> <code>{user_id}</code>\n"
+                    f"{channel_link}"
                     f"• <b>Type:</b> Channel\n"
                     f"• <b>Description:</b> {html.escape(chat.description) if chat.description else 'None'}"
                 )
@@ -706,7 +711,10 @@ async def info_callback_handler(update: Update, context: ContextTypes.DEFAULT_TY
 
         info_text = (
             f"👤 <b>User Information</b>\n\n"
+            f"• <b>Name:</b> {html.escape(stats.get('name', 'Unknown')) if stats else 'Unknown'}\n"
+            f"• <b>Username:</b> @{username if username else 'None'}\n"
             f"• <b>User ID:</b> <code>{user_id}</code>\n"
+            f"• <b>User Link:</b> <a href='tg://user?id={user_id}'>Direct Link</a>\n"
             f"• <b>Status:</b> {user_status}\n"
             f"• <b>Role:</b> {user_role}\n"
             f"• <b>Muted:</b> {'Yes 🔇' if is_muted else 'No 🔊'}\n"
