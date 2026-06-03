@@ -1,5 +1,6 @@
 import logging
-import asyncio
+import logging
+import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, MessageHandler, filters
 from settings_manager_mongo import get_chat_settings
@@ -21,6 +22,15 @@ async def edited_message_handler(update: Update, context: ContextTypes.DEFAULT_T
     # Check if feature is enabled
     if not settings.get("edit_checks_enabled", False):
         return
+
+    # Check age of message (1 month = 30 days)
+    # Only ignore if the message is older than 30 days
+    message_date = update.edited_message.date
+    if message_date:
+        now = datetime.datetime.now(datetime.timezone.utc)
+        if (now - message_date).days > 30:
+            logging.info(f"[EDIT] Ignoring old message edit (ID: {update.edited_message.message_id}, Date: {message_date})")
+            return
 
     # Check target (members or everyone)
     target = settings.get("edit_checks_target", "members")

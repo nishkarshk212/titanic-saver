@@ -1,7 +1,7 @@
 from telegram import Update, MessageEntity, InlineKeyboardButton, InlineKeyboardMarkup, ReactionTypeEmoji
 from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler, MessageHandler, MessageReactionHandler, filters
 from telegram.constants import ParseMode
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 import copy
 import random
@@ -245,6 +245,15 @@ async def handle_blocking(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     if not msg:
         return False
+
+    # Check age of message (1 month = 30 days)
+    # Only ignore if the message is older than 30 days
+    message_date = msg.date
+    if message_date:
+        now = datetime.now(timezone.utc)
+        if (now - message_date).days > 30:
+            logging.info(f"[BLOCKING] Ignoring old message (ID: {msg.message_id}, Date: {message_date})")
+            return False
 
     logging.info(f"[BLOCKING] Checking message in chat {chat_id}")
 
