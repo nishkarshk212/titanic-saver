@@ -278,18 +278,25 @@ async def _process_vc_join_event(event):
                 logger.warning(f"⚠️ Could not resolve chat for call {call_id}: {resolve_err}")
         
         # Glitch/Dedox Safety: Massive join events
-        if len(event.participants) > 10:
+        if len(event.participants) > 20: # Increased from 10
             logger.warning(f"⚠️ Massive VC join event ({len(event.participants)} users).")
             if chat_entity:
                 cid = chat_entity.id if not isinstance(chat_entity, int) else chat_entity
                 asyncio.create_task(clean_ghost_participants(cid))
             
-            # If it's a huge event (>25), just stop the call or skip individual processing
-            if len(event.participants) > 25:
-                logger.error(f"💣 Massive DDoS detected ({len(event.participants)} users). Ending call.")
+            # If it's a huge event (>60), check settings before ending call
+            if len(event.participants) > 60: # Increased from 25
+                logger.error(f"💣 Massive DDoS detected ({len(event.participants)} users).")
                 if chat_entity:
                     cid = chat_entity.id if not isinstance(chat_entity, int) else chat_entity
-                    asyncio.create_task(end_group_call(cid))
+                    settings_cid = int(f"-100{cid}") if not str(cid).startswith("-100") else cid
+                    settings = get_chat_settings(settings_cid)
+                    
+                    if settings.get("vc_ddos_protection_enabled", False):
+                        logger.error(f"🛡 DDoS Protection is ENABLED. Ending call in {cid}")
+                        asyncio.create_task(end_group_call(cid))
+                    else:
+                        logger.info(f"ℹ️ DDoS Protection is DISABLED. Skipping call termination for {cid}")
                 return
 
         # First event after gate: suppress notifications for all current participants
@@ -444,8 +451,8 @@ async def _process_single_participant(call_id, participant, chat_entity, is_join
                     if not is_under_ddos:
                         vc_ddos_active[chat_flood_key] = now + datetime.timedelta(minutes=10)
                     
-                    # If flood is extreme (2x threshold), end the call
-                    if count > flood_threshold * 2:
+                    # If flood is extreme (4x threshold), end the call
+                    if count > flood_threshold * 4:
                         logger.error(f"💣 [EXTREME FLOOD] Ending call in {settings_chat_id}")
                         asyncio.create_task(end_group_call(settings_chat_id))
                     else:
