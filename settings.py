@@ -927,7 +927,6 @@ def get_vc_settings_keyboard(settings):
     vc_user_leave_status = "✅" if settings.get("vc_user_leave_enabled", True) else "❌"
     vc_invite_status = "✅" if settings.get("vc_invite_notification_enabled", True) else "❌"
     vc_safety_status = "✅" if settings.get("vc_safety_enabled", False) else "❌"
-    vc_ddos_status = "✅" if settings.get("vc_ddos_protection_enabled", False) else "❌"
     vc_panic_status = "✅" if settings.get("vc_panic_mode_enabled", False) else "❌"
     
     keyboard = [
@@ -935,7 +934,6 @@ def get_vc_settings_keyboard(settings):
         [InlineKeyboardButton(f"User Leave Notification: {vc_user_leave_status}", callback_data="set_toggle_vc_user_leave_enabled")],
         [InlineKeyboardButton(f"Invite Notification: {vc_invite_status}", callback_data="set_toggle_vc_invite_notification_enabled")],
         [InlineKeyboardButton(f"VC Safety (Anti-Ghost): {vc_safety_status}", callback_data="set_toggle_vc_safety_enabled")],
-        [InlineKeyboardButton(f"VC DDoS Protection: {vc_ddos_status}", callback_data="set_toggle_vc_ddos_protection_enabled")],
         [InlineKeyboardButton(f"VC Panic Mode: {vc_panic_status}", callback_data="set_toggle_vc_panic_mode_enabled")],
         [InlineKeyboardButton("ℹ️ Voice chat related notifications", callback_data="set_none")],
         [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]

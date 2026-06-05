@@ -76,7 +76,6 @@ DEFAULT_CHAT_SETTINGS = {
     "manager_id_enabled": True,
     "manager_info_enabled": True,
     "vc_safety_enabled": False,
-    "vc_ddos_protection_enabled": False,
     "vc_panic_mode_enabled": False,
     "tagger_enabled": True,
     # Recurring messages settings
