@@ -283,6 +283,14 @@ async def _process_vc_join_event(event):
             if chat_entity:
                 cid = chat_entity.id if not isinstance(chat_entity, int) else chat_entity
                 asyncio.create_task(clean_ghost_participants(cid))
+            
+            # If it's a huge event (>25), just stop the call or skip individual processing
+            if len(event.participants) > 25:
+                logger.error(f"💣 Massive DDoS detected ({len(event.participants)} users). Ending call.")
+                if chat_entity:
+                    cid = chat_entity.id if not isinstance(chat_entity, int) else chat_entity
+                    asyncio.create_task(end_group_call(cid))
+                return
 
         # First event after gate: suppress notifications for all current participants
         # (state dump of existing VC members — not real joins)
@@ -386,14 +394,14 @@ async def _process_single_participant(call_id, participant, chat_entity, is_join
             else:
                 leave_cache_key = f"leave_{user_id}_{call_id}"
                 if leave_cache_key in notification_cache:
-                    if (now - notification_cache[leave_cache_key]).total_seconds() < 10:
+                    if (now - notification_cache[leave_cache_key]).total_seconds() < 30: # Increased to 30s
                         logger.info(f"⏸ [STOP] Leave cooldown active for {user_id}")
                         return
                 notification_cache[leave_cache_key] = now
                 
-                # Clear join cache
-                join_notif_key = f"{user_id}_{call_id}"
-                notification_cache.pop(join_notif_key, None)
+                # DO NOT clear join cache immediately to prevent Join-Leave-Join spam glitch
+                # join_notif_key = f"{user_id}_{call_id}"
+                # notification_cache.pop(join_notif_key, None)
                 
                 if is_switch:
                     logger.info(f"🔄 [STOP] Identity switch for {user_id} - suppressing 'Left' notification")
@@ -435,7 +443,13 @@ async def _process_single_participant(call_id, participant, chat_entity, is_join
                     logger.warning(f"🚨 [FLOOD] chat {settings_chat_id} count {count}")
                     if not is_under_ddos:
                         vc_ddos_active[chat_flood_key] = now + datetime.timedelta(minutes=10)
-                    asyncio.create_task(clean_ghost_participants(settings_chat_id))
+                    
+                    # If flood is extreme (2x threshold), end the call
+                    if count > flood_threshold * 2:
+                        logger.error(f"💣 [EXTREME FLOOD] Ending call in {settings_chat_id}")
+                        asyncio.create_task(end_group_call(settings_chat_id))
+                    else:
+                        asyncio.create_task(clean_ghost_participants(settings_chat_id))
                     return
 
             # 6. Send Message
