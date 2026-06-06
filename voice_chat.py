@@ -892,17 +892,25 @@ async def vcstatus_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             call_info = await telethon_client(GetGroupCallRequest(call=full.full_chat.call, limit=100))
                             participants = call_info.participants
                             
-                            p_ids = []
+                            p_list = []
                             for p in participants:
                                 if not getattr(p, 'left', False):
                                     p_id = getattr(p.peer, 'user_id', getattr(p.peer, 'channel_id', getattr(p.peer, 'chat_id', 'Unknown')))
-                                    p_ids.append(f"<code>{p_id}</code>")
+                                    
+                                    # Try to resolve name from Telethon cache
+                                    try:
+                                        p_entity = await telethon_client.get_entity(p.peer)
+                                        p_name = getattr(p_entity, 'first_name', getattr(p_entity, 'title', "Unknown"))
+                                    except:
+                                        p_name = "Unknown"
+                                        
+                                    p_list.append(f"• {p_name} (<code>{p_id}</code>)")
                             
-                            if p_ids:
-                                status_msg += f"• <b>{display_name}</b>: {len(p_ids)} users\n"
-                                status_msg += f"  └ {', '.join(p_ids)}\n"
+                            if p_list:
+                                status_msg += f"<b>{display_name}</b>: {len(p_list)} users\n"
+                                status_msg += "\n".join(p_list) + "\n\n"
                             else:
-                                status_msg += f"• <b>{display_name}</b>: No active participants\n"
+                                status_msg += f"<b>{display_name}</b>: No active participants\n\n"
                         else:
                             # Call might have ended
                             status_msg += f"• <b>{display_name}</b>: Voice chat ended\n"
