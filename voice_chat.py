@@ -369,6 +369,10 @@ async def _process_vc_join_event(event):
         leaves = []
         joins = []
         for p in event.participants:
+            # DEBUG: Log participant attributes
+            p_id = getattr(p.peer, 'user_id', getattr(p.peer, 'channel_id', getattr(p.peer, 'chat_id', 'Unknown')))
+            logger.info(f"🔎 Participant {p_id} attributes: date={getattr(p, 'date', 'N/A')}, left={getattr(p, 'left', 'N/A')}")
+            
             is_join = hasattr(p, 'date') and p.date is not None and not getattr(p, 'left', False)
             is_leave = getattr(p, 'left', False)
             if is_leave: leaves.append(p)
