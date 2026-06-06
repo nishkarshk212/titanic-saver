@@ -123,6 +123,11 @@ async def start_voice_chat_monitor(application: Application):
         _vc_monitor_start_ts = datetime.datetime.now()
         logger.info("✅ Telethon client started successfully!")
         
+        # Load dialogs to populate cache
+        logger.info("📂 Loading dialogs for Telethon client...")
+        dialogs = await telethon_client.get_dialogs(limit=50)
+        logger.info(f"✅ Loaded {len(dialogs)} dialogs.")
+        
         # Register PTB handlers for invite notifications and VC commands
         handlers = get_voice_chat_handlers()
         for handler in handlers:
