@@ -243,8 +243,8 @@ async def _process_vc_join_event(event):
         now = datetime.datetime.now()
         last_failed = _failed_resolutions.get(call_id)
         
-        # Try resolution if missing, and haven't failed recently (cooldown 10 mins)
-        if not chat_entity and (not last_failed or (now - last_failed).total_seconds() > 600):
+        # Try resolution if missing, and haven't failed recently (cooldown 5 mins)
+        if not chat_entity and (not last_failed or (now - last_failed).total_seconds() > 300):
             try:
                 logger.info(f"🔍 Attempting to resolve call {call_id} via GetGroupCallRequest...")
                 result = await telethon_client(GetGroupCallRequest(call=event.call, limit=1))
@@ -270,8 +270,38 @@ async def _process_vc_join_event(event):
                         _failed_resolutions[call_id] = now
                         logger.info(f"❌ Skipping call {call_id}: bot not in chat {bot_check_id} or error: {e}")
                 else:
-                    _failed_resolutions[call_id] = now
-                    logger.info(f"❓ GetGroupCallRequest returned no chats for call {call_id}")
+                    # Fallback: Deep scan all groups if GetGroupCallRequest returns nothing
+                    logger.info(f"❓ GetGroupCallRequest empty for {call_id}. Starting deep scan fallback...")
+                    collection = get_collection(COLLECTIONS['settings'])
+                    if collection:
+                        all_chats = list(collection.find({}))
+                        found = False
+                        for chat_doc in all_chats:
+                            cid = chat_doc.get("chat_id")
+                            if not cid: continue
+                            try:
+                                clean_id = int(str(cid).replace('-100', ''))
+                                try:
+                                    full = await telethon_client(GetFullChannelRequest(channel=clean_id))
+                                except:
+                                    full = await telethon_client(GetFullChatRequest(chat_id=clean_id))
+                                    
+                                if hasattr(full, 'full_chat') and hasattr(full.full_chat, 'call') and full.full_chat.call:
+                                    if full.full_chat.call.id == call_id:
+                                        entity = await telethon_client.get_entity(clean_id)
+                                        chat_entity = entity
+                                        call_to_chat[call_id] = chat_entity
+                                        _failed_resolutions.pop(call_id, None)
+                                        logger.info(f"🎯 Deep scan found call {call_id} in chat {cid}")
+                                        found = True
+                                        break
+                            except: continue
+                        if not found:
+                            _failed_resolutions[call_id] = now
+                            logger.info(f"❌ Deep scan could not resolve call {call_id}")
+                    else:
+                        _failed_resolutions[call_id] = now
+                        logger.info(f"❓ GetGroupCallRequest returned no chats for call {call_id}")
             except Exception as resolve_err:
                 _failed_resolutions[call_id] = now
                 logger.warning(f"⚠️ Could not resolve chat for call {call_id}: {resolve_err}")
