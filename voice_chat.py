@@ -205,22 +205,27 @@ async def scan_active_vcs():
                 clean_id = int(str(cid).replace('-100', ''))
                 try:
                     full = await telethon_client(GetFullChannelRequest(channel=clean_id))
-                except:
-                    full = await telethon_client(GetFullChatRequest(chat_id=clean_id))
+                except Exception as e:
+                    # logger.debug(f"Could not get full channel {clean_id}: {e}")
+                    try:
+                        full = await telethon_client(GetFullChatRequest(chat_id=clean_id))
+                    except:
+                        continue
                     
                 if hasattr(full, 'full_chat') and hasattr(full.full_chat, 'call') and full.full_chat.call:
                     call_id = full.full_chat.call.id
                     if call_id not in call_to_chat:
                         try:
+                            # Verify if the bot is actually in the group before mapping
                             await ptb_application.bot.get_chat(cid)
-                        except:
-                            logger.info(f"🔍 Skipping group {cid}: bot not a member")
+                            entity = await telethon_client.get_entity(clean_id)
+                            call_to_chat[call_id] = entity
+                            count += 1
+                            logger.info(f"🔍 Pre-scanned active VC: call {call_id} in group {cid}")
+                        except Exception as e:
+                            # logger.debug(f"Skipping call {call_id} in group {cid}: bot not a member or {e}")
                             continue
-                        entity = await telethon_client.get_entity(clean_id)
-                        call_to_chat[call_id] = entity
-                        count += 1
-                        logger.info(f"🔍 Pre-scanned active VC: call {call_id} in group {cid}")
-                await asyncio.sleep(2)
+                await asyncio.sleep(0.5) # Faster scan on startup
             except:
                 continue
         logger.info(f"🔍 Pre-scan complete: mapped {count} active VCs")
@@ -232,8 +237,8 @@ async def _process_vc_join_event(event):
     try:
         call_id = event.call.id
         
-        # Skip initial state dump events during the first 15 seconds after startup
-        if _vc_monitor_start_ts and (datetime.datetime.now() - _vc_monitor_start_ts).total_seconds() < 15:
+        # Skip initial state dump events during the first 5 seconds after startup
+        if _vc_monitor_start_ts and (datetime.datetime.now() - _vc_monitor_start_ts).total_seconds() < 5:
             logger.info(f"Ignoring initial state sync for call {call_id} ({len(event.participants)} participants)")
             return
         
@@ -284,7 +289,8 @@ async def _process_vc_join_event(event):
                                 clean_id = int(str(cid).replace('-100', ''))
                                 try:
                                     full = await telethon_client(GetFullChannelRequest(channel=clean_id))
-                                except:
+                                except Exception as e:
+                                    # logger.debug(f"Could not get full channel {clean_id}: {e}")
                                     full = await telethon_client(GetFullChatRequest(chat_id=clean_id))
                                     
                                 if hasattr(full, 'full_chat') and hasattr(full.full_chat, 'call') and full.full_chat.call:
@@ -296,7 +302,9 @@ async def _process_vc_join_event(event):
                                         logger.info(f"🎯 Deep scan found call {call_id} in chat {cid}")
                                         found = True
                                         break
-                            except: continue
+                            except Exception as e:
+                                # logger.debug(f"Deep scan error for chat {cid}: {e}")
+                                continue
                         if not found:
                             _failed_resolutions[call_id] = now
                             logger.info(f"❌ Deep scan could not resolve call {call_id}")
@@ -783,12 +791,50 @@ async def vcclean_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"Error executing vcclean: {e}")
         await status_msg.edit_text(f"❌ Error: {str(e)}")
 
+async def vcstatus_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin command to show VC monitor status and active calls."""
+    if not update.effective_chat or update.effective_chat.type == 'private':
+        return
+        
+    if not await is_user_admin(update.effective_chat.id, update.effective_user.id, context):
+        return await update.message.reply_text("❌ Only admins can use this command.")
+        
+    status_msg = (
+        f"🎙 <b>Voice Chat Monitor Status</b>\n\n"
+        f"<b>Connected:</b> {'✅ Yes' if telethon_client and telethon_client.is_connected() else '❌ No'}\n"
+        f"<b>Active Mappings:</b> {len(call_to_chat)}\n"
+        f"<b>Notification Cache:</b> {len(notification_cache)}\n"
+        f"<b>Failed Resolutions:</b> {len(_failed_resolutions)}\n\n"
+        f"<i>Use /vcrefresh to force a global scan of all groups.</i>"
+    )
+    await update.message.reply_text(status_msg, parse_mode=ParseMode.HTML)
+
+async def vcrefresh_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin command to force a global scan of all groups for active VCs."""
+    if not update.effective_chat or update.effective_chat.type == 'private':
+        return
+        
+    if not await is_user_admin(update.effective_chat.id, update.effective_user.id, context):
+        return await update.message.reply_text("❌ Only admins can use this command.")
+        
+    msg = await update.message.reply_text("🔄 Starting global VC scan... this may take a minute.")
+    
+    # Reset failed resolutions to allow retrying everything
+    _failed_resolutions.clear()
+    
+    # Run scan
+    asyncio.create_task(scan_active_vcs())
+    
+    await msg.edit_text("✅ Global VC scan started in background. Check /vcstatus in a moment.")
+
 def get_voice_chat_handlers():
     """Returns handlers for voice chat events."""
     return [
         CallbackQueryHandler(vc_join_callback, pattern="^join_vc_"),
         MessageHandler(filters.StatusUpdate.VIDEO_CHAT_PARTICIPANTS_INVITED, voice_chat_invite_handler),
-        CommandHandler("vcclean", vcclean_command)
+        CommandHandler("vcclean", vcclean_command),
+        CommandHandler("vcstatus", vcstatus_command),
+        CommandHandler("vcrefresh", vcrefresh_command)
     ]
 
 async def stop_voice_chat_monitor():
