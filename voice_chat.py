@@ -224,6 +224,11 @@ async def scan_active_vcs():
                             # Verify if the bot is actually in the group before mapping
                             await ptb_application.bot.get_chat(cid)
                             entity = await telethon_client.get_entity(clean_id)
+                            
+                            # Populate Telethon's entity cache for this group
+                            logger.info(f"👥 Populating entity cache for group {cid}...")
+                            await telethon_client.get_participants(entity, limit=200)
+                            
                             call_to_chat[call_id] = entity
                             count += 1
                             logger.info(f"🔍 Pre-scanned active VC: call {call_id} in group {cid}")
@@ -295,6 +300,11 @@ async def _process_vc_join_event(event):
                                     call_to_chat[call_id] = dialog.entity
                                     _failed_resolutions.pop(call_id, None)
                                     logger.info(f"🎯 Dialog scan found call {call_id} in chat {dialog.id}")
+                                    
+                                    # Populate cache
+                                    try: await telethon_client.get_participants(dialog.entity, limit=100)
+                                    except: pass
+                                    
                                     found = True
                                     chat_entity = dialog.entity
                                     break
@@ -369,10 +379,6 @@ async def _process_vc_join_event(event):
         leaves = []
         joins = []
         for p in event.participants:
-            # DEBUG: Log participant attributes
-            p_id = getattr(p.peer, 'user_id', getattr(p.peer, 'channel_id', getattr(p.peer, 'chat_id', 'Unknown')))
-            logger.info(f"🔎 Participant {p_id} attributes: date={getattr(p, 'date', 'N/A')}, left={getattr(p, 'left', 'N/A')}")
-            
             is_join = hasattr(p, 'date') and p.date is not None and not getattr(p, 'left', False)
             is_leave = getattr(p, 'left', False)
             if is_leave: leaves.append(p)
@@ -468,8 +474,30 @@ async def _process_single_participant(call_id, participant, chat_entity, is_join
                 name = getattr(entity, 'first_name', getattr(entity, 'title', "Unknown"))
                 logger.info(f"✅ [ENTITY_FOUND] Name: {name}")
             except Exception as e:
-                logger.warning(f"❌ [ENTITY_FAILED] {user_id}: {e}")
-                return
+                # Fallback: try to find the user in the group participants
+                try:
+                    logger.info(f"🔍 [GET_ENTITY_FALLBACK] Searching for {user_id} in group participants...")
+                    participants = await telethon_client.get_participants(chat_entity, search=str(user_id))
+                    if participants:
+                        entity = participants[0]
+                        name = getattr(entity, 'first_name', getattr(entity, 'title', "Unknown"))
+                        logger.info(f"✅ [ENTITY_FOUND_FALLBACK] Name: {name}")
+                    else:
+                        # Final attempt: use PTB bot to get basic info
+                        logger.info(f"🔍 [GET_ENTITY_FINAL] Using PTB fallback for {user_id}...")
+                        chat_member = await ptb_application.bot.get_chat_member(chat_id=settings_chat_id, user_id=user_id)
+                        user = chat_member.user
+                        name = user.first_name
+                        # Create a dummy entity object for the rest of the logic
+                        class DummyEntity:
+                            def __init__(self, u):
+                                self.username = u.username
+                                self.first_name = u.first_name
+                        entity = DummyEntity(user)
+                        logger.info(f"✅ [ENTITY_FOUND_FINAL] Name: {name}")
+                except Exception as fallback_err:
+                    logger.warning(f"❌ [ENTITY_FAILED] {user_id}: {e} (Fallback also failed: {fallback_err})")
+                    return
 
             # 4. Check Settings
             settings = get_chat_settings(settings_chat_id)
