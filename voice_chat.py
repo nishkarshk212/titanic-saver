@@ -384,14 +384,16 @@ async def _process_vc_join_event(event):
             if is_leave: leaves.append(p)
             elif is_join: joins.append(p)
 
-        is_batch_switch = len(leaves) > 0 and len(joins) > 0
+        # A switch is typically a single user changing their peer (e.g. User -> Channel)
+        # This usually results in 1 leave and 1 join in the same update batch.
+        is_switch_event = len(leaves) == 1 and len(joins) == 1
         
         # Process participants in parallel tasks to avoid blocking the loop
         for participant in leaves:
-            asyncio.create_task(_process_single_participant(call_id, participant, chat_entity, is_join=False, is_switch=is_batch_switch))
+            asyncio.create_task(_process_single_participant(call_id, participant, chat_entity, is_join=False, is_switch=is_switch_event))
             
         for participant in joins:
-            asyncio.create_task(_process_single_participant(call_id, participant, chat_entity, is_join=True, is_switch=is_batch_switch))
+            asyncio.create_task(_process_single_participant(call_id, participant, chat_entity, is_join=True, is_switch=is_switch_event))
     except Exception as e:
         logger.error(f"❌ Error in _process_vc_join_event: {e}")
 
