@@ -273,9 +273,10 @@ async def _process_vc_join_event(event):
                     # Fallback: Deep scan all groups if GetGroupCallRequest returns nothing
                     logger.info(f"❓ GetGroupCallRequest empty for {call_id}. Starting deep scan fallback...")
                     collection = get_collection(COLLECTIONS['settings'])
-                    if collection:
+                    if collection is not None:
                         all_chats = list(collection.find({}))
                         found = False
+                        logger.info(f"🔎 Scanning {len(all_chats)} groups for call {call_id}...")
                         for chat_doc in all_chats:
                             cid = chat_doc.get("chat_id")
                             if not cid: continue
