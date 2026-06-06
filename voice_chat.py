@@ -523,12 +523,15 @@ async def _process_single_participant(call_id, participant, chat_entity, is_join
                     asyncio.create_task(clean_ghost_participants(settings_chat_id))
                     return
 
-            # 6. Send Message
+        # 6. Send Message
             username_str = f"@{entity.username}" if getattr(entity, 'username', None) else "—"
             display_id = user_id
+            
+            # For Channels/Chats, ensure we show the -100 prefix if missing
             if peer_type in ["channel", "chat"] and not str(user_id).startswith("-100"):
                 display_id = f"-100{user_id}"
             
+            # Formatting mention based on peer type
             if peer_type == "channel":
                 mention = f'<a href="https://t.me/{entity.username}">{name}</a>' if getattr(entity, 'username', None) else f"<b>{name}</b>"
             elif peer_type == "chat":
@@ -536,8 +539,14 @@ async def _process_single_participant(call_id, participant, chat_entity, is_join
             else:
                 mention = f'<a href="tg://user?id={user_id}">{name}</a>'
 
-            status_text = "Joined ✅" if is_join else "Left ❌"
-            if is_join and is_switch: status_text = "Switched Identity 🔄"
+            # Status logic
+            if is_join:
+                if is_switch:
+                    status_text = "Switched Identity 🔄"
+                else:
+                    status_text = "Joined ✅"
+            else:
+                status_text = "Left ❌"
             
             notification_text = (
                 f"<blockquote>\n"
@@ -846,7 +855,7 @@ async def vcclean_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await status_msg.edit_text(f"❌ Error: {str(e)}")
 
 async def vcstatus_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Admin command to show VC monitor status and active calls."""
+    """Admin command to show VC monitor status and active calls with live participants."""
     if not update.effective_chat or update.effective_chat.type == 'private':
         return
         
@@ -859,9 +868,61 @@ async def vcstatus_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"<b>Active Mappings:</b> {len(call_to_chat)}\n"
         f"<b>Notification Cache:</b> {len(notification_cache)}\n"
         f"<b>Failed Resolutions:</b> {len(_failed_resolutions)}\n\n"
-        f"<i>Use /vcrefresh to force a global scan of all groups.</i>"
     )
-    await update.message.reply_text(status_msg, parse_mode=ParseMode.HTML)
+
+    if call_to_chat and telethon_client and telethon_client.is_connected():
+        status_msg += "<b>Live Active Voice Chats:</b>\n"
+        for call_id, chat_entity in list(call_to_chat.items()):
+            try:
+                # Determine chat ID for display
+                if hasattr(chat_entity, 'id'):
+                    cid = chat_entity.id
+                    clean_id = int(str(cid).replace('-100', ''))
+                    display_name = getattr(chat_entity, 'title', f"Chat {cid}")
+                    
+                    # Fetch participants for this call
+                    try:
+                        # Get full chat to ensure we have the correct call reference
+                        if isinstance(chat_entity, PeerChannel) or "Channel" in type(chat_entity).__name__:
+                            full = await telethon_client(GetFullChannelRequest(channel=clean_id))
+                        else:
+                            full = await telethon_client(GetFullChatRequest(chat_id=clean_id))
+                        
+                        if hasattr(full, 'full_chat') and hasattr(full.full_chat, 'call') and full.full_chat.call:
+                            call_info = await telethon_client(GetGroupCallRequest(call=full.full_chat.call, limit=100))
+                            participants = call_info.participants
+                            
+                            p_ids = []
+                            for p in participants:
+                                if not getattr(p, 'left', False):
+                                    p_id = getattr(p.peer, 'user_id', getattr(p.peer, 'channel_id', getattr(p.peer, 'chat_id', 'Unknown')))
+                                    p_ids.append(f"<code>{p_id}</code>")
+                            
+                            if p_ids:
+                                status_msg += f"• <b>{display_name}</b>: {len(p_ids)} users\n"
+                                status_msg += f"  └ {', '.join(p_ids)}\n"
+                            else:
+                                status_msg += f"• <b>{display_name}</b>: No active participants\n"
+                        else:
+                            # Call might have ended
+                            status_msg += f"• <b>{display_name}</b>: Voice chat ended\n"
+                    except Exception as e:
+                        status_msg += f"• <b>{display_name}</b>: (Error fetching users)\n"
+                else:
+                    status_msg += f"• <b>Unknown Chat ({call_id})</b>\n"
+            except: continue
+    else:
+        status_msg += "<i>No active voice chats currently tracked.</i>\n"
+
+    status_msg += f"\n<i>Use /vcrefresh to force a global scan of all groups.</i>"
+    
+    # Split message if it's too long
+    if len(status_msg) > 4000:
+        parts = [status_msg[i:i+4000] for i in range(0, len(status_msg), 4000)]
+        for part in parts:
+            await update.message.reply_text(part, parse_mode=ParseMode.HTML)
+    else:
+        await update.message.reply_text(status_msg, parse_mode=ParseMode.HTML)
 
 async def vcrefresh_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Admin command to force a global scan of all groups for active VCs."""
