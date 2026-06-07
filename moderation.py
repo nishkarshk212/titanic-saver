@@ -681,6 +681,10 @@ async def forceban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     sender_id = update.effective_user.id if update.effective_user else None
     logger = logging.getLogger(__name__)
 
+    # Permission check for admin
+    if not await can_user_ban(chat_id, sender_id, context):
+        return await send_bot_response(update, context, "You don't have permission to ban users.")
+
     if not await check_bot_admin_rights(chat_id, context, ['can_restrict_members']):
         return await send_bot_response(update, context, "Bot needs restrict members permission.")
 
@@ -714,6 +718,10 @@ async def forceunban_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
     sender_id = update.effective_user.id if update.effective_user else None
     logger = logging.getLogger(__name__)
 
+    # Permission check for admin
+    if not await can_user_ban(chat_id, sender_id, context):
+        return await send_bot_response(update, context, "You don't have permission to unban users.")
+
     if not await check_bot_admin_rights(chat_id, context, ['can_restrict_members']):
         return await send_bot_response(update, context, "Bot needs restrict members permission.")
 
@@ -745,6 +753,10 @@ async def forcemute_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     sender_id = update.effective_user.id if update.effective_user else None
     logger = logging.getLogger(__name__)
 
+    # Permission check for admin
+    if not await can_user_mute(chat_id, sender_id, context):
+        return await send_bot_response(update, context, "You don't have permission to mute users.")
+
     if not await check_bot_admin_rights(chat_id, context, ['can_restrict_members']):
         return await send_bot_response(update, context, "Bot needs restrict members permission.")
 
@@ -775,6 +787,10 @@ async def forceunmute_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     chat_id = update.effective_chat.id
     sender_id = update.effective_user.id if update.effective_user else None
     logger = logging.getLogger(__name__)
+
+    # Permission check for admin
+    if not await can_user_mute(chat_id, sender_id, context):
+        return await send_bot_response(update, context, "You don't have permission to unmute users.")
 
     if not await check_bot_admin_rights(chat_id, context, ['can_restrict_members']):
         return await send_bot_response(update, context, "Bot needs restrict members permission.")
