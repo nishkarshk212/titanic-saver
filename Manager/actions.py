@@ -92,7 +92,13 @@ async def check_admin_permission(update: Update, context: ContextTypes.DEFAULT_T
             return await anon_checks[permission](chat.id, context)
         return False, f"❌ Unsupported permission check: {permission}"
     
-    # Try Telegram API first for accurate real-time permissions
+    # 1. Check database first for bot-only permissions
+    if permission in ['can_restrict_members', 'can_ban_users']:
+        stored_perms = get_stored_admin_permissions(chat.id, user.id)
+        if stored_perms and stored_perms.get(permission):
+            return True, None
+
+    # 2. Try Telegram API for native permissions
     try:
         member = await context.bot.get_chat_member(chat.id, user.id)
         status = member.status
@@ -117,9 +123,8 @@ async def check_admin_permission(update: Update, context: ContextTypes.DEFAULT_T
             return True, None
             
         if status != ChatMemberStatus.ADMINISTRATOR:
-            # If not admin on Telegram, remove from cache and deny
-            from admin_manager_mongo import remove_admin_cache
-            asyncio.create_task(asyncio.to_thread(remove_admin_cache, chat.id, user.id))
+            # If they have a bot-only permission (already checked above), we would have returned True.
+            # If they reach here and are not a Telegram admin, they are denied.
             return False, "❌ You need to be an administrator to use this command."
         
         if not permission:
@@ -127,11 +132,7 @@ async def check_admin_permission(update: Update, context: ContextTypes.DEFAULT_T
         
         # Check specific right
         if permission in ['can_restrict_members', 'can_ban_users']:
-            stored_perms = get_stored_admin_permissions(chat.id, user.id)
-            if stored_perms and stored_perms.get(permission):
-                return True, None
-            
-            # Fallback: if we don't have custom data but they have Telegram restriction right, allow it
+            # Fallback: if they have Telegram restriction right, allow it
             if getattr(member, 'can_restrict_members', False):
                 return True, None
             
