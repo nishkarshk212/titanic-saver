@@ -19,36 +19,22 @@ from staff_manager_mongo import increment_staff_stat
 
 async def can_user_mute(chat_id, user_id, context):
     """Check if a user can mute/unmute (Admin or Muter)."""
-    # Owner can always mute
-    from config import OWNER_ID
-    if user_id == OWNER_ID:
-        return True
-
-    # Check if it's an anonymous admin
-    if is_anonymous_admin(user_id):
-        logging.info(f"Anonymous admin detected, checking mute permissions for chat {chat_id}")
-        has_perm, error_msg = await check_anonymous_admin_mute_permission(chat_id, context)
-        logging.info(f"Anonymous admin mute permission result: {has_perm}, error: {error_msg}")
-        return has_perm
-    
-    # Check if user is a dedicated Muter (role in MongoDB)
+    # dedicated Muter (role in MongoDB) can always mute
     if check_is_muter(chat_id, user_id):
         return True
+
+    # Use the centralized check_admin_permission from Manager.actions
+    from Manager.actions import check_admin_permission
     
-    try:
-        member = await context.bot.get_chat_member(chat_id, user_id)
-        # Must be admin or creator
-        if member.status not in ['administrator', 'creator']:
-            return False
-        
-        # Creator has all permissions
-        if member.status == 'creator':
-            return True
-        
-        # Check if admin has can_restrict_members permission
-        return member.can_restrict_members
-    except:
-        return False
+    class MockUpdate:
+        def __init__(self, chat_id, user_id):
+            from telegram import Chat, User
+            self.effective_chat = Chat(chat_id, 'group')
+            self.effective_user = User(user_id, 'User', False)
+    
+    mock_update = MockUpdate(chat_id, user_id)
+    has_perm, _ = await check_admin_permission(mock_update, context, 'can_restrict_members')
+    return has_perm
 
 async def can_user_manage_voice_chat(chat_id, user_id, context):
     """Check if a user can manage voice chats (Admin, Muter, or Voice Chat Manager)."""
@@ -65,48 +51,18 @@ async def can_user_manage_voice_chat(chat_id, user_id, context):
 
 async def can_user_ban(chat_id, user_id, context):
     """Check if a user can ban/unban (Admin with custom ban permission)."""
-    # Owner can always ban
-    from config import OWNER_ID
+    # Use the centralized check_admin_permission from Manager.actions
+    from Manager.actions import check_admin_permission
     
-    # Telegram's ID for anonymous admins (Group Anonymous Bot)
-    ANONYMOUS_ADMIN_ID = 1087968824
+    # We create a mock update for the check
+    class MockUpdate:
+        def __init__(self, chat_id, user_id):
+            from telegram import Chat, User
+            self.effective_chat = Chat(chat_id, 'group')
+            self.effective_user = User(user_id, 'User', False)
     
-    if user_id == OWNER_ID:
-        logging.info(f"Owner {user_id} can ban in chat {chat_id}")
-        return True, None
-    
-    # Check if it's an anonymous admin (via ID)
-    if is_anonymous_admin(user_id):
-        logging.info(f"Anonymous admin detected (ID {user_id}), checking ban permissions for chat {chat_id}")
-        has_perm, error_msg = await check_anonymous_admin_ban_permission(chat_id, context)
-        logging.info(f"Anonymous admin ban permission result: {has_perm}, error: {error_msg}")
-        return has_perm, error_msg
-    
-    # If user_id is 0 or None, it might still be an anonymous admin via sender_chat
-    # This is handled in the command handlers themselves usually, but we check here if possible
-    
-    try:
-        member = await context.bot.get_chat_member(chat_id, user_id)
-        
-        # Must be admin or creator
-        if member.status not in ['administrator', 'creator']:
-            return False, "You must be an admin to ban users."
-        
-        # Creator has all permissions
-        if member.status == 'creator':
-            return True, None
-        
-        # Check if user is explicitly marked as a Muter (role in MongoDB)
-        if check_is_muter(chat_id, user_id):
-            return False, "❌ You have Muter permission but not Ban permission."
-
-        # Check if user has the actual Telegram permission to restrict members (Ban/Mute)
-        if not member.can_restrict_members:
-            return False, "❌ You don't have permission to ban users. You need the 'Ban Users' permission."
-
-        return True, None
-    except Exception as e:
-        return False, f"❌ Error checking permissions: {str(e)}"
+    mock_update = MockUpdate(chat_id, user_id)
+    return await check_admin_permission(mock_update, context, 'can_ban_users')
 
 async def check_bot_admin_rights(chat_id, context, required_rights=None):
     """Checks if the bot has the required administrative rights."""

@@ -153,7 +153,7 @@ async def check_anonymous_admin_mute_permission(chat_id, context):
     
     if has_perm:
         return True, None
-    return False, "❌ Anonymous admin doesn't have 'Ban Users' permission. Please enable 'Ban Users' permission for anonymous admins in group settings."
+    return False, "❌ Anonymous admin doesn't have 'Mute/Restrict Users' permission. Please enable 'Mute/Restrict Users' permission for anonymous admins in group settings."
 
 
 async def check_anonymous_admin_promote_permission(chat_id, context):

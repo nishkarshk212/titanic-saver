@@ -35,7 +35,13 @@ async def ask_mass_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await update.message.reply_text(f"❌ Mass action commands are currently disabled.")
     
     # Permission check
-    permission = 'can_pin_messages' if cmd == 'unpinall' else 'can_restrict_members'
+    if cmd == 'unpinall':
+        permission = 'can_pin_messages'
+    elif cmd in ['kickall', 'banall', 'unbanall']:
+        permission = 'can_ban_users'
+    else: # muteall, unmuteall
+        permission = 'can_restrict_members'
+        
     has_perm, error_msg = await check_admin_permission(update, context, permission)
     if not has_perm:
         return await update.message.reply_text(error_msg)
@@ -65,7 +71,13 @@ async def handle_mass_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE
     chat_id = query.message.chat_id
     
     # Permission check
-    permission = 'can_pin_messages' if cmd == 'unpinall' else 'can_restrict_members'
+    if cmd == 'unpinall':
+        permission = 'can_pin_messages'
+    elif cmd in ['kickall', 'banall', 'unbanall']:
+        permission = 'can_ban_users'
+    else: # muteall, unmuteall
+        permission = 'can_restrict_members'
+        
     has_perm, error_msg = await check_admin_permission(update, context, permission)
     if not has_perm:
         return await query.answer(error_msg, show_alert=True)

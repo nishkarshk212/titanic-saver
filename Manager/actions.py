@@ -79,7 +79,8 @@ async def check_admin_permission(update: Update, context: ContextTypes.DEFAULT_T
             return True, None
         
         anon_checks = {
-            'can_restrict_members': check_anonymous_admin_ban_permission,
+            'can_restrict_members': check_anonymous_admin_mute_permission,
+            'can_ban_users': check_anonymous_admin_ban_permission,
             'can_promote_members': check_anonymous_admin_promote_permission,
             'can_pin_messages': check_anonymous_admin_pin_permission,
             'can_delete_messages': check_anonymous_admin_delete_permission,
@@ -125,12 +126,23 @@ async def check_admin_permission(update: Update, context: ContextTypes.DEFAULT_T
             return True, None
         
         # Check specific right
+        # Special case for custom permission 'can_ban_users'
+        if permission == 'can_ban_users':
+            stored_perms = get_stored_admin_permissions(chat.id, user.id)
+            if stored_perms and stored_perms.get('can_ban_users'):
+                return True, None
+            # Fallback: if we don't have custom data but they have Telegram restriction right, allow it
+            if getattr(member, 'can_restrict_members', False):
+                return True, None
+            return False, "❌ You don't have the 'Ban Users' permission."
+
         has_right = getattr(member, permission, False)
         if has_right is True:
             return True, None
             
         perm_names = {
-            'can_restrict_members': "Ban Users",
+            'can_restrict_members': "Mute Users",
+            'can_ban_users': "Ban Users",
             'can_promote_members': "Add New Admins",
             'can_pin_messages': "Pin Messages",
             'can_delete_messages': "Delete Messages",
@@ -212,7 +224,7 @@ async def ban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await update.message.reply_text("❌ The /ban command is currently disabled.")
     
     # Permission check
-    has_perm, error_msg = await check_admin_permission(update, context, 'can_restrict_members')
+    has_perm, error_msg = await check_admin_permission(update, context, 'can_ban_users')
     if not has_perm:
         return await update.message.reply_text(error_msg)
     
@@ -272,7 +284,7 @@ async def unban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await update.message.reply_text("❌ The /unban command is currently disabled.")
     
     # Permission check
-    has_perm, error_msg = await check_admin_permission(update, context, 'can_restrict_members')
+    has_perm, error_msg = await check_admin_permission(update, context, 'can_ban_users')
     if not has_perm:
         return await update.message.reply_text(error_msg)
     
@@ -812,7 +824,7 @@ async def kick_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await update.message.reply_text("❌ The /kick command is currently disabled.")
     
     # Permission check
-    has_perm, error_msg = await check_admin_permission(update, context, 'can_restrict_members')
+    has_perm, error_msg = await check_admin_permission(update, context, 'can_ban_users')
     if not has_perm:
         return await update.message.reply_text(error_msg)
     
@@ -858,7 +870,7 @@ async def dban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     
     # Permission check
-    has_perm, error_msg = await check_admin_permission(update, context, 'can_restrict_members')
+    has_perm, error_msg = await check_admin_permission(update, context, 'can_ban_users')
     if not has_perm:
         return await update.message.reply_text(error_msg)
     
@@ -906,7 +918,7 @@ async def sban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     
     # Permission check
-    has_perm, error_msg = await check_admin_permission(update, context, 'can_restrict_members')
+    has_perm, error_msg = await check_admin_permission(update, context, 'can_ban_users')
     if not has_perm:
         return await update.message.reply_text(error_msg)
     
@@ -959,7 +971,7 @@ async def tban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     
     # Permission check
-    has_perm, error_msg = await check_admin_permission(update, context, 'can_restrict_members')
+    has_perm, error_msg = await check_admin_permission(update, context, 'can_ban_users')
     if not has_perm:
         return await update.message.reply_text(error_msg)
     

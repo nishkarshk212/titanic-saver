@@ -140,7 +140,7 @@ async def zombie_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await update.message.reply_text("❌ The /zombies command is currently disabled.")
     
     # Permission check
-    has_perm, error_msg = await check_admin_permission(update, context, 'can_restrict_members')
+    has_perm, error_msg = await check_admin_permission(update, context, 'can_ban_users')
     if not has_perm:
         return await update.message.reply_text(error_msg)
     
