@@ -27,12 +27,12 @@ async def can_user_mute(chat_id, user_id, context):
     from Manager.actions import check_admin_permission
     
     class MockUpdate:
-        def __init__(self, chat_id, user_id, bot):
+        def __init__(self, chat_id, user_id):
             from telegram import Chat, User
-            self.effective_chat = Chat(chat_id, 'group', bot=bot)
-            self.effective_user = User(user_id, 'User', False, bot=bot)
+            self.effective_chat = Chat(chat_id, 'group')
+            self.effective_user = User(user_id, 'User', False)
     
-    mock_update = MockUpdate(chat_id, user_id, context.bot)
+    mock_update = MockUpdate(chat_id, user_id)
     has_perm, _ = await check_admin_permission(mock_update, context, 'can_restrict_members')
     return has_perm
 
@@ -56,12 +56,12 @@ async def can_user_ban(chat_id, user_id, context):
     
     # We create a mock update for the check
     class MockUpdate:
-        def __init__(self, chat_id, user_id, bot):
+        def __init__(self, chat_id, user_id):
             from telegram import Chat, User
-            self.effective_chat = Chat(chat_id, 'group', bot=bot)
-            self.effective_user = User(user_id, 'User', False, bot=bot)
+            self.effective_chat = Chat(chat_id, 'group')
+            self.effective_user = User(user_id, 'User', False)
     
-    mock_update = MockUpdate(chat_id, user_id, context.bot)
+    mock_update = MockUpdate(chat_id, user_id)
     return await check_admin_permission(mock_update, context, 'can_ban_users')
 
 async def check_bot_admin_rights(chat_id, context, required_rights=None):

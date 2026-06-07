@@ -94,7 +94,7 @@ async def check_admin_permission(update: Update, context: ContextTypes.DEFAULT_T
     
     # Try Telegram API first for accurate real-time permissions
     try:
-        member = await chat.get_member(user.id)
+        member = await context.bot.get_chat_member(chat.id, user.id)
         status = member.status
         
         # Build permissions dict to update cache

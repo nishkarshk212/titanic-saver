@@ -85,6 +85,7 @@ async def start(update, context):
     bot_info = await context.bot.get_me()
     bot_name = bot_info.first_name
     bot_username = bot_info.username
+    bot_mention = f"@{bot_username}" if bot_username else bot_name
     add_to_group_url = f"https://t.me/{bot_username}?startgroup=true"
     
     keyboard = InlineKeyboardMarkup([
