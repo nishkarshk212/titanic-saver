@@ -240,11 +240,11 @@ async def promote_muter_command(update: Update, context: ContextTypes.DEFAULT_TY
             await send_bot_response(update, context, bot_error)
             return
 
-        # Promote to admin with ONLY restrict_members permission
+        # Promote to admin with NO native rights (bot-only muter)
         await context.bot.promote_chat_member(
             chat_id=chat_id,
             user_id=target_id,
-            can_restrict_members=True
+            can_restrict_members=False
         )
         
         # Set custom title

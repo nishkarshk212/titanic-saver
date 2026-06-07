@@ -430,8 +430,10 @@ async def confirm_promotion(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # We don't return here, we proceed with the rights I DO have
             # or the user can toggle them off.
 
-        # Calculate effective Telegram can_restrict_members (True if Ban or Mute is requested)
-        effective_can_restrict = final_perms.get('can_ban_users', False) or final_perms.get('can_restrict_members', False)
+        # Calculate effective Telegram can_restrict_members
+        # ONLY grant native Telegram restriction right if 'can_ban_users' is selected.
+        # 'can_restrict_members' (Mute) in our bot will be handled internally (bot-only).
+        effective_can_restrict = final_perms.get('can_ban_users', False)
 
         await context.bot.promote_chat_member(
             chat_id=chat_id,

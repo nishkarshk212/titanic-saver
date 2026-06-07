@@ -126,15 +126,17 @@ async def check_admin_permission(update: Update, context: ContextTypes.DEFAULT_T
             return True, None
         
         # Check specific right
-        # Special case for custom permission 'can_ban_users'
-        if permission == 'can_ban_users':
+        if permission in ['can_restrict_members', 'can_ban_users']:
             stored_perms = get_stored_admin_permissions(chat.id, user.id)
-            if stored_perms and stored_perms.get('can_ban_users'):
+            if stored_perms and stored_perms.get(permission):
                 return True, None
+            
             # Fallback: if we don't have custom data but they have Telegram restriction right, allow it
             if getattr(member, 'can_restrict_members', False):
                 return True, None
-            return False, "❌ You don't have the 'Ban Users' permission."
+            
+            perm_name = "Ban Users" if permission == 'can_ban_users' else "Mute Users"
+            return False, f"❌ You don't have the '{perm_name}' permission."
 
         has_right = getattr(member, permission, False)
         if has_right is True:
