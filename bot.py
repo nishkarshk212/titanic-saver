@@ -31,6 +31,7 @@ from nightmode import get_nightmode_handlers
 from font_normalizer import normalize_text
 from recurring import get_recurring_handlers, check_recurring_messages, count_recurring_messages
 from Manager import get_manager_handlers
+from Manager.button_style import styled_button
 from tagger import get_tagger_handlers
 from config import BOT_TOKEN, LOG_CHANNEL_ID, OWNER_ID, log_to_channel, send_bot_response, send_bot_media, START_IMG, to_small_caps
 from voice_chat import start_voice_chat_monitor, stop_voice_chat_monitor, get_voice_chat_handlers
@@ -87,15 +88,19 @@ async def start(update, context):
     bot_username = bot_info.username
     add_to_group_url = f"https://t.me/{bot_username}?startgroup=true"
     
+    # Use styled buttons for a more colorful start menu
+    def sb(text, **kwargs):
+        return styled_button(text, theme_name="blue", **kwargs)
+    
     # Format bot name and mention
     header_name = to_small_caps(bot_name)
     bot_mention = f"<a href='https://t.me/{bot_username}'>{header_name}</a>"
     
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("+ ᴀᴅᴅ ᴍᴇ ɪɴ ɢʀᴏᴜᴘ +", url=add_to_group_url)],
+        [sb("+ ᴀᴅᴅ ᴍᴇ ɪɴ ɢʀᴏᴜᴘ +", url=add_to_group_url)],
         [
-            InlineKeyboardButton(to_small_caps("「 Support 」"), url="https://t.me/jayden_clan"),
-            InlineKeyboardButton(to_small_caps("「 Updates 」"), url="https://t.me/Tele_212_bots")
+            sb(to_small_caps("「 Support 」"), url="https://t.me/jayden_clan"),
+            sb(to_small_caps("「 Updates 」"), url="https://t.me/Tele_212_bots")
         ]
     ])
     
