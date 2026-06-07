@@ -247,62 +247,62 @@ def get_main_settings_keyboard(chat_id):
     layout_type = settings.get("ui_layout_type", 1)
     theme = settings.get("ui_button_style", "default")
     
-    def b(text, callback_data=None, url=None):
-        return styled_button(text, callback_data=callback_data, url=url, theme_name=theme)
+    def b(text, callback_data=None, url=None, row=None):
+        return styled_button(text, callback_data=callback_data, url=url, theme_name=theme, row_index=row)
 
     if layout_type == 2:
         # Compact layout (Small)
         keyboard = [
-            [b("👋 Welcome", callback_data="set_view_welcome"),
-             b("📏 Length", callback_data="set_view_msg_length")],
-            [b("🛡️ Mod", callback_data="set_view_mod"),
-             b("🤖 BotProt", callback_data="set_view_bot_protection")],
-            [b("🔗 LinkProt", callback_data="set_view_link_spam"),
-             b("🔄 Fwd", callback_data="set_view_forward_protection")],
-            [b("🔑 Cmd", callback_data="set_view_command_access"),
-             b("🎛️ Perms", callback_data="set_view_command_permissions")],
-            [b("🕒 Recur", callback_data="set_view_recurring"),
-             b("🌊 Flood", callback_data="set_view_antiflood")],
-            [b("🚫 Words", callback_data="set_view_banned_words"),
-             b("🏷️ Tag", callback_data="set_view_tagger")],
-            [b("🔗 Link", callback_data="set_view_group_link"),
-             b("👥 Mem", callback_data="set_view_members_mgmt")],
-            [b("🎙 VC", callback_data="set_view_vc"),
-             b("🗑️ Del", callback_data="set_view_deleting")],
-            [b("👥 Mgr", callback_data="set_view_manager"),
-             b("🚨 Emergency", callback_data="set_view_emergency")],
-            [b("📋 Freed", callback_data="free_list_members")],
-            [b("🎨 Layout: Small", callback_data="set_toggle_ui_layout"),
-             b("🎭 Button Style", callback_data="set_view_ui_style")],
-            [b("❌ Close", callback_data="set_close")]
+            [b("👋 Welcome", callback_data="set_view_welcome", row=0),
+             b("📏 Length", callback_data="set_view_msg_length", row=0)],
+            [b("🛡️ Mod", callback_data="set_view_mod", row=1),
+             b("🤖 BotProt", callback_data="set_view_bot_protection", row=1)],
+            [b("🔗 LinkProt", callback_data="set_view_link_spam", row=2),
+             b("🔄 Fwd", callback_data="set_view_forward_protection", row=2)],
+            [b("🔑 Cmd", callback_data="set_view_command_access", row=3),
+             b("🎛️ Perms", callback_data="set_view_command_permissions", row=3)],
+            [b("🕒 Recur", callback_data="set_view_recurring", row=4),
+             b("🌊 Flood", callback_data="set_view_antiflood", row=4)],
+            [b("🚫 Words", callback_data="set_view_banned_words", row=5),
+             b("🏷️ Tag", callback_data="set_view_tagger", row=5)],
+            [b("🔗 Link", callback_data="set_view_group_link", row=6),
+             b("👥 Mem", callback_data="set_view_members_mgmt", row=6)],
+            [b("🎙 VC", callback_data="set_view_vc", row=7),
+             b("🗑️ Del", callback_data="set_view_deleting", row=7)],
+            [b("👥 Mgr", callback_data="set_view_manager", row=8),
+             b("🚨 Emergency", callback_data="set_view_emergency", row=8)],
+            [b("📋 Freed", callback_data="free_list_members", row=9)],
+            [b("🎨 Layout: Small", callback_data="set_toggle_ui_layout", row=10),
+             b("🎭 Button Style", callback_data="set_view_ui_style", row=10)],
+            [b("❌ Close", callback_data="set_close", row=11)]
         ]
     else:
         # Standard layout (Large)
         keyboard = [
-            [b("👋 Welcome", callback_data="set_view_welcome")],
-            [b("📏 Message Length", callback_data="set_view_msg_length"),
-             b("🛡️ Moderation", callback_data="set_view_mod")],
-            [b("🤖 Bot Protection", callback_data="set_view_bot_protection"),
-             b("🔗 Link Protection", callback_data="set_view_link_spam")],
-            [b("🔄 Forward Protect", callback_data="set_view_forward_protection"),
-             b("🔑 Cmd Access", callback_data="set_view_command_access")],
-            [b("🎛️ Command Perms", callback_data="set_view_command_permissions"),
-             b("🌐 Language Filter", callback_data="set_view_language_filter")],
-            [b("🕒 Recurring Msg", callback_data="set_view_recurring"),
-             b("🌊 Anti-Flood", callback_data="set_view_antiflood")],
-            [b("🚫 Banned Words", callback_data="set_view_banned_words"),
-             b("🏷️ Tagger", callback_data="set_view_tagger")],
-            [b("🔗 Group Link", callback_data="set_view_group_link"),
-             b("📜 Regulations", callback_data="set_view_regulations")],
-            [b("👥 Members Mgmt", callback_data="set_view_members_mgmt"),
-             b("🎙 Voice Chat", callback_data="set_view_vc")],
-            [b("🗑️ Deleting Messages", callback_data="set_view_deleting"),
-             b("👥 Manager", callback_data="set_view_manager")],
-            [b("🚨 Emergency", callback_data="set_view_emergency")],
-            [b("📋 Freed Members", callback_data="free_list_members")],
-            [b("🎨 Layout: Large", callback_data="set_toggle_ui_layout"),
-             b("🎭 Button Style", callback_data="set_view_ui_style")],
-            [b("❌ Close Menu", callback_data="set_close")]
+            [b("👋 Welcome", callback_data="set_view_welcome", row=0)],
+            [b("📏 Message Length", callback_data="set_view_msg_length", row=1),
+             b("🛡️ Moderation", callback_data="set_view_mod", row=1)],
+            [b("🤖 Bot Protection", callback_data="set_view_bot_protection", row=2),
+             b("🔗 Link Protection", callback_data="set_view_link_spam", row=2)],
+            [b("🔄 Forward Protect", callback_data="set_view_forward_protection", row=3),
+             b("🔑 Cmd Access", callback_data="set_view_command_access", row=3)],
+            [b("🎛️ Command Perms", callback_data="set_view_command_permissions", row=4),
+             b("🌐 Language Filter", callback_data="set_view_language_filter", row=4)],
+            [b("🕒 Recurring Msg", callback_data="set_view_recurring", row=5),
+             b("🌊 Anti-Flood", callback_data="set_view_antiflood", row=5)],
+            [b("🚫 Banned Words", callback_data="set_view_banned_words", row=6),
+             b("🏷️ Tagger", callback_data="set_view_tagger", row=6)],
+            [b("🔗 Group Link", callback_data="set_view_group_link", row=7),
+             b("📜 Regulations", callback_data="set_view_regulations", row=7)],
+            [b("👥 Members Mgmt", callback_data="set_view_members_mgmt", row=8),
+             b("🎙 Voice Chat", callback_data="set_view_vc", row=8)],
+            [b("🗑️ Deleting Messages", callback_data="set_view_deleting", row=9),
+             b("👥 Manager", callback_data="set_view_manager", row=9)],
+            [b("🚨 Emergency", callback_data="set_view_emergency", row=10)],
+            [b("📋 Freed Members", callback_data="free_list_members", row=11)],
+            [b("🎨 Layout: Large", callback_data="set_toggle_ui_layout", row=12),
+             b("🎭 Button Style", callback_data="set_view_ui_style", row=12)],
+            [b("❌ Close Menu", callback_data="set_close", row=13)]
         ]
     return InlineKeyboardMarkup(keyboard)
 

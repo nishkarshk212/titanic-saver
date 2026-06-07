@@ -89,18 +89,23 @@ async def start(update, context):
     add_to_group_url = f"https://t.me/{bot_username}?startgroup=true"
     
     # Use styled buttons for a more colorful start menu
-    def sb(text, **kwargs):
-        return styled_button(text, theme_name="blue", **kwargs)
+    def sb(text, row=0, **kwargs):
+        return styled_button(text, theme_name="rainbow", row_index=row, **kwargs)
     
     # Format bot name and mention
     header_name = to_small_caps(bot_name)
     bot_mention = f"<a href='https://t.me/{bot_username}'>{header_name}</a>"
     
     keyboard = InlineKeyboardMarkup([
-        [sb("+ ᴀᴅᴅ ᴍᴇ ɪɴ ɢʀᴏᴜᴘ +", url=add_to_group_url)],
+        [sb("+ ᴀᴅᴅ ᴍᴇ ɪɴ ɢʀᴏᴜᴘ +", row=0, url=add_to_group_url)],
+        [sb(to_small_caps("「 Help and Commands 」"), row=1, callback_data="help_main")],
         [
-            sb(to_small_caps("「 Support 」"), url="https://t.me/jayden_clan"),
-            sb(to_small_caps("「 Updates 」"), url="https://t.me/Tele_212_bots")
+            sb(to_small_caps("「 Support 」"), row=2, url="https://t.me/jayden_clan"),
+            sb(to_small_caps("「 Updates 」"), row=2, url="https://t.me/Tele_212_bots")
+        ],
+        [
+            sb(to_small_caps("「 Owner 」"), row=3, url=f"tg://user?id={OWNER_ID}"),
+            sb(to_small_caps("「 Source 」"), row=3, url="https://github.com/nishkarshk212/titanic-saver")
         ]
     ])
     
