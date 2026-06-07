@@ -31,7 +31,6 @@ from nightmode import get_nightmode_handlers
 from font_normalizer import normalize_text
 from recurring import get_recurring_handlers, check_recurring_messages, count_recurring_messages
 from Manager import get_manager_handlers
-from Manager.button_style import styled_button
 from tagger import get_tagger_handlers
 from config import BOT_TOKEN, LOG_CHANNEL_ID, OWNER_ID, log_to_channel, send_bot_response, send_bot_media, START_IMG, to_small_caps
 from voice_chat import start_voice_chat_monitor, stop_voice_chat_monitor, get_voice_chat_handlers
@@ -88,24 +87,16 @@ async def start(update, context):
     bot_username = bot_info.username
     add_to_group_url = f"https://t.me/{bot_username}?startgroup=true"
     
-    # Use styled buttons for a more colorful start menu
-    def sb(text, row=0, **kwargs):
-        return styled_button(text, theme_name="rainbow", row_index=row, **kwargs)
-    
-    # Format bot name and mention
-    header_name = to_small_caps(bot_name)
-    bot_mention = f"<a href='https://t.me/{bot_username}'>{header_name}</a>"
-    
     keyboard = InlineKeyboardMarkup([
-        [sb("+ ᴀᴅᴅ ᴍᴇ ɪɴ ɢʀᴏᴜᴘ +", row=0, url=add_to_group_url)],
-        [sb(to_small_caps("「 Help and Commands 」"), row=1, callback_data="help_main")],
+        [InlineKeyboardButton("+ ᴀᴅᴅ ᴍᴇ ɪɴ ɢʀᴏᴜᴘ +", url=add_to_group_url)],
+        [InlineKeyboardButton(to_small_caps("「 Help and Commands 」"), callback_data="help_main")],
         [
-            sb(to_small_caps("「 Support 」"), row=2, url="https://t.me/jayden_clan"),
-            sb(to_small_caps("「 Updates 」"), row=2, url="https://t.me/Tele_212_bots")
+            InlineKeyboardButton(to_small_caps("「 Support 」"), url="https://t.me/jayden_clan"),
+            InlineKeyboardButton(to_small_caps("「 Updates 」"), url="https://t.me/Tele_212_bots")
         ],
         [
-            sb(to_small_caps("「 Owner 」"), row=3, url=f"tg://user?id={OWNER_ID}"),
-            sb(to_small_caps("「 Source 」"), row=3, url="https://github.com/nishkarshk212/titanic-saver")
+            InlineKeyboardButton(to_small_caps("「 Owner 」"), url=f"tg://user?id={OWNER_ID}"),
+            InlineKeyboardButton(to_small_caps("「 Source 」"), url="https://github.com/nishkarshk212/titanic-saver")
         ]
     ])
     

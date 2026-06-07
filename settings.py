@@ -7,7 +7,6 @@ from config import OWNER_ID, send_bot_response, edit_bot_response
 from user_manager_mongo import can_user_configure_settings
 from anonymous_admin import is_anonymous_admin, check_anonymous_admin_change_info_permission
 from blocking_handler import DEFAULT_BLOCKING_SETTINGS
-from Manager.button_style import styled_button
 import logging
 import asyncio
 
@@ -245,64 +244,58 @@ def get_main_settings_keyboard(chat_id):
     """Get main settings keyboard with layout support."""
     settings = get_chat_settings(chat_id)
     layout_type = settings.get("ui_layout_type", 1)
-    theme = settings.get("ui_button_style", "default")
     
-    def b(text, callback_data=None, url=None, row=None):
-        return styled_button(text, callback_data=callback_data, url=url, theme_name=theme, row_index=row)
-
     if layout_type == 2:
         # Compact layout (Small)
         keyboard = [
-            [b("👋 Welcome", callback_data="set_view_welcome", row=0),
-             b("📏 Length", callback_data="set_view_msg_length", row=0)],
-            [b("🛡️ Mod", callback_data="set_view_mod", row=1),
-             b("🤖 BotProt", callback_data="set_view_bot_protection", row=1)],
-            [b("🔗 LinkProt", callback_data="set_view_link_spam", row=2),
-             b("🔄 Fwd", callback_data="set_view_forward_protection", row=2)],
-            [b("🔑 Cmd", callback_data="set_view_command_access", row=3),
-             b("🎛️ Perms", callback_data="set_view_command_permissions", row=3)],
-            [b("🕒 Recur", callback_data="set_view_recurring", row=4),
-             b("🌊 Flood", callback_data="set_view_antiflood", row=4)],
-            [b("🚫 Words", callback_data="set_view_banned_words", row=5),
-             b("🏷️ Tag", callback_data="set_view_tagger", row=5)],
-            [b("🔗 Link", callback_data="set_view_group_link", row=6),
-             b("👥 Mem", callback_data="set_view_members_mgmt", row=6)],
-            [b("🎙 VC", callback_data="set_view_vc", row=7),
-             b("🗑️ Del", callback_data="set_view_deleting", row=7)],
-            [b("👥 Mgr", callback_data="set_view_manager", row=8),
-             b("🚨 Emergency", callback_data="set_view_emergency", row=8)],
-            [b("📋 Freed", callback_data="free_list_members", row=9)],
-            [b("🎨 Layout: Small", callback_data="set_toggle_ui_layout", row=10),
-             b("🎭 Button Style", callback_data="set_view_ui_style", row=10)],
-            [b("❌ Close", callback_data="set_close", row=11)]
+            [InlineKeyboardButton("👋 Welcome", callback_data="set_view_welcome"),
+             InlineKeyboardButton("📏 Length", callback_data="set_view_msg_length")],
+            [InlineKeyboardButton("🛡️ Mod", callback_data="set_view_mod"),
+             InlineKeyboardButton("🤖 BotProt", callback_data="set_view_bot_protection")],
+            [InlineKeyboardButton("🔗 LinkProt", callback_data="set_view_link_spam"),
+             InlineKeyboardButton("🔄 Fwd", callback_data="set_view_forward_protection")],
+            [InlineKeyboardButton("🔑 Cmd", callback_data="set_view_command_access"),
+             InlineKeyboardButton("🎛️ Perms", callback_data="set_view_command_permissions")],
+            [InlineKeyboardButton("🕒 Recur", callback_data="set_view_recurring"),
+             InlineKeyboardButton("🌊 Flood", callback_data="set_view_antiflood")],
+            [InlineKeyboardButton("🚫 Words", callback_data="set_view_banned_words"),
+             InlineKeyboardButton("🏷️ Tag", callback_data="set_view_tagger")],
+            [InlineKeyboardButton("🔗 Link", callback_data="set_view_group_link"),
+             InlineKeyboardButton("👥 Mem", callback_data="set_view_members_mgmt")],
+            [InlineKeyboardButton("🎙 VC", callback_data="set_view_vc"),
+             InlineKeyboardButton("🗑️ Del", callback_data="set_view_deleting")],
+            [InlineKeyboardButton("👥 Mgr", callback_data="set_view_manager"),
+             InlineKeyboardButton("🚨 Emergency", callback_data="set_view_emergency")],
+            [InlineKeyboardButton("📋 Freed", callback_data="free_list_members")],
+            [InlineKeyboardButton("🎨 Layout: Small", callback_data="set_toggle_ui_layout")],
+            [InlineKeyboardButton("❌ Close", callback_data="set_close")]
         ]
     else:
         # Standard layout (Large)
         keyboard = [
-            [b("👋 Welcome", callback_data="set_view_welcome", row=0)],
-            [b("📏 Message Length", callback_data="set_view_msg_length", row=1),
-             b("🛡️ Moderation", callback_data="set_view_mod", row=1)],
-            [b("🤖 Bot Protection", callback_data="set_view_bot_protection", row=2),
-             b("🔗 Link Protection", callback_data="set_view_link_spam", row=2)],
-            [b("🔄 Forward Protect", callback_data="set_view_forward_protection", row=3),
-             b("🔑 Cmd Access", callback_data="set_view_command_access", row=3)],
-            [b("🎛️ Command Perms", callback_data="set_view_command_permissions", row=4),
-             b("🌐 Language Filter", callback_data="set_view_language_filter", row=4)],
-            [b("🕒 Recurring Msg", callback_data="set_view_recurring", row=5),
-             b("🌊 Anti-Flood", callback_data="set_view_antiflood", row=5)],
-            [b("🚫 Banned Words", callback_data="set_view_banned_words", row=6),
-             b("🏷️ Tagger", callback_data="set_view_tagger", row=6)],
-            [b("🔗 Group Link", callback_data="set_view_group_link", row=7),
-             b("📜 Regulations", callback_data="set_view_regulations", row=7)],
-            [b("👥 Members Mgmt", callback_data="set_view_members_mgmt", row=8),
-             b("🎙 Voice Chat", callback_data="set_view_vc", row=8)],
-            [b("🗑️ Deleting Messages", callback_data="set_view_deleting", row=9),
-             b("👥 Manager", callback_data="set_view_manager", row=9)],
-            [b("🚨 Emergency", callback_data="set_view_emergency", row=10)],
-            [b("📋 Freed Members", callback_data="free_list_members", row=11)],
-            [b("🎨 Layout: Large", callback_data="set_toggle_ui_layout", row=12),
-             b("🎭 Button Style", callback_data="set_view_ui_style", row=12)],
-            [b("❌ Close Menu", callback_data="set_close", row=13)]
+            [InlineKeyboardButton("👋 Welcome", callback_data="set_view_welcome")],
+            [InlineKeyboardButton("📏 Message Length", callback_data="set_view_msg_length"),
+             InlineKeyboardButton("🛡️ Moderation", callback_data="set_view_mod")],
+            [InlineKeyboardButton("🤖 Bot Protection", callback_data="set_view_bot_protection"),
+             InlineKeyboardButton("🔗 Link Protection", callback_data="set_view_link_spam")],
+            [InlineKeyboardButton("🔄 Forward Protect", callback_data="set_view_forward_protection"),
+             InlineKeyboardButton("🔑 Cmd Access", callback_data="set_view_command_access")],
+            [InlineKeyboardButton("🎛️ Command Perms", callback_data="set_view_command_permissions"),
+             InlineKeyboardButton("🌐 Language Filter", callback_data="set_view_language_filter")],
+            [InlineKeyboardButton("🕒 Recurring Msg", callback_data="set_view_recurring"),
+             InlineKeyboardButton("🌊 Anti-Flood", callback_data="set_view_antiflood")],
+            [InlineKeyboardButton("🚫 Banned Words", callback_data="set_view_banned_words"),
+             InlineKeyboardButton("🏷️ Tagger", callback_data="set_view_tagger")],
+            [InlineKeyboardButton("🔗 Group Link", callback_data="set_view_group_link"),
+             InlineKeyboardButton("📜 Regulations", callback_data="set_view_regulations")],
+            [InlineKeyboardButton("👥 Members Mgmt", callback_data="set_view_members_mgmt"),
+             InlineKeyboardButton("🎙 Voice Chat", callback_data="set_view_vc")],
+            [InlineKeyboardButton("🗑️ Deleting Messages", callback_data="set_view_deleting"),
+             InlineKeyboardButton("👥 Manager", callback_data="set_view_manager")],
+            [InlineKeyboardButton("🚨 Emergency", callback_data="set_view_emergency")],
+            [InlineKeyboardButton("📋 Freed Members", callback_data="free_list_members")],
+            [InlineKeyboardButton("🎨 Layout: Large", callback_data="set_toggle_ui_layout")],
+            [InlineKeyboardButton("❌ Close Menu", callback_data="set_close")]
         ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -431,33 +424,6 @@ def get_edit_checks_keyboard(settings):
         ])
         
     keyboard.append([InlineKeyboardButton("🔙 Back", callback_data="set_view_deleting")])
-    return InlineKeyboardMarkup(keyboard)
-
-def get_ui_style_keyboard(settings):
-    """Get UI Button Style settings keyboard."""
-    current_style = settings.get("ui_button_style", "default")
-    from Manager.button_style import THEMES
-    
-    keyboard = []
-    # Create 3 columns of style buttons
-    row = []
-    for style_id, theme in THEMES.items():
-        label = theme["name"]
-        if style_id == current_style:
-            label = f"✅ {label}"
-        
-        # Use the style itself for the button text to preview it
-        preview_text = f"{theme['prefix']}{label}{theme['suffix']}"
-        row.append(InlineKeyboardButton(preview_text, callback_data=f"set_ui_style_{style_id}"))
-        
-        if len(row) == 2:
-            keyboard.append(row)
-            row = []
-    
-    if row:
-        keyboard.append(row)
-        
-    keyboard.append([InlineKeyboardButton("🔙 Back", callback_data="set_view_main")])
     return InlineKeyboardMarkup(keyboard)
 
 def get_members_mgmt_keyboard():
@@ -1825,29 +1791,6 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.answer("Members Management action completed.")
         except:
             pass
-        return
-
-    if data == "set_view_ui_style":
-        settings = get_chat_settings(chat_id)
-        try:
-            await edit_bot_response(
-                query, context,
-                "🎭 <b>ʙᴜᴛᴛᴏɴ ꜱᴛʏʟᴇ ꜱᴇᴛᴛɪɴɢꜱ 🎭</b>\n\nꜱᴇʟᴇᴄᴛ ᴀ ꜱᴛʏʟᴇ ꜰᴏʀ ᴛʜᴇ ʙᴏᴛ'ꜱ ʙᴜᴛᴛᴏɴꜱ:",
-                reply_markup=get_ui_style_keyboard(settings),
-                parse_mode='HTML'
-            )
-        except BadRequest: pass
-        await query.answer()
-        return
-
-    if data.startswith("set_ui_style_"):
-        style_id = data.replace("set_ui_style_", "")
-        update_chat_setting(chat_id, "ui_button_style", style_id)
-        settings = get_chat_settings(chat_id)
-        try:
-            await query.edit_message_reply_markup(reply_markup=get_ui_style_keyboard(settings))
-        except BadRequest: pass
-        await query.answer(f"Style set to {style_id.title()}!")
         return
 
     if data == "set_view_vc":

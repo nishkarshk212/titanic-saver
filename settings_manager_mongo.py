@@ -214,8 +214,7 @@ DEFAULT_CHAT_SETTINGS = {
     "blocking_delete_notifications": True,
     "blocking_notification_timer": 30,
     "blocking_custom_text": None,
-    "ui_layout_type": 1, # 1 (Default/Large), 2 (Small/Compact)
-    "ui_button_style": "rainbow" # default, blue, green, red, gold, pink, purple, aqua, fire, rainbow
+    "ui_layout_type": 1 # 1 (Default/Large), 2 (Small/Compact)
 }
 
 def get_chat_settings(chat_id):
