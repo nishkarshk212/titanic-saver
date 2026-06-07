@@ -8,16 +8,31 @@ from telegram.ext import ContextTypes
 # Format: {(chat_id, user_id): permissions_dict}
 ADMIN_CACHE = {}
 
-def update_admin_cache(chat_id, user_id, permissions):
+def update_admin_cache(chat_id, user_id, permissions, merge=True):
     """
     Store or update admin permissions in MongoDB and in-memory cache.
     
-    permissions: dict of boolean permissions (e.g., {'can_restrict_members': True, ...})
+    permissions: dict of boolean permissions
+    merge: if True, merges with existing permissions (preserving custom ones)
     """
     try:
-        # Update in-memory cache
-        clean_permissions = {k: bool(v) for k, v in permissions.items() if k.startswith('can_') or k == 'is_anonymous'}
-        ADMIN_CACHE[(chat_id, user_id)] = clean_permissions
+        clean_new = {k: bool(v) for k, v in permissions.items() if k.startswith('can_') or k == 'is_anonymous'}
+        
+        if merge:
+            existing = get_stored_admin_permissions(chat_id, user_id) or {}
+            updated = existing.copy()
+            for k, v in clean_new.items():
+                # If we are syncing from native Telegram (merge=True),
+                # we don't want to overwrite can_restrict_members if it's False,
+                # because it might be a bot-only Mute permission (which is False on Telegram).
+                if k == 'can_restrict_members' and not v:
+                    continue
+                updated[k] = v
+            final_perms = updated
+        else:
+            final_perms = clean_new
+
+        ADMIN_CACHE[(chat_id, user_id)] = final_perms
         
         admins_col = get_collection(COLLECTIONS["admins"])
         if admins_col is None:
@@ -27,7 +42,7 @@ def update_admin_cache(chat_id, user_id, permissions):
             {"chat_id": chat_id, "user_id": user_id},
             {
                 "$set": {
-                    "permissions": clean_permissions,
+                    "permissions": final_perms,
                     "last_updated": datetime.datetime.now()
                 }
             },

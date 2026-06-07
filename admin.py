@@ -451,8 +451,8 @@ async def confirm_promotion(update: Update, context: ContextTypes.DEFAULT_TYPE):
             is_anonymous=final_perms.get('is_anonymous', False)
         )
         
-        # Update database cache
-        update_admin_cache(chat_id, user_id, final_perms)
+        # Update database cache - use merge=False to overwrite with the full set of bot permissions
+        update_admin_cache(chat_id, user_id, final_perms, merge=False)
         
         # Build summary message
         summary = []
