@@ -116,6 +116,13 @@ async def start_voice_chat_monitor(application: Application):
         logger.info(f"📥 Received UpdateGroupCallParticipants for call {event.call.id} with {len(event.participants)} participants")
         asyncio.create_task(_process_vc_join_event(event))
     
+    # Register PTB handlers for invite notifications and VC commands
+    # We do this OUTSIDE the try block so they work even if Telethon fails
+    handlers = get_voice_chat_handlers()
+    for handler in handlers:
+        ptb_application.add_handler(handler)
+    logger.info(f"✅ Voice Chat handlers registered: {[type(h) for h in handlers]}")
+
     # Connect and start the client properly
     try:
         await telethon_client.start()
@@ -128,12 +135,6 @@ async def start_voice_chat_monitor(application: Application):
         dialogs = await telethon_client.get_dialogs(limit=50)
         logger.info(f"✅ Loaded {len(dialogs)} dialogs.")
         
-        # Register PTB handlers for invite notifications and VC commands
-        handlers = get_voice_chat_handlers()
-        for handler in handlers:
-            ptb_application.add_handler(handler)
-        logger.info(f"✅ Voice Chat handlers registered: {[type(h) for h in handlers]}")
-        
         # Start automatic ghost cleaner
         asyncio.create_task(auto_ghost_cleaner_task())
         
@@ -141,6 +142,16 @@ async def start_voice_chat_monitor(application: Application):
         asyncio.create_task(scan_active_vcs())
     except Exception as e:
         logger.error(f"❌ Failed to start Telethon client: {e}")
+        
+        # Notify the log channel if possible
+        from config import LOG_CHANNEL_ID
+        if LOG_CHANNEL_ID:
+            try:
+                error_text = f"❌ <b>Voice Chat Monitor Failed to Start</b>\n\nError: <code>{e}</code>"
+                if "AuthKeyDuplicatedError" in str(e):
+                    error_text += "\n\n⚠️ <b>Root Cause:</b> Your <code>STRING_SESSION</code> is being used elsewhere. Please generate a new session string."
+                await ptb_application.bot.send_message(chat_id=LOG_CHANNEL_ID, text=error_text, parse_mode='HTML')
+            except: pass
         return
 
 async def cleanup_vc_caches():
@@ -548,6 +559,20 @@ async def _process_single_participant(call_id, participant, chat_entity, is_join
             else:
                 status_text = "Left ❌"
             
+            bot_info = await ptb_application.bot.get_me()
+            
+            # Dynamic Join Link
+            chat_obj = None
+            try:
+                chat_obj = await ptb_application.bot.get_chat(settings_chat_id)
+            except: pass
+            
+            if chat_obj and chat_obj.username:
+                join_link = f"https://t.me/{chat_obj.username}?videochat"
+            else:
+                clean_id = str(settings_chat_id).replace("-100", "")
+                join_link = f"https://t.me/c/{clean_id}?videochat"
+
             notification_text = (
                 f"<blockquote>\n"
                 f"𝚴𝛂ϻ𝛆 ➛ {mention}\n"
@@ -557,10 +582,8 @@ async def _process_single_participant(call_id, participant, chat_entity, is_join
                 f"</blockquote>"
             )
             
-            bot_info = await ptb_application.bot.get_me()
-            join_link = "https://t.me/Titanic_world_chatting_zonee?videochat"
             keyboard = InlineKeyboardMarkup([
-                [InlineKeyboardButton("ᴊᴏɪɴ ᴠᴏɪᴄᴇ ᴄʜᴀᴛ", url=join_link)],
+                [InlineKeyboardButton("𝐉𝐨𝐢𝐧 𝐕𝐨𝐢𝐜𝐞 𝐂𝐡𝐚𝐭", url=join_link)],
                 [InlineKeyboardButton(to_small_caps("+ ᴀᴅᴅ ᴍᴇ ɪɴ ɢʀᴏᴜᴘ +"), url=f"https://t.me/{bot_info.username}?startgroup=true")]
             ])
             
@@ -603,8 +626,17 @@ async def vc_join_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
         chat_id = int(data_parts[2])
         
-        # Use the specific join link provided by the user
-        join_link = "https://t.me/Titanic_world_chatting_zonee?videochat"
+        # Use a dynamic join link
+        chat_obj = None
+        try:
+            chat_obj = await context.bot.get_chat(chat_id)
+        except: pass
+        
+        if chat_obj and chat_obj.username:
+            join_link = f"https://t.me/{chat_obj.username}?videochat"
+        else:
+            clean_id = str(chat_id).replace("-100", "")
+            join_link = f"https://t.me/c/{clean_id}?videochat"
 
         # Check if call is active using Telethon (if available)
         is_active = True # Default to True to allow users to try joining
@@ -680,15 +712,16 @@ async def voice_chat_invite_handler(update: Update, context: ContextTypes.DEFAUL
     vc_mono = to_mono("'s voice chat")
     
     for user in invited_users:
-        # Format: {inviter_mention} 𝚒𝚗𝚟𝚒𝚝𝚎𝚍 {invitee_mention}𝚝𝚘 ˹ 🇹ɪᴛᴀɴɪᴄ ꭙ 🇼ᴏʀʟᴅ ˼ 🪽'𝚜 𝚟𝚘𝚒𝚌𝚎 𝚌𝚑𝚊𝚝
+        # Format: {inviter_mention} 𝚒𝚗𝚟𝚒𝚝𝚎𝚍 {invitee_mention}𝚝𝚘 ˹ {chat_title} ˼ 🪽'𝚜 𝚟𝚘𝚒𝚌𝚎 𝚌𝚑𝚊𝚝
         inviter_mention = inviter.mention_html()
         invitee_mention = user.mention_html()
+        chat_title = update.effective_chat.title
         
         # Constructing the message with requested styling
         message_text = (
             f"<blockquote>\n"
             f"{inviter_mention} {invited_mono} {invitee_mention} {to_mono_str} "
-            f"˹ 🇹ɪᴛᴀɴɪᴄ ꭙ 🇼ᴏʀʟᴅ ˼ 🪽{vc_mono}\n"
+            f"˹ {chat_title} ˼ 🪽{vc_mono}\n"
             f"</blockquote>"
         )
         
