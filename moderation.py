@@ -51,6 +51,9 @@ async def can_user_manage_voice_chat(chat_id, user_id, context):
 
 async def can_user_ban(chat_id, user_id, context):
     """Check if a user can ban/unban (Admin with custom ban permission)."""
+    if user_id == OWNER_ID:
+        return True, None
+
     # Use the centralized check_admin_permission from Manager.actions
     from Manager.actions import check_admin_permission
     
@@ -140,7 +143,7 @@ async def ban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # Check if target is an admin
-    if await is_user_admin(chat_id, target_id, context):
+    if await is_user_admin(chat_id, target_id, context) and sender_id != OWNER_ID:
         await send_bot_response(update, context, "❌ I cannot ban another administrator.")
         return
 
@@ -344,7 +347,7 @@ async def mute_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not user_id: return
 
     # Check if target is an admin
-    if await is_user_admin(chat_id, user_id, context):
+    if await is_user_admin(chat_id, user_id, context) and sender_id != OWNER_ID:
         await send_bot_response(update, context, "❌ I cannot mute another administrator.")
         return
 
@@ -479,7 +482,7 @@ async def warn_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not user_id: return
 
     # Check if target is an admin
-    if await is_user_admin(chat_id, user_id, context):
+    if await is_user_admin(chat_id, user_id, context) and sender_id != OWNER_ID:
         await send_bot_response(update, context, "❌ I cannot warn another administrator.")
         return
 
