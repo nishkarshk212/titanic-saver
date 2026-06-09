@@ -1058,6 +1058,19 @@ def main():
     # Initialize the bot application with optimization
     application = ApplicationBuilder().token(BOT_TOKEN).concurrent_updates(True).build()
 
+    async def startup_info(app):
+        me = await app.bot.get_me()
+        print(f"✅ Bot started as @{me.username} ({me.id})")
+    
+    # Add startup info to post_init
+    original_post_init = application.post_init
+    async def new_post_init(app):
+        await startup_info(app)
+        if original_post_init:
+            await original_post_init(app)
+    
+    application.post_init = new_post_init
+
     # Add error handler
     application.add_error_handler(error_handler)
 
