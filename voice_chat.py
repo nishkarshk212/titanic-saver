@@ -480,17 +480,20 @@ async def _process_single_participant(call_id, participant, chat_entity, is_join
         try:
             # 1. Check Chat Entity
             if not chat_entity:
-                logger.warning(f"❌ [STOP] No chat_entity for {user_id} in call {call_id}")
+                logger.debug(f"❌ [STOP] No chat_entity for {user_id} in call {call_id}")
                 return
 
+            # Determine the PTB-compatible chat ID
             if isinstance(chat_entity, int):
-                chat_id = chat_entity
+                settings_chat_id = chat_entity
             else:
-                chat_id = chat_entity.id
-            
-            settings_chat_id = chat_id
-            if not str(chat_id).startswith('-100'):
-                settings_chat_id = int(f"-100{chat_id}")
+                # chat_entity is a Telethon entity
+                raw_id = chat_entity.id
+                from telethon.tl.types import Channel
+                if isinstance(chat_entity, Channel) or getattr(chat_entity, 'broadcast', False) or getattr(chat_entity, 'megagroup', False):
+                    settings_chat_id = int(f"-100{raw_id}")
+                else:
+                    settings_chat_id = -raw_id
 
             # 2. Check Cooldowns/Glitches
             now = datetime.datetime.now()
@@ -656,9 +659,13 @@ async def _process_single_participant(call_id, participant, chat_entity, is_join
             asyncio.create_task(auto_delete_notification(settings_chat_id, sent_message.message_id))
             
         except Exception as e:
-            logger.error(f"❌ [CRASH] _process_single_participant: {e}")
+            if "Chat not found" in str(e):
+                logger.debug(f"🔇 [SKIP] {user_id} in {call_id}: Bot not in chat")
+            else:
+                logger.error(f"❌ [CRASH] _process_single_participant: {e}")
     except Exception as e:
-        logger.error(f"❌ [CRASH] _process_single_participant outer: {e}")
+        if "Chat not found" not in str(e):
+            logger.error(f"❌ [CRASH] _process_single_participant outer: {e}")
 
 async def vc_join_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handles the 'Join Voice Chat' button click for old messages."""
