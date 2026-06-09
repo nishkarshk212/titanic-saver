@@ -574,6 +574,7 @@ async def _process_single_participant(call_id, participant, chat_entity, is_join
                 join_link = f"https://t.me/c/{clean_id}?videochat"
 
             notification_text = (
+                f"<b>#𝛁𝐂_𝐉𝐎𝚰𝚴_𝚴𝐎𝚻𝚰𝐅𝚰𝐂𝚨𝚻𝚰𝐎𝚴</b>\n\n"
                 f"<blockquote>\n"
                 f"𝚴𝛂ϻ𝛆 ➛ {mention}\n"
                 f"𝚰𝛛 ➛ <code>{display_id}</code>\n"
