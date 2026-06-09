@@ -49,8 +49,19 @@ _vc_monitor_start_ts = None
 # Calls we've already resolved but the bot isn't a member — skip resolution next time
 _failed_resolutions = {} # call_id -> timestamp
 
-# Tracks call_ids whose first post-gate state dump has already been suppressed
-_post_gate_sync_done = set()
+# Track current participants per call to detect actual joins/leaves
+# call_id -> set(user_id)
+current_participants_map = {}
+
+def get_peer_id(peer):
+    """Helper to get ID from PeerUser, PeerChannel, or PeerChat."""
+    if isinstance(peer, PeerUser):
+        return peer.user_id
+    elif isinstance(peer, PeerChannel):
+        return peer.channel_id
+    elif isinstance(peer, PeerChat):
+        return peer.chat_id
+    return None
 
 async def start_voice_chat_monitor(application: Application):
     """Starts the Telethon client to monitor voice chat events."""
@@ -363,43 +374,41 @@ async def _process_vc_join_event(event):
                 cid = chat_entity.id if not isinstance(chat_entity, int) else chat_entity
                 asyncio.create_task(clean_ghost_participants(cid))
 
-        # First event after gate: suppress notifications for all current participants
-        # (state dump of existing VC members — not real joins)
-        if call_id not in _post_gate_sync_done:
-            _post_gate_sync_done.add(call_id)
-            now = datetime.datetime.now()
-            silent_count = 0
-            for participant in event.participants:
-                if not hasattr(participant, 'date') or participant.date is None:
-                    continue
-                peer = participant.peer
-                uid = None
-                if isinstance(peer, PeerUser):
-                    uid = peer.user_id
-                elif isinstance(peer, PeerChannel):
-                    uid = peer.channel_id
-                elif isinstance(peer, PeerChat):
-                    uid = peer.chat_id
-                if uid:
-                    notification_cache[f"{uid}_{call_id}"] = now
-                    silent_count += 1
-            logger.info(f"Pre-populated notification cache for {silent_count} existing participants in call {call_id}")
+        # Track participants to avoid ghost joins
+        if call_id not in current_participants_map:
+            current_participants_map[call_id] = set()
+            for p in event.participants:
+                if not getattr(p, 'left', False):
+                    uid = get_peer_id(p.peer)
+                    if uid: current_participants_map[call_id].add(uid)
+            logger.info(f"Initialized participant map for call {call_id} with {len(current_participants_map[call_id])} users")
             return
 
-        # Analyze batch for switches
+        # Analyze batch for actual changes
         leaves = []
         joins = []
+        
+        current_set = current_participants_map[call_id]
+        
         for p in event.participants:
-            is_join = hasattr(p, 'date') and p.date is not None and not getattr(p, 'left', False)
-            is_leave = getattr(p, 'left', False)
-            if is_leave: leaves.append(p)
-            elif is_join: joins.append(p)
+            uid = get_peer_id(p.peer)
+            if not uid: continue
+            
+            is_left = getattr(p, 'left', False)
+            
+            if is_left:
+                if uid in current_set:
+                    leaves.append(p)
+                    current_set.discard(uid)
+            else:
+                if uid not in current_set:
+                    joins.append(p)
+                    current_set.add(uid)
 
         # A switch is typically a single user changing their peer (e.g. User -> Channel)
-        # This usually results in 1 leave and 1 join in the same update batch.
         is_switch_event = len(leaves) == 1 and len(joins) == 1
         
-        # Process participants in parallel tasks to avoid blocking the loop
+        # Process participants
         for participant in leaves:
             asyncio.create_task(_process_single_participant(call_id, participant, chat_entity, is_join=False, is_switch=is_switch_event))
             
@@ -550,13 +559,15 @@ async def _process_single_participant(call_id, participant, chat_entity, is_join
             else:
                 mention = f'<a href="tg://user?id={user_id}">{name}</a>'
 
-            # Status logic
+            # Status logic and header
             if is_join:
+                header = "#𝛁𝐂_𝐉𝐎𝚰𝚴_𝚴𝐎𝚻𝚰𝐅𝚰𝐂𝚨𝚻𝚰𝐎𝚴"
                 if is_switch:
                     status_text = "Switched Identity 🔄"
                 else:
                     status_text = "Joined ✅"
             else:
+                header = "#𝛁𝐂_𝐋𝐄𝚨𝐕𝚵_𝚴𝐎𝚻𝚰𝐅𝚰𝐂𝚨𝚻𝚰𝐎𝚴"
                 status_text = "Left ❌"
             
             bot_info = await ptb_application.bot.get_me()
@@ -574,7 +585,7 @@ async def _process_single_participant(call_id, participant, chat_entity, is_join
                 join_link = f"https://t.me/c/{clean_id}?videochat"
 
             notification_text = (
-                f"<b>#𝛁𝐂_𝐉𝐎𝚰𝚴_𝚴𝐎𝚻𝚰𝐅𝚰𝐂𝚨𝚻𝚰𝐎𝚴</b>\n\n"
+                f"<b>{header}</b>\n\n"
                 f"<blockquote>\n"
                 f"𝚴𝛂ϻ𝛆 ➛ {mention}\n"
                 f"𝚰𝛛 ➛ <code>{display_id}</code>\n"
@@ -602,7 +613,7 @@ async def _process_single_participant(call_id, participant, chat_entity, is_join
             
             # Auto delete
             async def auto_delete_notification(c_id, m_id):
-                await asyncio.sleep(5)
+                await asyncio.sleep(15) # Increased to 15s
                 try: await ptb_application.bot.delete_message(chat_id=c_id, message_id=m_id)
                 except: pass
             
