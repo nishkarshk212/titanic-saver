@@ -99,23 +99,37 @@ async def start_voice_chat_monitor(application: Application):
                 return
             logger.info(f"📞 UpdateGroupCall: call_id={call.id}, peer_id={peer_id}")
             try:
-                # Try to get Telethon entity first to determine the chat type
+                # Resolve the PTB-compatible chat ID
+                # 1. First try Telethon entity resolution
                 try:
                     entity = await telethon_client.get_entity(peer_id)
                     from telethon.tl.types import Channel
-                    if isinstance(entity, Channel):
+                    if isinstance(entity, Channel) or getattr(entity, 'broadcast', False) or getattr(entity, 'megagroup', False):
                         peer_full = int(f"-100{peer_id}")
                     else:
                         peer_full = -peer_id
                 except:
-                    # Fallback if get_entity fails
-                    peer_full = int(f"-100{peer_id}") if peer_id > 0 else peer_id
+                    # Fallback 1: Assume it's a channel/supergroup
+                    peer_full = int(f"-100{peer_id}")
                 
+                # 2. Check if bot is in the chat
                 try:
                     await ptb_application.bot.get_chat(peer_full)
+                    logger.info(f"✅ Bot is in chat {peer_full}. Mapping call {call.id}.")
                 except Exception as e:
-                    logger.info(f"📞 Skipping call {call.id}: bot not in chat {peer_full} ({e})")
-                    return
+                    # Fallback 2: Try without -100 prefix for legacy groups
+                    if str(peer_full).startswith("-100"):
+                        legacy_id = -peer_id
+                        try:
+                            await ptb_application.bot.get_chat(legacy_id)
+                            peer_full = legacy_id
+                            logger.info(f"✅ Bot is in legacy chat {peer_full}. Mapping call {call.id}.")
+                        except:
+                            logger.info(f"📞 Skipping call {call.id}: bot not in chat {peer_full} or {-peer_id} ({e})")
+                            return
+                    else:
+                        logger.info(f"📞 Skipping call {call.id}: bot not in chat {peer_full} ({e})")
+                        return
                 
                 # If we reached here, the bot is in the chat
                 if 'entity' in locals():
@@ -252,7 +266,17 @@ async def scan_active_vcs():
                     if call_id not in call_to_chat:
                         try:
                             # Verify if the bot is actually in the group before mapping
-                            await ptb_application.bot.get_chat(cid)
+                            try:
+                                await ptb_application.bot.get_chat(cid)
+                            except Exception as e:
+                                # Try legacy ID fallback
+                                if str(cid).startswith("-100"):
+                                    legacy_id = -int(str(cid).replace("-100", ""))
+                                    await ptb_application.bot.get_chat(legacy_id)
+                                    cid = legacy_id
+                                else:
+                                    raise e
+
                             entity = await telethon_client.get_entity(clean_id)
                             
                             # Populate Telethon's entity cache for this group
@@ -321,7 +345,7 @@ async def _process_vc_join_event(event):
                         
                         # Determine PTB compatible ID
                         from telethon.tl.types import Channel
-                        if isinstance(raw_entity, Channel):
+                        if isinstance(raw_entity, Channel) or getattr(raw_entity, 'broadcast', False) or getattr(raw_entity, 'megagroup', False):
                             bot_check_id = int(f"-100{raw_id}")
                         else:
                             bot_check_id = -raw_id
@@ -333,8 +357,22 @@ async def _process_vc_join_event(event):
                             _failed_resolutions.pop(call_id, None)
                             logger.info(f"✅ Successfully resolved call {call_id} -> chat {bot_check_id} ({type(raw_entity).__name__})")
                         except Exception as e:
-                            _failed_resolutions[call_id] = now
-                            logger.info(f"❌ Skipping call {call_id}: bot not in chat {bot_check_id} or error: {e}")
+                            # Fallback: Try without -100 prefix for legacy groups
+                            if str(bot_check_id).startswith("-100"):
+                                legacy_id = -raw_id
+                                try:
+                                    await ptb_application.bot.get_chat(legacy_id)
+                                    bot_check_id = legacy_id
+                                    chat_entity = raw_entity
+                                    call_to_chat[call_id] = chat_entity
+                                    _failed_resolutions.pop(call_id, None)
+                                    logger.info(f"✅ Successfully resolved call {call_id} -> legacy chat {bot_check_id}")
+                                except:
+                                    _failed_resolutions[call_id] = now
+                                    logger.info(f"❌ Skipping call {call_id}: bot not in chat {bot_check_id} or error: {e}")
+                            else:
+                                _failed_resolutions[call_id] = now
+                                logger.info(f"❌ Skipping call {call_id}: bot not in chat {bot_check_id} or error: {e}")
                     else:
                         # Fallback: Deep scan all groups if GetGroupCallRequest returns nothing
                         logger.info(f"❓ GetGroupCallRequest empty for {call_id}. Starting deep scan fallback...")
