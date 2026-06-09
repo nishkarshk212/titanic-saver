@@ -125,13 +125,11 @@ async def start_voice_chat_monitor(application: Application):
                             peer_full = legacy_id
                             logger.info(f"✅ Bot is in legacy chat {peer_full}. Mapping call {call.id}.")
                         except:
-                            logger.info(f"📞 Skipping call {call.id}: bot not in chat {peer_full} or {-peer_id} ({e})")
-                            return
+                            logger.info(f"⚠️ Bot might not be in chat {peer_full} or {-peer_id} ({e}). Mapping anyway per user request.")
                     else:
-                        logger.info(f"📞 Skipping call {call.id}: bot not in chat {peer_full} ({e})")
-                        return
+                        logger.info(f"⚠️ Bot might not be in chat {peer_full} ({e}). Mapping anyway per user request.")
                 
-                # If we reached here, the bot is in the chat
+                # If we reached here, we map the call regardless of get_chat success
                 if 'entity' in locals():
                     call_to_chat[call.id] = entity
                     logger.info(f"📞 Mapped call {call.id} to chat {entity.id} (entity)")
@@ -571,10 +569,13 @@ async def _process_single_participant(call_id, participant, chat_entity, is_join
                     return
 
             # 3. Get Entity
+            name = "User" # Default name
+            entity = None
+            
             try:
                 logger.info(f"🔍 [GET_ENTITY] Fetching {peer_type} {user_id}...")
                 entity = await asyncio.wait_for(telethon_client.get_entity(peer), timeout=10.0)
-                name = getattr(entity, 'first_name', getattr(entity, 'title', "Unknown"))
+                name = getattr(entity, 'first_name', getattr(entity, 'title', "User"))
                 logger.info(f"✅ [ENTITY_FOUND] Name: {name}")
             except Exception as e:
                 # Fallback: try to find the user in the group participants
@@ -583,7 +584,7 @@ async def _process_single_participant(call_id, participant, chat_entity, is_join
                     participants = await telethon_client.get_participants(chat_entity, search=str(user_id))
                     if participants:
                         entity = participants[0]
-                        name = getattr(entity, 'first_name', getattr(entity, 'title', "Unknown"))
+                        name = getattr(entity, 'first_name', getattr(entity, 'title', "User"))
                         logger.info(f"✅ [ENTITY_FOUND_FALLBACK] Name: {name}")
                     else:
                         # Final attempt: use PTB fallback for {user_id}...
@@ -600,14 +601,22 @@ async def _process_single_participant(call_id, participant, chat_entity, is_join
                             entity = DummyEntity(user)
                             logger.info(f"✅ [ENTITY_FOUND_FINAL] Name: {name}")
                         except Exception as ptb_err:
-                            if "Chat not found" in str(ptb_err):
-                                logger.info(f"🔇 [SKIP] {user_id}: Bot not in chat {settings_chat_id}")
-                            else:
-                                logger.warning(f"❌ [PTB_FALLBACK_FAILED] {user_id}: {ptb_err}")
-                            return
+                            logger.info(f"ℹ️ [ENTITY_NOT_FOUND] {user_id} in {settings_chat_id}: {ptb_err}. Proceeding with default name.")
+                            # Create a minimal dummy entity if we still don't have one
+                            if not entity:
+                                class MinimalEntity:
+                                    def __init__(self):
+                                        self.username = None
+                                        self.first_name = "User"
+                                entity = MinimalEntity()
                 except Exception as fallback_err:
-                    logger.warning(f"❌ [ENTITY_FAILED] {user_id}: {e} (Fallback also failed: {fallback_err})")
-                    return
+                    logger.warning(f"⚠️ [ENTITY_RESOLUTION_FAILED] {user_id}: {fallback_err}. Proceeding with default name.")
+                    if not entity:
+                        class MinimalEntity:
+                            def __init__(self):
+                                self.username = None
+                                self.first_name = "User"
+                        entity = MinimalEntity()
 
             # 4. Check Settings
             settings = get_chat_settings(settings_chat_id)
