@@ -73,6 +73,8 @@ async def start_voice_chat_monitor(application: Application):
     global telethon_client, ptb_application
     ptb_application = application
     
+    logger.info(f"🎙 VC Monitor: LOG_CHANNEL_ID is {LOG_CHANNEL_ID}")
+    
     if not API_ID or not API_HASH or not STRING_SESSION:
         logger.warning("⚠️ Telethon credentials missing. Voice chat join notifications disabled.")
         return
@@ -653,7 +655,7 @@ async def _process_single_participant(call_id, participant, chat_entity, is_join
                 parse_mode=ParseMode.HTML,
                 disable_web_page_preview=True
             )
-            logger.info(f"📤 [SENT] {user_id} to {settings_chat_id}")
+            logger.info(f"📤 [SENT] {user_id} to group {settings_chat_id}")
             
             # Log to log channel
             if LOG_CHANNEL_ID:
@@ -675,8 +677,11 @@ async def _process_single_participant(call_id, participant, chat_entity, is_join
                         f"🕒 <b>Time:</b> {now.strftime('%Y-%m-%d %H:%M:%S')}"
                     )
                     await ptb_application.bot.send_message(chat_id=target_log_id, text=log_msg, parse_mode=ParseMode.HTML)
+                    logger.info(f"📤 [LOGGED] {user_id} to log channel {target_log_id}")
                 except Exception as le:
                     logger.error(f"❌ Failed to log VC event to channel {LOG_CHANNEL_ID}: {le}")
+            else:
+                logger.info(f"ℹ️ [SKIP_LOG] No LOG_CHANNEL_ID configured for {user_id}")
 
             if is_join:
                 notification_cache[f"{user_id}_{call_id}"] = datetime.datetime.now()
