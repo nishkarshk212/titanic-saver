@@ -522,7 +522,7 @@ async def _process_single_participant(call_id, participant, chat_entity, is_join
         try:
             # 1. Check Chat Entity
             if not chat_entity:
-                logger.debug(f"❌ [STOP] No chat_entity for {user_id} in call {call_id}")
+                logger.info(f"❌ [STOP] No chat_entity for {user_id} in call {call_id}")
                 return
 
             # Determine the PTB-compatible chat ID
@@ -601,7 +601,7 @@ async def _process_single_participant(call_id, participant, chat_entity, is_join
                             logger.info(f"✅ [ENTITY_FOUND_FINAL] Name: {name}")
                         except Exception as ptb_err:
                             if "Chat not found" in str(ptb_err):
-                                logger.debug(f"🔇 [SKIP] {user_id}: Bot not in chat {settings_chat_id}")
+                                logger.info(f"🔇 [SKIP] {user_id}: Bot not in chat {settings_chat_id}")
                             else:
                                 logger.warning(f"❌ [PTB_FALLBACK_FAILED] {user_id}: {ptb_err}")
                             return
@@ -735,7 +735,7 @@ async def _process_single_participant(call_id, participant, chat_entity, is_join
             
         except Exception as e:
             if "Chat not found" in str(e):
-                logger.debug(f"🔇 [SKIP] {user_id} in {call_id}: Bot not in chat")
+                logger.info(f"🔇 [SKIP] {user_id} in {call_id}: Bot not in chat")
             else:
                 logger.error(f"❌ [CRASH] _process_single_participant: {e}")
     except Exception as e:
