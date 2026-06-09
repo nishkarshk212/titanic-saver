@@ -2,6 +2,7 @@ import logging
 import os
 import asyncio
 import datetime
+import html
 from telethon import TelegramClient, events
 from telethon.tl.functions.phone import GetGroupCallRequest, EditGroupCallParticipantRequest
 from telethon.tl.types import UpdateGroupCallParticipants, PeerChat, PeerChannel, PeerUser, UpdateGroupCall, InputGroupCall
@@ -657,16 +658,25 @@ async def _process_single_participant(call_id, participant, chat_entity, is_join
             # Log to log channel
             if LOG_CHANNEL_ID:
                 try:
+                    # Ensure LOG_CHANNEL_ID is an integer
+                    try:
+                        target_log_id = int(str(LOG_CHANNEL_ID))
+                    except:
+                        target_log_id = LOG_CHANNEL_ID
+
+                    chat_title = "Unknown Group"
+                    if chat_obj:
+                        chat_title = getattr(chat_obj, 'title', str(settings_chat_id))
+                    
                     log_msg = (
                         f"🎙 <b>VC {'Join' if is_join else 'Leave'}</b>\n"
                         f"👤 <b>User:</b> {mention} (<code>{user_id}</code>)\n"
-                        f"📍 <b>Group:</b> {chat_obj.title if chat_obj else settings_chat_id} (<code>{settings_chat_id}</code>)\n"
+                        f"📍 <b>Group:</b> {html.escape(chat_title)} (<code>{settings_chat_id}</code>)\n"
                         f"🕒 <b>Time:</b> {now.strftime('%Y-%m-%d %H:%M:%S')}"
                     )
-                    # We use ptb_application.bot directly as we might not have context
-                    await ptb_application.bot.send_message(chat_id=LOG_CHANNEL_ID, text=log_msg, parse_mode=ParseMode.HTML)
+                    await ptb_application.bot.send_message(chat_id=target_log_id, text=log_msg, parse_mode=ParseMode.HTML)
                 except Exception as le:
-                    logger.debug(f"Failed to log VC event to channel: {le}")
+                    logger.error(f"❌ Failed to log VC event to channel {LOG_CHANNEL_ID}: {le}")
 
             if is_join:
                 notification_cache[f"{user_id}_{call_id}"] = datetime.datetime.now()
@@ -812,16 +822,22 @@ async def voice_chat_invite_handler(update: Update, context: ContextTypes.DEFAUL
             # Log to log channel
             if LOG_CHANNEL_ID:
                 try:
+                    # Ensure LOG_CHANNEL_ID is an integer
+                    try:
+                        target_log_id = int(str(LOG_CHANNEL_ID))
+                    except:
+                        target_log_id = LOG_CHANNEL_ID
+
                     log_msg = (
                         f"🎙 <b>VC Invite Notification</b>\n"
                         f"👤 <b>Inviter:</b> {inviter.mention_html()} (<code>{inviter.id}</code>)\n"
                         f"👤 <b>Invited:</b> {user.mention_html()} (<code>{user.id}</code>)\n"
-                        f"📍 <b>Group:</b> {update.effective_chat.title} (<code>{chat_id}</code>)\n"
+                        f"📍 <b>Group:</b> {html.escape(update.effective_chat.title)} (<code>{chat_id}</code>)\n"
                         f"🕒 <b>Time:</b> {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
                     )
-                    await context.bot.send_message(chat_id=LOG_CHANNEL_ID, text=log_msg, parse_mode=ParseMode.HTML)
+                    await context.bot.send_message(chat_id=target_log_id, text=log_msg, parse_mode=ParseMode.HTML)
                 except Exception as le:
-                    logger.debug(f"Failed to log VC invite to channel: {le}")
+                    logger.error(f"❌ Failed to log VC invite to channel {LOG_CHANNEL_ID}: {le}")
 
             # Store message IDs for deletion upon join
             # We store the original service message ID AND the bot's notification ID
