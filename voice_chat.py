@@ -15,6 +15,7 @@ from font import to_mono
 from telegram.ext import Application, CallbackQueryHandler, ContextTypes, MessageHandler, filters, CommandHandler
 from settings_manager_mongo import get_chat_settings
 from user_manager_mongo import is_user_admin
+from collections import defaultdict
 from database import get_collection, COLLECTIONS
 
 # Configure logging
@@ -35,6 +36,9 @@ notification_cache = {}
 
 # Map call IDs to chat entities
 call_to_chat = {}
+
+# Locks for processing VC events to avoid race conditions
+processing_locks = defaultdict(asyncio.Lock)
 
 # Glitch/Dedox Protection
 vc_glitch_cache = {} # (chat_id, user_id) -> timestamp
@@ -251,6 +255,18 @@ async def scan_active_vcs():
                             logger.info(f"👥 Populating entity cache for group {cid}...")
                             await telethon_client.get_participants(entity, limit=200)
                             
+                            # Populate initial participant map to avoid ghost joins
+                            try:
+                                call_info = await telethon_client(GetGroupCallRequest(call=full.full_chat.call, limit=100))
+                                current_participants_map[call_id] = set()
+                                for p in call_info.participants:
+                                    if not getattr(p, 'left', False):
+                                        uid = get_peer_id(p.peer)
+                                        if uid: current_participants_map[call_id].add(uid)
+                                logger.info(f"👥 Initialized map for call {call_id} with {len(current_participants_map[call_id])} users")
+                            except Exception as ce:
+                                logger.warning(f"Could not get initial participants for call {call_id}: {ce}")
+
                             call_to_chat[call_id] = entity
                             count += 1
                             logger.info(f"🔍 Pre-scanned active VC: call {call_id} in group {cid}")
@@ -266,156 +282,176 @@ async def scan_active_vcs():
 
 async def _process_vc_join_event(event):
     """Internal function to process VC join events asynchronously."""
-    try:
-        call_id = event.call.id
-        
-        # Skip initial state dump events during the first 5 seconds after startup
-        if _vc_monitor_start_ts and (datetime.datetime.now() - _vc_monitor_start_ts).total_seconds() < 5:
-            logger.info(f"Ignoring initial state sync for call {call_id} ({len(event.participants)} participants)")
-            return
-        
-        chat_entity = call_to_chat.get(call_id)
-        
-        # If call_to_chat missing, try resolving the chat from the call itself
-        now = datetime.datetime.now()
-        last_failed = _failed_resolutions.get(call_id)
-        
-        # Try resolution if missing, and haven't failed recently (cooldown 5 mins)
-        if not chat_entity and (not last_failed or (now - last_failed).total_seconds() > 300):
-            try:
-                logger.info(f"🔍 Attempting to resolve call {call_id} via GetGroupCallRequest...")
-                result = await telethon_client(GetGroupCallRequest(call=event.call, limit=1))
-                if result and result.chats:
-                    raw_entity = result.chats[0]
-                    raw_id = raw_entity.id
-                    logger.info(f"📡 Found raw_entity {raw_id} for call {call_id}")
-                    
-                    # Determine PTB compatible ID
-                    from telethon.tl.types import Channel
-                    if isinstance(raw_entity, Channel):
-                        bot_check_id = int(f"-100{raw_id}")
+    call_id = event.call.id
+    
+    # Use a lock per call_id to prevent race conditions during state updates
+    async with processing_locks[call_id]:
+        try:
+            # Skip initial state dump events during the first few seconds after startup
+            # increased to 10s to be safe
+            if _vc_monitor_start_ts and (datetime.datetime.now() - _vc_monitor_start_ts).total_seconds() < 10:
+                if call_id not in current_participants_map:
+                    current_participants_map[call_id] = set()
+                    for p in event.participants:
+                        if not getattr(p, 'left', False):
+                            uid = get_peer_id(p.peer)
+                            if uid: current_participants_map[call_id].add(uid)
+                    logger.info(f"Ignoring startup sync for call {call_id} (initialized with {len(current_participants_map[call_id])} users)")
+                return
+            
+            chat_entity = call_to_chat.get(call_id)
+            
+            # If call_to_chat missing, try resolving the chat from the call itself
+            now = datetime.datetime.now()
+            last_failed = _failed_resolutions.get(call_id)
+            
+            # Try resolution if missing, and haven't failed recently (cooldown 5 mins)
+            if not chat_entity and (not last_failed or (now - last_failed).total_seconds() > 300):
+                try:
+                    logger.info(f"🔍 Attempting to resolve call {call_id} via GetGroupCallRequest...")
+                    result = await telethon_client(GetGroupCallRequest(call=event.call, limit=1))
+                    if result and result.chats:
+                        raw_entity = result.chats[0]
+                        raw_id = raw_entity.id
+                        logger.info(f"📡 Found raw_entity {raw_id} for call {call_id}")
+                        
+                        # Determine PTB compatible ID
+                        from telethon.tl.types import Channel
+                        if isinstance(raw_entity, Channel):
+                            bot_check_id = int(f"-100{raw_id}")
+                        else:
+                            bot_check_id = -raw_id
+                            
+                        try:
+                            await ptb_application.bot.get_chat(bot_check_id)
+                            chat_entity = raw_entity
+                            call_to_chat[call_id] = chat_entity
+                            _failed_resolutions.pop(call_id, None)
+                            logger.info(f"✅ Successfully resolved call {call_id} -> chat {bot_check_id} ({type(raw_entity).__name__})")
+                        except Exception as e:
+                            _failed_resolutions[call_id] = now
+                            logger.info(f"❌ Skipping call {call_id}: bot not in chat {bot_check_id} or error: {e}")
                     else:
-                        bot_check_id = -raw_id
+                        # Fallback: Deep scan all groups if GetGroupCallRequest returns nothing
+                        logger.info(f"❓ GetGroupCallRequest empty for {call_id}. Starting deep scan fallback...")
                         
-                    try:
-                        await ptb_application.bot.get_chat(bot_check_id)
-                        chat_entity = raw_entity
-                        call_to_chat[call_id] = chat_entity
-                        _failed_resolutions.pop(call_id, None)
-                        logger.info(f"✅ Successfully resolved call {call_id} -> chat {bot_check_id} ({type(raw_entity).__name__})")
-                    except Exception as e:
-                        _failed_resolutions[call_id] = now
-                        logger.info(f"❌ Skipping call {call_id}: bot not in chat {bot_check_id} or error: {e}")
-                else:
-                    # Fallback: Deep scan all groups if GetGroupCallRequest returns nothing
-                    logger.info(f"❓ GetGroupCallRequest empty for {call_id}. Starting deep scan fallback...")
-                    
-                    # 1. First try scanning dialogs the account is already in
-                    logger.info(f"🔎 Scanning active dialogs for call {call_id}...")
-                    dialogs = await telethon_client.get_dialogs(limit=100)
-                    found = False
-                    for dialog in dialogs:
-                        if dialog.is_group or dialog.is_channel:
-                            try:
-                                full = await telethon_client(GetFullChannelRequest(channel=dialog.entity)) if dialog.is_channel else await telethon_client(GetFullChatRequest(chat_id=dialog.id))
-                                if hasattr(full, 'full_chat') and hasattr(full.full_chat, 'call') and full.full_chat.call and full.full_chat.call.id == call_id:
-                                    call_to_chat[call_id] = dialog.entity
-                                    _failed_resolutions.pop(call_id, None)
-                                    logger.info(f"🎯 Dialog scan found call {call_id} in chat {dialog.id}")
-                                    
-                                    # Populate cache
-                                    try: await telethon_client.get_participants(dialog.entity, limit=100)
-                                    except: pass
-                                    
-                                    found = True
-                                    chat_entity = dialog.entity
-                                    break
-                            except: continue
-                    
-                    # 2. If still not found, scan all groups in DB (backup)
-                    if not found:
-                        collection = get_collection(COLLECTIONS['settings'])
-                        if collection is not None:
-                            all_chats = list(collection.find({}))
-                            logger.info(f"🔎 Scanning {len(all_chats)} database groups for call {call_id}...")
-                            for chat_doc in all_chats:
-                                cid = chat_doc.get("chat_id")
-                                if not cid: continue
+                        # 1. First try scanning dialogs the account is already in
+                        logger.info(f"🔎 Scanning active dialogs for call {call_id}...")
+                        dialogs = await telethon_client.get_dialogs(limit=100)
+                        found = False
+                        for dialog in dialogs:
+                            if dialog.is_group or dialog.is_channel:
                                 try:
-                                    clean_id = int(str(cid).replace('-100', ''))
-                                    try:
-                                        full = await telethon_client(GetFullChannelRequest(channel=clean_id))
-                                    except Exception as e:
-                                        full = await telethon_client(GetFullChatRequest(chat_id=clean_id))
+                                    full = await telethon_client(GetFullChannelRequest(channel=dialog.entity)) if dialog.is_channel else await telethon_client(GetFullChatRequest(chat_id=dialog.id))
+                                    if hasattr(full, 'full_chat') and hasattr(full.full_chat, 'call') and full.full_chat.call and full.full_chat.call.id == call_id:
+                                        call_to_chat[call_id] = dialog.entity
+                                        _failed_resolutions.pop(call_id, None)
+                                        logger.info(f"🎯 Dialog scan found call {call_id} in chat {dialog.id}")
                                         
-                                    if hasattr(full, 'full_chat') and hasattr(full.full_chat, 'call') and full.full_chat.call:
-                                        if full.full_chat.call.id == call_id:
-                                            entity = await telethon_client.get_entity(clean_id)
-                                            chat_entity = entity
-                                            call_to_chat[call_id] = chat_entity
-                                            _failed_resolutions.pop(call_id, None)
-                                            logger.info(f"🎯 DB scan found call {call_id} in chat {cid}")
-                                            found = True
-                                            break
-                                except Exception as e:
-                                    continue
+                                        # Populate cache
+                                        try: await telethon_client.get_participants(dialog.entity, limit=100)
+                                        except: pass
+                                        
+                                        found = True
+                                        chat_entity = dialog.entity
+                                        break
+                                except: continue
                         
-                    if not found:
-                        _failed_resolutions[call_id] = now
-                        logger.info(f"❌ Resolution fallback failed for call {call_id}")
-            except Exception as resolve_err:
-                _failed_resolutions[call_id] = now
-                logger.warning(f"⚠️ Could not resolve chat for call {call_id}: {resolve_err}")
-        
-        # Glitch/Dedox Safety: Massive join events
-        if len(event.participants) > 20: 
-            logger.warning(f"⚠️ Massive VC join event ({len(event.participants)} users).")
-            if chat_entity:
-                cid = chat_entity.id if not isinstance(chat_entity, int) else chat_entity
-                asyncio.create_task(clean_ghost_participants(cid))
+                        # 2. If still not found, scan all groups in DB (backup)
+                        if not found:
+                            collection = get_collection(COLLECTIONS['settings'])
+                            if collection is not None:
+                                all_chats = list(collection.find({}))
+                                logger.info(f"🔎 Scanning {len(all_chats)} database groups for call {call_id}...")
+                                for chat_doc in all_chats:
+                                    cid = chat_doc.get("chat_id")
+                                    if not cid: continue
+                                    try:
+                                        clean_id = int(str(cid).replace('-100', ''))
+                                        try:
+                                            full = await telethon_client(GetFullChannelRequest(channel=clean_id))
+                                        except Exception as e:
+                                            full = await telethon_client(GetFullChatRequest(chat_id=clean_id))
+                                            
+                                        if hasattr(full, 'full_chat') and hasattr(full.full_chat, 'call') and full.full_chat.call:
+                                            if full.full_chat.call.id == call_id:
+                                                entity = await telethon_client.get_entity(clean_id)
+                                                chat_entity = entity
+                                                call_to_chat[call_id] = chat_entity
+                                                _failed_resolutions.pop(call_id, None)
+                                                logger.info(f"🎯 DB scan found call {call_id} in chat {cid}")
+                                                found = True
+                                                break
+                                    except Exception as e:
+                                        continue
+                            
+                        if not found:
+                            _failed_resolutions[call_id] = now
+                            logger.info(f"❌ Resolution fallback failed for call {call_id}")
+                except Exception as resolve_err:
+                    _failed_resolutions[call_id] = now
+                    logger.warning(f"⚠️ Could not resolve chat for call {call_id}: {resolve_err}")
+            
+            # Glitch/Dedox Safety: Massive join events
+            if len(event.participants) > 20: 
+                logger.warning(f"⚠️ Massive VC join event ({len(event.participants)} users).")
+                if chat_entity:
+                    cid = chat_entity.id if not isinstance(chat_entity, int) else chat_entity
+                    asyncio.create_task(clean_ghost_participants(cid))
 
-        # Track participants to avoid ghost joins
-        if call_id not in current_participants_map:
-            current_participants_map[call_id] = set()
+            # Track participants to avoid ghost joins
+            if call_id not in current_participants_map:
+                # If this is the first event for a call, and it has multiple participants, 
+                # it's likely an existing call we just discovered.
+                # If it has only 1, it's likely a new join we should notify.
+                is_state_sync = len(event.participants) > 2
+                
+                current_participants_map[call_id] = set()
+                if is_state_sync:
+                    for p in event.participants:
+                        if not getattr(p, 'left', False):
+                            uid = get_peer_id(p.peer)
+                            if uid: current_participants_map[call_id].add(uid)
+                    logger.info(f"Initialized participant map for call {call_id} (sync mode, {len(current_participants_map[call_id])} users)")
+                    return
+                else:
+                    logger.info(f"Initialized empty participant map for NEW call {call_id}")
+
+            # Analyze batch for actual changes
+            leaves = []
+            joins = []
+            
+            current_set = current_participants_map[call_id]
+            
             for p in event.participants:
-                if not getattr(p, 'left', False):
-                    uid = get_peer_id(p.peer)
-                    if uid: current_participants_map[call_id].add(uid)
-            logger.info(f"Initialized participant map for call {call_id} with {len(current_participants_map[call_id])} users")
-            return
+                uid = get_peer_id(p.peer)
+                if not uid: continue
+                
+                is_left = getattr(p, 'left', False)
+                
+                if is_left:
+                    if uid in current_set:
+                        leaves.append(p)
+                        current_set.discard(uid)
+                else:
+                    if uid not in current_set:
+                        joins.append(p)
+                        current_set.add(uid)
 
-        # Analyze batch for actual changes
-        leaves = []
-        joins = []
-        
-        current_set = current_participants_map[call_id]
-        
-        for p in event.participants:
-            uid = get_peer_id(p.peer)
-            if not uid: continue
+            # Identity Switch Detection:
+            # If someone leaves and joins in the same update, it's often a switch.
+            # We look for participants with different peer types but possibly related.
+            # Simplified: if len(leaves) == 1 and len(joins) == 1, we treat it as a potential switch.
+            is_switch_event = len(leaves) == 1 and len(joins) == 1
             
-            is_left = getattr(p, 'left', False)
-            
-            if is_left:
-                if uid in current_set:
-                    leaves.append(p)
-                    current_set.discard(uid)
-            else:
-                if uid not in current_set:
-                    joins.append(p)
-                    current_set.add(uid)
-
-        # A switch is typically a single user changing their peer (e.g. User -> Channel)
-        is_switch_event = len(leaves) == 1 and len(joins) == 1
-        
-        # Process participants
-        for participant in leaves:
-            asyncio.create_task(_process_single_participant(call_id, participant, chat_entity, is_join=False, is_switch=is_switch_event))
-            
-        for participant in joins:
-            asyncio.create_task(_process_single_participant(call_id, participant, chat_entity, is_join=True, is_switch=is_switch_event))
-    except Exception as e:
-        logger.error(f"❌ Error in _process_vc_join_event: {e}")
+            # Process participants
+            for participant in leaves:
+                asyncio.create_task(_process_single_participant(call_id, participant, chat_entity, is_join=False, is_switch=is_switch_event))
+                
+            for participant in joins:
+                asyncio.create_task(_process_single_participant(call_id, participant, chat_entity, is_join=True, is_switch=is_switch_event))
+        except Exception as e:
+            logger.error(f"❌ Error in _process_vc_join_event: {e}")
 
 async def _process_single_participant(call_id, participant, chat_entity, is_join=True, is_switch=False):
     """Process a single VC participant join or leave."""
@@ -804,6 +840,15 @@ async def clean_ghost_participants(chat_id):
         call_info = await telethon_client(GetGroupCallRequest(call=call, limit=100))
         participants = call_info.participants
         
+        # Sync current_participants_map with reality
+        new_set = set()
+        for p in participants:
+            if not getattr(p, 'left', False):
+                uid = get_peer_id(p.peer)
+                if uid: new_set.add(uid)
+        current_participants_map[call.id] = new_set
+        logger.info(f"🔄 Synced participant map for call {call.id} with {len(new_set)} users")
+
         if not participants:
             return True, "Voice chat is empty."
             
