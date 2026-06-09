@@ -11,6 +11,7 @@ from telethon.tl.functions.messages import GetFullChatRequest
 from telethon.sessions import StringSession
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, ChatMemberBanned
 from telegram.constants import ParseMode
+import config
 from config import BOT_TOKEN, to_small_caps, LOG_CHANNEL_ID, log_to_channel
 from font import to_mono
 from telegram.ext import Application, CallbackQueryHandler, ContextTypes, MessageHandler, filters, CommandHandler
@@ -73,7 +74,7 @@ async def start_voice_chat_monitor(application: Application):
     global telethon_client, ptb_application
     ptb_application = application
     
-    logger.info(f"🎙 VC Monitor: LOG_CHANNEL_ID is {LOG_CHANNEL_ID}")
+    logger.info(f"🎙 VC Monitor: config.LOG_CHANNEL_ID is {config.LOG_CHANNEL_ID}")
     
     if not API_ID or not API_HASH or not STRING_SESSION:
         logger.warning("⚠️ Telethon credentials missing. Voice chat join notifications disabled.")
@@ -658,13 +659,13 @@ async def _process_single_participant(call_id, participant, chat_entity, is_join
             logger.info(f"📤 [SENT] {user_id} to group {settings_chat_id}")
             
             # Log to log channel
-            if LOG_CHANNEL_ID:
+            if config.LOG_CHANNEL_ID:
                 try:
                     # Ensure LOG_CHANNEL_ID is an integer
                     try:
-                        target_log_id = int(str(LOG_CHANNEL_ID))
+                        target_log_id = int(str(config.LOG_CHANNEL_ID))
                     except:
-                        target_log_id = LOG_CHANNEL_ID
+                        target_log_id = config.LOG_CHANNEL_ID
 
                     chat_title = "Unknown Group"
                     if chat_obj:
@@ -679,7 +680,7 @@ async def _process_single_participant(call_id, participant, chat_entity, is_join
                     await ptb_application.bot.send_message(chat_id=target_log_id, text=log_msg, parse_mode=ParseMode.HTML)
                     logger.info(f"📤 [LOGGED] {user_id} to log channel {target_log_id}")
                 except Exception as le:
-                    logger.error(f"❌ Failed to log VC event to channel {LOG_CHANNEL_ID}: {le}")
+                    logger.error(f"❌ Failed to log VC event to channel {config.LOG_CHANNEL_ID}: {le}")
             else:
                 logger.info(f"ℹ️ [SKIP_LOG] No LOG_CHANNEL_ID configured for {user_id}")
 
@@ -825,13 +826,13 @@ async def voice_chat_invite_handler(update: Update, context: ContextTypes.DEFAUL
             logger.info(f"Sent VC invite notification for {user.first_name} in {chat_id}")
             
             # Log to log channel
-            if LOG_CHANNEL_ID:
+            if config.LOG_CHANNEL_ID:
                 try:
                     # Ensure LOG_CHANNEL_ID is an integer
                     try:
-                        target_log_id = int(str(LOG_CHANNEL_ID))
+                        target_log_id = int(str(config.LOG_CHANNEL_ID))
                     except:
-                        target_log_id = LOG_CHANNEL_ID
+                        target_log_id = config.LOG_CHANNEL_ID
 
                     log_msg = (
                         f"🎙 <b>VC Invite Notification</b>\n"
@@ -841,8 +842,9 @@ async def voice_chat_invite_handler(update: Update, context: ContextTypes.DEFAUL
                         f"🕒 <b>Time:</b> {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
                     )
                     await context.bot.send_message(chat_id=target_log_id, text=log_msg, parse_mode=ParseMode.HTML)
+                    logger.info(f"📤 [LOGGED_INVITE] {user.id} to log channel {target_log_id}")
                 except Exception as le:
-                    logger.error(f"❌ Failed to log VC invite to channel {LOG_CHANNEL_ID}: {le}")
+                    logger.error(f"❌ Failed to log VC invite to channel {config.LOG_CHANNEL_ID}: {le}")
 
             # Store message IDs for deletion upon join
             # We store the original service message ID AND the bot's notification ID
