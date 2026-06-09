@@ -10,7 +10,7 @@ from telethon.tl.functions.messages import GetFullChatRequest
 from telethon.sessions import StringSession
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, ChatMemberBanned
 from telegram.constants import ParseMode
-from config import BOT_TOKEN, to_small_caps
+from config import BOT_TOKEN, to_small_caps, LOG_CHANNEL_ID, log_to_channel
 from font import to_mono
 from telegram.ext import Application, CallbackQueryHandler, ContextTypes, MessageHandler, filters, CommandHandler
 from settings_manager_mongo import get_chat_settings
@@ -544,18 +544,25 @@ async def _process_single_participant(call_id, participant, chat_entity, is_join
                         name = getattr(entity, 'first_name', getattr(entity, 'title', "Unknown"))
                         logger.info(f"✅ [ENTITY_FOUND_FALLBACK] Name: {name}")
                     else:
-                        # Final attempt: use PTB bot to get basic info
-                        logger.info(f"🔍 [GET_ENTITY_FINAL] Using PTB fallback for {user_id}...")
-                        chat_member = await ptb_application.bot.get_chat_member(chat_id=settings_chat_id, user_id=user_id)
-                        user = chat_member.user
-                        name = user.first_name
-                        # Create a dummy entity object for the rest of the logic
-                        class DummyEntity:
-                            def __init__(self, u):
-                                self.username = u.username
-                                self.first_name = u.first_name
-                        entity = DummyEntity(user)
-                        logger.info(f"✅ [ENTITY_FOUND_FINAL] Name: {name}")
+                        # Final attempt: use PTB fallback for {user_id}...
+                        try:
+                            logger.info(f"🔍 [GET_ENTITY_FINAL] Using PTB fallback for {user_id}...")
+                            chat_member = await ptb_application.bot.get_chat_member(chat_id=settings_chat_id, user_id=user_id)
+                            user = chat_member.user
+                            name = user.first_name
+                            # Create a dummy entity object for the rest of the logic
+                            class DummyEntity:
+                                def __init__(self, u):
+                                    self.username = u.username
+                                    self.first_name = u.first_name
+                            entity = DummyEntity(user)
+                            logger.info(f"✅ [ENTITY_FOUND_FINAL] Name: {name}")
+                        except Exception as ptb_err:
+                            if "Chat not found" in str(ptb_err):
+                                logger.debug(f"🔇 [SKIP] {user_id}: Bot not in chat {settings_chat_id}")
+                            else:
+                                logger.warning(f"❌ [PTB_FALLBACK_FAILED] {user_id}: {ptb_err}")
+                            return
                 except Exception as fallback_err:
                     logger.warning(f"❌ [ENTITY_FAILED] {user_id}: {e} (Fallback also failed: {fallback_err})")
                     return
@@ -647,6 +654,20 @@ async def _process_single_participant(call_id, participant, chat_entity, is_join
             )
             logger.info(f"📤 [SENT] {user_id} to {settings_chat_id}")
             
+            # Log to log channel
+            if LOG_CHANNEL_ID:
+                try:
+                    log_msg = (
+                        f"🎙 <b>VC {'Join' if is_join else 'Leave'}</b>\n"
+                        f"👤 <b>User:</b> {mention} (<code>{user_id}</code>)\n"
+                        f"📍 <b>Group:</b> {chat_obj.title if chat_obj else settings_chat_id} (<code>{settings_chat_id}</code>)\n"
+                        f"🕒 <b>Time:</b> {now.strftime('%Y-%m-%d %H:%M:%S')}"
+                    )
+                    # We use ptb_application.bot directly as we might not have context
+                    await ptb_application.bot.send_message(chat_id=LOG_CHANNEL_ID, text=log_msg, parse_mode=ParseMode.HTML)
+                except Exception as le:
+                    logger.debug(f"Failed to log VC event to channel: {le}")
+
             if is_join:
                 notification_cache[f"{user_id}_{call_id}"] = datetime.datetime.now()
             
@@ -788,6 +809,20 @@ async def voice_chat_invite_handler(update: Update, context: ContextTypes.DEFAUL
             )
             logger.info(f"Sent VC invite notification for {user.first_name} in {chat_id}")
             
+            # Log to log channel
+            if LOG_CHANNEL_ID:
+                try:
+                    log_msg = (
+                        f"🎙 <b>VC Invite Notification</b>\n"
+                        f"👤 <b>Inviter:</b> {inviter.mention_html()} (<code>{inviter.id}</code>)\n"
+                        f"👤 <b>Invited:</b> {user.mention_html()} (<code>{user.id}</code>)\n"
+                        f"📍 <b>Group:</b> {update.effective_chat.title} (<code>{chat_id}</code>)\n"
+                        f"🕒 <b>Time:</b> {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                    )
+                    await context.bot.send_message(chat_id=LOG_CHANNEL_ID, text=log_msg, parse_mode=ParseMode.HTML)
+                except Exception as le:
+                    logger.debug(f"Failed to log VC invite to channel: {le}")
+
             # Store message IDs for deletion upon join
             # We store the original service message ID AND the bot's notification ID
             invite_key = (chat_id, user.id)
