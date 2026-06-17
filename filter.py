@@ -61,6 +61,9 @@ async def set_filter(update: Update, context: ContextTypes.DEFAULT_TYPE):
             else:
                 await update.message.reply_text("This type of content is not supported for filters.")
                 return
+            # Save inline keyboard if present
+            if reply.reply_markup:
+                content_data["reply_markup"] = reply.reply_markup.to_dict()
         else:
             # Text only from command arguments
             if len(split_text) < 3:
@@ -167,21 +170,25 @@ async def filter_reply_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             caption = data.get("caption")
             
             try:
+                reply_markup = None
+                if data.get("reply_markup"):
+                    reply_markup = InlineKeyboardMarkup.de_json(data["reply_markup"], context.bot)
+                    
                 if msg_type == "text":
                     parse_mode = ParseMode.MARKDOWN_V2 if data.get("is_markdown") else None
-                    await update.message.reply_text(content, parse_mode=parse_mode)
+                    await update.message.reply_text(content, parse_mode=parse_mode, reply_markup=reply_markup)
                 elif msg_type == "sticker":
-                    await update.message.reply_sticker(content)
+                    await update.message.reply_sticker(content, reply_markup=reply_markup)
                 elif msg_type == "photo":
-                    await update.message.reply_photo(content, caption=caption, parse_mode=ParseMode.MARKDOWN_V2)
+                    await update.message.reply_photo(content, caption=caption, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=reply_markup)
                 elif msg_type == "video":
-                    await update.message.reply_video(content, caption=caption, parse_mode=ParseMode.MARKDOWN_V2)
+                    await update.message.reply_video(content, caption=caption, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=reply_markup)
                 elif msg_type == "document":
-                    await update.message.reply_document(content, caption=caption, parse_mode=ParseMode.MARKDOWN_V2)
+                    await update.message.reply_document(content, caption=caption, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=reply_markup)
                 elif msg_type == "animation":
-                    await update.message.reply_animation(content, caption=caption, parse_mode=ParseMode.MARKDOWN_V2)
+                    await update.message.reply_animation(content, caption=caption, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=reply_markup)
                 elif msg_type == "voice":
-                    await update.message.reply_voice(content)
+                    await update.message.reply_voice(content, reply_markup=reply_markup)
             except Exception as e:
                 logging.error(f"Error sending filter reply: {e}")
 
