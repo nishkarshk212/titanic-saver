@@ -984,6 +984,7 @@ def get_user_permission_keyboard(chat_id, user_id, settings):
     # Blocking options in grid format - shortened for mobile
     # True = FREED/ALLOWED ✅, False = BLOCKED ❌
     blocking_options = [
+        ("block_stickers", "🎫 Stickers"),
         ("block_premium_sticker", "✨ Premium"),
     ]
     
