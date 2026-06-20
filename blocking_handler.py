@@ -684,22 +684,6 @@ async def free_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     blocking_labels = {
         "block_stickers": "🎫 Stickers",
         "block_premium_sticker": "✨ Premium",
-        "block_link": "🔗 Links",
-        "block_embed_link": "🔘 Embed",
-        "block_media": "🖼️ Media",
-        "block_documents": "📄 Files",
-        "block_audio": "🎵 Audio",
-        "block_forward": "🔄 Fwd",
-        "block_channel_post": "📢 Channel",
-        "block_command": "⌨️ Cmds",
-        "block_contact": "📱 Contact",
-        "block_location": "📍 Location",
-        "block_voice": "🎤 Voice",
-        "block_video_note": "📹 Video",
-        "block_poll": "📊 Poll",
-        "block_dice": "🎲 Dice",
-        "block_game": "🎮 Game",
-        "block_reactions": "⚡ React",
     }
     
     if already_freed:
@@ -819,22 +803,6 @@ async def list_freed_members(update: Update, context: ContextTypes.DEFAULT_TYPE)
     blocking_labels = {
         "block_stickers": "🎫",
         "block_premium_sticker": "✨",
-        "block_link": "🔗",
-        "block_embed_link": "🔘",
-        "block_media": "🖼️",
-        "block_documents": "📄",
-        "block_audio": "🎵",
-        "block_forward": "🔄",
-        "block_channel_post": "📢",
-        "block_command": "⌨️",
-        "block_contact": "📱",
-        "block_location": "📍",
-        "block_voice": "🎤",
-        "block_video_note": "📹",
-        "block_poll": "📊",
-        "block_dice": "🎲",
-        "block_game": "🎮",
-        "block_reactions": "⚡",
     }
 
     from user_manager_mongo import resolve_username
