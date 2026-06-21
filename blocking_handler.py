@@ -954,22 +954,6 @@ def get_user_permission_keyboard(chat_id, user_id, settings):
     blocking_options = [
         ("block_stickers", "🎫 Stickers"),
         ("block_premium_sticker", "✨ Premium"),
-        ("block_link", "🔗 Links"),
-        ("block_embed_link", "🔘 Embed"),
-        ("block_media", "🖼️ Media"),
-        ("block_documents", "📄 Files"),
-        ("block_audio", "🎵 Audio"),
-        ("block_forward", "🔄 Fwd"),
-        ("block_channel_post", "📢 Channel"),
-        ("block_command", "⌨️ Cmds"),
-        ("block_contact", "📱 Contact"),
-        ("block_location", "📍 Location"),
-        ("block_voice", "🎤 Voice"),
-        ("block_video_note", "📹 Video"),
-        ("block_poll", "📊 Poll"),
-        ("block_dice", "🎲 Dice"),
-        ("block_game", "🎮 Game"),
-        ("block_reactions", "⚡ React"),
     ]
     
     keyboard = []
