@@ -301,6 +301,77 @@ async def purge_user_messages(update: Update, context: ContextTypes.DEFAULT_TYPE
     except Exception as e:
         await status_msg.edit_text(f"❌ **Error during purge:**\n`{str(e)}`", parse_mode='Markdown')
 
+async def purge_service_messages(update: Update, context: ContextTypes.DEFAULT_TYPE, chat_id=None):
+    """Delete all service/event messages in the group."""
+    if chat_id is None:
+        chat = update.effective_chat
+        chat_id = chat.id
+    else:
+        chat = await context.bot.get_chat(chat_id)
+    
+    # Permission check
+    has_perm, error_msg = await check_admin_permission(update, context, 'can_delete_messages')
+    if not has_perm:
+        return await update.message.reply_text(error_msg)
+    
+    # Bot permission check
+    has_bot_perm, bot_error_msg = await check_bot_permission(update, context, 'can_delete_messages')
+    if not has_bot_perm:
+        return await update.message.reply_text(bot_error_msg)
+
+    if chat.type not in ['group', 'supergroup']:
+        return await update.message.reply_text("This command works only in supergroups.")
+
+    status_msg = await update.message.reply_text("🚀 **Starting service messages purge...**", parse_mode='Markdown')
+    
+    current_id = update.message.id if update.message else 0
+    deleted_count = 0
+    
+    try:
+        # We delete in batches of 100 backwards
+        # Service messages are typically lower message IDs
+        consecutive_errors = 0
+        for i in range(current_id, 0, -100):
+            batch = list(range(max(1, i - 100), i))
+            try:
+                await context.bot.delete_messages(chat_id, batch)
+                deleted_count += len(batch)
+                consecutive_errors = 0
+                if deleted_count % 500 == 0:
+                    await status_msg.edit_text(f"🚀 **Purging service messages...**\nDeleted: `{deleted_count}` messages", parse_mode='Markdown')
+                await asyncio.sleep(0.2)
+            except BadRequest as e:
+                err = str(e)
+                if "Message to delete not found" in err or "Message can't be deleted" in err:
+                    consecutive_errors += 1
+                    # Stop if 5000 messages in a row are missing/undeletable
+                    if consecutive_errors > 50:
+                        break
+                    continue
+                elif "Flood control exceeded" in err:
+                    # Handle flood wait
+                    import re
+                    seconds = re.search(r'wait (\d+)', err)
+                    wait_time = int(seconds.group(1)) if seconds else 30
+                    await asyncio.sleep(wait_time + 1)
+                    continue
+                else:
+                    # Other errors like "Chat not found" or permissions
+                    break
+            except Exception:
+                break
+                
+        await status_msg.edit_text(f"✅ **Service messages purge complete!**\nTotal deleted: `{deleted_count}` messages\nAll service messages, VC invites, and joins have been cleared.", parse_mode='Markdown')
+        
+        # Record stats
+        if update.effective_user:
+            increment_staff_stat(chat_id, update.effective_user.id, "purge", deleted_count)
+            
+        await asyncio.sleep(5)
+        await status_msg.delete()
+    except Exception as e:
+        await status_msg.edit_text(f"❌ **Purge interrupted:**\n`{str(e)}`", parse_mode='Markdown')
+
 def get_purge_handlers():
     """Return purge handlers."""
     return [

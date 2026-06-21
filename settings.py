@@ -349,6 +349,7 @@ def get_deleting_messages_keyboard():
         [InlineKeyboardButton("📓 Block cancellation", callback_data="set_view_blocking")],
         [InlineKeyboardButton("🕒 Warning Time", callback_data="set_view_warning_time")],
         [InlineKeyboardButton("💥 Delete all messages", callback_data="set_view_global_purge")],
+        [InlineKeyboardButton("🧹 Delete event messages", callback_data="set_view_purge_service")],
         [InlineKeyboardButton("♻️ Self-Destruction", callback_data="set_view_auto_delete")],
         [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
     ]
@@ -1786,6 +1787,75 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except:
                 pass
             return
+        elif action == "confirm_purge_service":
+            # Start service messages deletion process
+            logging.info(f"🧹 Service purge requested for chat {chat_id} by user {user_id}")
+            try:
+                await query.edit_message_text("🧹 <b>Event messages purge in progress...</b>\nYou can close this menu, the process will continue in the background.", parse_mode='HTML')
+            except Exception as e:
+                logging.error(f"Failed to edit message for service purge: {e}")
+            
+            # Run in background to not block the bot
+            async def background_service_purge(b, c_id, start_msg_id):
+                deleted = 0
+                logging.info(f"Starting background service purge for {c_id} from ID {start_msg_id}")
+                try:
+                    # If start_msg_id is too low (e.g. from private chat), 
+                    # we should try to get a more realistic starting ID
+                    if start_msg_id < 1000 and str(c_id).startswith('-100'):
+                        try:
+                            temp_msg = await b.send_message(c_id, "...")
+                            start_msg_id = temp_msg.message_id
+                            await temp_msg.delete()
+                        except:
+                            # Fallback to a high number if we can't send message
+                            start_msg_id = 1000000 
+                    
+                    # We delete in batches of 100 backwards
+                    # This will cover all messages including service messages
+                    consecutive_errors = 0
+                    for i in range(start_msg_id, 0, -100):
+                        batch = list(range(max(1, i - 100), i))
+                        try:
+                            await b.delete_messages(c_id, batch)
+                            deleted += len(batch)
+                            consecutive_errors = 0
+                            await asyncio.sleep(0.1)
+                        except BadRequest as e:
+                            err = str(e)
+                            if "Message to delete not found" in err or "Message can't be deleted" in err:
+                                consecutive_errors += 1
+                                # Stop if 5000 messages in a row are missing/undeletable
+                                if consecutive_errors > 50:
+                                    logging.info(f"Service purge stopped for {c_id}: too many consecutive errors at ID {i}")
+                                    break
+                                continue
+                            elif "Flood control exceeded" in err:
+                                import re
+                                seconds = re.search(r'wait (\d+)', err)
+                                wait_time = int(seconds.group(1)) if seconds else 30
+                                await asyncio.sleep(wait_time + 1)
+                                continue
+                            else: 
+                                logging.warning(f"Service purge batch failed for {c_id}: {err}")
+                                break
+                        except Exception as e:
+                            logging.error(f"Unexpected error in service purge batch for {c_id}: {e}")
+                            break
+                    
+                    await b.send_message(c_id, f"✅ <b>Event messages purge complete!</b>\nTotal deleted: `{deleted}` messages\nAll service messages, VC invites, and joins have been cleared.", parse_mode='HTML')
+                    logging.info(f"✅ Service purge complete for {c_id}. Total: {deleted}")
+                except Exception as e:
+                    logging.error(f"Error in background service purge for {c_id}: {e}")
+
+            # Get a fresh message ID if possible
+            actual_start_id = query.message.message_id
+            asyncio.create_task(background_service_purge(context.bot, chat_id, actual_start_id))
+            try:
+                await query.answer("Event purge started!")
+            except:
+                pass
+            return
             
         try:
             await query.answer("Members Management action completed.")
@@ -1997,6 +2067,43 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = []
         if has_perms:
             keyboard.append([InlineKeyboardButton("🚀 Start Global Purge", callback_data="mgmt_confirm_delete_all")])
+        
+        keyboard.append([InlineKeyboardButton("🔙 Back", callback_data="set_view_deleting")])
+        
+        try:
+            await edit_bot_response(
+                query, context,
+                text,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode='HTML'
+            )
+        except BadRequest: pass
+        await query.answer()
+        return
+
+    if data == "set_view_purge_service":
+        bot_info = await context.bot.get_me()
+        bot_username = f"@{bot_info.username}"
+        
+        # Check bot permissions
+        try:
+            bot_member = await context.bot.get_chat_member(chat_id, context.bot.id)
+            has_perms = (
+                bot_member.status == 'administrator' and
+                bot_member.can_delete_messages
+            )
+        except:
+            has_perms = False
+            
+        text = (
+            f"🧹 <b>Delete Event Messages</b>\n\n"
+            f"This will delete all service/event messages (user joined/left, pinned messages, etc.) in the group.\n\n"
+            f"The Bot {bot_username} must be Admin with <b>delete messages</b> permission."
+        )
+        
+        keyboard = []
+        if has_perms:
+            keyboard.append([InlineKeyboardButton("🚀 Start Event Purge", callback_data="mgmt_confirm_purge_service")])
         
         keyboard.append([InlineKeyboardButton("🔙 Back", callback_data="set_view_deleting")])
         
