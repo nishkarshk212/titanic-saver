@@ -380,4 +380,5 @@ def get_purge_handlers():
         CommandHandler("del", delete_msg),
         CommandHandler(["purgeall", "cleanall"], purge_all),
         CommandHandler(["purgeuser", "delalluser"], purge_user_messages),
+        CommandHandler(["epurge", "cleanevent"], purge_service_messages),
     ]
