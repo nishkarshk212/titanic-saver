@@ -194,6 +194,16 @@ DEFAULT_CHAT_SETTINGS = {
     "antiflood_window": 3,
     "antiflood_penalty": "mute", # warn, mute, ban, kick
     "antiflood_apply_on": "members", # members, everyone
+    # Edit Check settings
+    "edit_checks_enabled": False,
+    "edit_checks_target": "members",
+    "edit_checks_penalty": "off",
+    "edit_checks_warn_limit": 3,
+    # Bio Link Check settings
+    "bio_link_check_enabled": False,
+    "bio_link_target": "members",
+    "bio_link_penalty": "warn",
+    "bio_link_warn_limit": 3,
     # Emergency settings
     "emergency_enabled": False,
     "emergency_block_stickers": False,
