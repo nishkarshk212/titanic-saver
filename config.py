@@ -129,33 +129,22 @@ async def delete_message_job(context):
         pass
 
 def colored_button(text, color="default"):
-    """Add emoji color indicator to button text for visual distinction.
+    """Add color prefix to button text for background styling.
     
     Args:
         text: Button text
-        color: 'green', 'red', 'blue', 'default', 'orange', 'purple',
-               'yellow', 'cyan', 'pink', 'gold', 'white', 'black'
+        color: 'green', 'red', 'blue', 'default'
     
     Returns:
-        Text with color emoji prefix
+        Text with color prefix
     """
-    color_map = {
-        "green":   "🟢",
-        "red":     "🔴",
-        "blue":    "🔵",
-        "orange":  "🟠",
-        "yellow":  "🟡",
-        "purple":  "🟣",
-        "brown":   "🟤",
-        "cyan":    "🔷",
-        "pink":    "🩷",
-        "gold":    "✨",
-        "white":   "⚪",
-        "black":   "⚫",
-        "default": "⚪"
-    }
-    emoji = color_map.get(color, "⚪")
-    return f"{emoji} {text}"
+    if color == "green":
+        return f"#g {text}"
+    elif color == "red":
+        return f"#r {text}"
+    elif color == "blue":
+        return f"#p {text}"
+    return text
 
 # --- Monkey-patch telegram.InlineKeyboardButton to support native background styling ---
 try:
@@ -164,13 +153,16 @@ try:
 
     def _patched_inline_init(self, text, *args, **kwargs):
         style = None
-        # Use emojis added by colored_button to determine the native Telegram style
-        if text.startswith("🟢 "):
+        # Parse text for color tags
+        if text.startswith("#g ") or text == "#g":
             style = "success"
-        elif text.startswith("🔴 "):
+            text = text[3:] if text.startswith("#g ") else ""
+        elif text.startswith("#r ") or text == "#r":
             style = "danger"
-        elif text.startswith("🔵 "):
+            text = text[3:] if text.startswith("#r ") else ""
+        elif text.startswith("#p ") or text == "#p":
             style = "primary"
+            text = text[3:] if text.startswith("#p ") else ""
             
         if style:
             api_kwargs = kwargs.get('api_kwargs', {})
