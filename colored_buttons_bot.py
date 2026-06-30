@@ -11,6 +11,10 @@ API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
+print(f"DEBUG: API_ID={API_ID}")
+print(f"DEBUG: API_HASH={API_HASH}")
+print(f"DEBUG: BOT_TOKEN={BOT_TOKEN[:20]}..." if BOT_TOKEN else "DEBUG: BOT_TOKEN=None")
+
 app = Client(
     "colored-buttons-bot",
     api_id=API_ID,
