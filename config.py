@@ -133,15 +133,25 @@ def colored_button(text, color="default"):
     
     Args:
         text: Button text
-        color: 'green', 'red', 'blue', or 'default'
+        color: 'green', 'red', 'blue', 'default', 'orange', 'purple',
+               'yellow', 'cyan', 'pink', 'gold', 'white', 'black'
     
     Returns:
         Text with color emoji prefix
     """
     color_map = {
-        "green": "🟢",
-        "red": "🔴", 
-        "blue": "🔵",
+        "green":   "🟢",
+        "red":     "🔴",
+        "blue":    "🔵",
+        "orange":  "🟠",
+        "yellow":  "🟡",
+        "purple":  "🟣",
+        "brown":   "🟤",
+        "cyan":    "🔷",
+        "pink":    "🩷",
+        "gold":    "✨",
+        "white":   "⚪",
+        "black":   "⚫",
         "default": "⚪"
     }
     emoji = color_map.get(color, "⚪")
