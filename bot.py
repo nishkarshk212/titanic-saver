@@ -90,14 +90,12 @@ async def start(update, context):
     
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton(colored_button("+ ᴀᴅᴅ ᴍᴇ ɪɴ ɢʀᴏᴜᴘ +", "green"), url=add_to_group_url)],
-        [InlineKeyboardButton(colored_button(to_small_caps("「 Help and Commands 」"), "purple"), callback_data="help_main")],
         [
-            InlineKeyboardButton(colored_button(to_small_caps("「 Support 」"), "orange"), url="https://t.me/jayden_clan"),
-            InlineKeyboardButton(colored_button(to_small_caps("「 Updates 」"), "cyan"), url="https://t.me/Tele_212_bots")
+            InlineKeyboardButton(colored_button(to_small_caps("「 Support 」"), "blue"), url="https://t.me/jayden_clan"),
+            InlineKeyboardButton(colored_button(to_small_caps("「 Updates 」"), "red"), url="https://t.me/Tele_212_bots")
         ],
         [
-            InlineKeyboardButton(colored_button(to_small_caps("「 Owner 」"), "red"), url=f"tg://user?id={OWNER_ID}"),
-            InlineKeyboardButton(colored_button(to_small_caps("「 Source 」"), "gold"), url="https://github.com/nishkarshk212/titanic-saver")
+            InlineKeyboardButton(colored_button(to_small_caps("「 Owner 」"), "red"), url=f"tg://user?id={OWNER_ID}")
         ]
     ])
     
