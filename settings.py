@@ -302,8 +302,8 @@ def get_main_settings_keyboard(chat_id):
 def get_group_link_keyboard(settings):
     """Get group link settings keyboard."""
     keyboard = [
-        [InlineKeyboardButton("✍️ Set", callback_data="set_config_group_link")],
-        [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
+        [InlineKeyboardButton(colored_button("✍️ Set", "blue"), callback_data="set_config_group_link")],
+        [InlineKeyboardButton(colored_button("🔙 Back", "red"), callback_data="set_view_main")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -316,42 +316,42 @@ def get_banned_words_keyboard(settings):
     
     keyboard = [
         [
-            InlineKeyboardButton(f"{'❌ ' if penalty == 'off' else ''}Off", callback_data="set_banned_penalty_off"),
-            InlineKeyboardButton(f"{'❗ ' if penalty == 'warn' else ''}Warn", callback_data="set_banned_penalty_warn"),
-            InlineKeyboardButton(f"{'❗ ' if penalty == 'kick' else ''}Kick", callback_data="set_banned_penalty_kick")
+            InlineKeyboardButton(colored_button(f"{'❌ ' if penalty == 'off' else ''}Off", "red"), callback_data="set_banned_penalty_off"),
+            InlineKeyboardButton(colored_button(f"{'❗ ' if penalty == 'warn' else ''}Warn", "blue"), callback_data="set_banned_penalty_warn"),
+            InlineKeyboardButton(colored_button(f"{'❗ ' if penalty == 'kick' else ''}Kick", "red"), callback_data="set_banned_penalty_kick")
         ],
         [
-            InlineKeyboardButton(f"{'🔊 ' if penalty == 'mute' else ''}Mute", callback_data="set_banned_penalty_mute"),
-            InlineKeyboardButton(f"{'🚫 ' if penalty == 'ban' else ''}Ban", callback_data="set_banned_penalty_ban")
+            InlineKeyboardButton(colored_button(f"{'🔊 ' if penalty == 'mute' else ''}Mute", "blue"), callback_data="set_banned_penalty_mute"),
+            InlineKeyboardButton(colored_button(f"{'🚫 ' if penalty == 'ban' else ''}Ban", "red"), callback_data="set_banned_penalty_ban")
         ],
-        [InlineKeyboardButton(f"🎯 Target: {target}", callback_data="set_toggle_banned_words_target")],
-        [InlineKeyboardButton(f"🗑️ Delete Messages {deletion}", callback_data="set_toggle_banned_words_deletion")],
+        [InlineKeyboardButton(colored_button(f"🎯 Target: {target}", "blue"), callback_data="set_toggle_banned_words_target")],
+        [InlineKeyboardButton(colored_button(f"🗑️ Delete Messages {deletion}", "red"), callback_data="set_toggle_banned_words_deletion")],
         [
-            InlineKeyboardButton("-10s", callback_data="set_banned_warn_time_sub_10"),
-            InlineKeyboardButton(f"🕒 Warn Delete: {warn_delete_time}s", callback_data="set_none"),
-            InlineKeyboardButton("+10s", callback_data="set_banned_warn_time_add_10")
+            InlineKeyboardButton(colored_button("-10s", "blue"), callback_data="set_banned_warn_time_sub_10"),
+            InlineKeyboardButton(colored_button(f"🕒 Warn Delete: {warn_delete_time}s", "red"), callback_data="set_none"),
+            InlineKeyboardButton(colored_button("+10s", "blue"), callback_data="set_banned_warn_time_add_10")
         ],
         [
-            InlineKeyboardButton("➕ Add", callback_data="set_config_banned_words_add"),
-            InlineKeyboardButton("➖ Remove", callback_data="set_config_banned_words_remove")
+            InlineKeyboardButton(colored_button("➕ Add", "green"), callback_data="set_config_banned_words_add"),
+            InlineKeyboardButton(colored_button("➖ Remove", "red"), callback_data="set_config_banned_words_remove")
         ],
-        [InlineKeyboardButton("🔤 List", callback_data="set_view_banned_words_list")],
-        [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
+        [InlineKeyboardButton(colored_button("🔤 List", "blue"), callback_data="set_view_banned_words_list")],
+        [InlineKeyboardButton(colored_button("🔙 Back", "red"), callback_data="set_view_main")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
 def get_deleting_messages_keyboard():
     """Get Deleting Messages sub-menu keyboard."""
     keyboard = [
-        [InlineKeyboardButton("✍️ Edit Checks", callback_data="set_view_edit_checks")],
-        [InlineKeyboardButton("🔗 Bio Link Check", callback_data="set_view_bio_link")],
-        [InlineKeyboardButton("💭 Service Messages", callback_data="set_view_clean")],
-        [InlineKeyboardButton("📓 Block cancellation", callback_data="set_view_blocking")],
-        [InlineKeyboardButton("🕒 Warning Time", callback_data="set_view_warning_time")],
-        [InlineKeyboardButton("💥 Delete all messages", callback_data="set_view_global_purge")],
-        [InlineKeyboardButton("🧹 Delete event messages", callback_data="set_view_purge_service")],
-        [InlineKeyboardButton("♻️ Self-Destruction", callback_data="set_view_auto_delete")],
-        [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
+        [InlineKeyboardButton(colored_button("✍️ Edit Checks", "blue"), callback_data="set_view_edit_checks")],
+        [InlineKeyboardButton(colored_button("🔗 Bio Link Check", "blue"), callback_data="set_view_bio_link")],
+        [InlineKeyboardButton(colored_button("💭 Service Messages", "blue"), callback_data="set_view_clean")],
+        [InlineKeyboardButton(colored_button("📓 Block cancellation", "blue"), callback_data="set_view_blocking")],
+        [InlineKeyboardButton(colored_button("🕒 Warning Time", "blue"), callback_data="set_view_warning_time")],
+        [InlineKeyboardButton(colored_button("💥 Delete all messages", "red"), callback_data="set_view_global_purge")],
+        [InlineKeyboardButton(colored_button("🧹 Delete event messages", "red"), callback_data="set_view_purge_service")],
+        [InlineKeyboardButton(colored_button("♻️ Self-Destruction", "blue"), callback_data="set_view_auto_delete")],
+        [InlineKeyboardButton(colored_button("🔙 Back", "red"), callback_data="set_view_main")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -370,14 +370,14 @@ def get_warning_time_settings_keyboard(settings):
     if s > 0 or (h == 0 and m == 0): time_str += f"{s}s"
     
     keyboard = [
-        [InlineKeyboardButton(f"🕒 Warning Deletion: {time_str}", callback_data="set_none")],
+        [InlineKeyboardButton(colored_button(f"🕒 Warning Deletion: {time_str}", "blue"), callback_data="set_none")],
         [
-            InlineKeyboardButton("-1min", callback_data="set_warn_time_sub_60"),
-            InlineKeyboardButton("-10sec", callback_data="set_warn_time_sub_10"),
-            InlineKeyboardButton("+10sec", callback_data="set_warn_time_add_10"),
-            InlineKeyboardButton("+1min", callback_data="set_warn_time_add_60")
+            InlineKeyboardButton(colored_button("-1min", "blue"), callback_data="set_warn_time_sub_60"),
+            InlineKeyboardButton(colored_button("-10sec", "blue"), callback_data="set_warn_time_sub_10"),
+            InlineKeyboardButton(colored_button("+10sec", "blue"), callback_data="set_warn_time_add_10"),
+            InlineKeyboardButton(colored_button("+1min", "blue"), callback_data="set_warn_time_add_60")
         ],
-        [InlineKeyboardButton("🔙 Back", callback_data="set_view_deleting")]
+        [InlineKeyboardButton(colored_button("🔙 Back", "red"), callback_data="set_view_deleting")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -389,19 +389,19 @@ def get_bio_link_settings_keyboard(settings):
     limit = settings.get("bio_link_warn_limit", 3)
     
     keyboard = [
-        [InlineKeyboardButton(f"Bio Link Check: {status}", callback_data="set_toggle_bio_link_check_enabled")],
-        [InlineKeyboardButton(f"🎯 Target: {target}", callback_data="set_toggle_bio_link_target")],
-        [InlineKeyboardButton(f"⚖️ Penalty: {penalty}", callback_data="set_toggle_bio_link_penalty")],
+        [InlineKeyboardButton(colored_button(f"Bio Link Check: {status}", "blue"), callback_data="set_toggle_bio_link_check_enabled")],
+        [InlineKeyboardButton(colored_button(f"🎯 Target: {target}", "blue"), callback_data="set_toggle_bio_link_target")],
+        [InlineKeyboardButton(colored_button(f"⚖️ Penalty: {penalty}", "blue"), callback_data="set_toggle_bio_link_penalty")],
     ]
     
     if penalty.lower() != "off":
         keyboard.append([
-            InlineKeyboardButton("➖", callback_data="set_bio_warn_sub"),
-            InlineKeyboardButton(f"⚠ Limit: {limit}", callback_data="set_none"),
-            InlineKeyboardButton("➕", callback_data="set_bio_warn_add")
+            InlineKeyboardButton(colored_button("➖", "blue"), callback_data="set_bio_warn_sub"),
+            InlineKeyboardButton(colored_button(f"⚠ Limit: {limit}", "blue"), callback_data="set_none"),
+            InlineKeyboardButton(colored_button("➕", "blue"), callback_data="set_bio_warn_add")
         ])
         
-    keyboard.append([InlineKeyboardButton("🔙 Back", callback_data="set_view_deleting")])
+    keyboard.append([InlineKeyboardButton(colored_button("🔙 Back", "red"), callback_data="set_view_deleting")])
     return InlineKeyboardMarkup(keyboard)
 
 def get_edit_checks_keyboard(settings):
@@ -412,40 +412,40 @@ def get_edit_checks_keyboard(settings):
     limit = settings.get("edit_checks_warn_limit", 3)
     
     keyboard = [
-        [InlineKeyboardButton(f"Edit Protection: {status}", callback_data="set_toggle_edit_checks_enabled")],
-        [InlineKeyboardButton(f"🎯 Target: {target}", callback_data="set_toggle_edit_checks_target")],
-        [InlineKeyboardButton(f"⚖️ Penalty: {penalty}", callback_data="set_toggle_edit_checks_penalty")],
+        [InlineKeyboardButton(colored_button(f"Edit Protection: {status}", "blue"), callback_data="set_toggle_edit_checks_enabled")],
+        [InlineKeyboardButton(colored_button(f"🎯 Target: {target}", "blue"), callback_data="set_toggle_edit_checks_target")],
+        [InlineKeyboardButton(colored_button(f"⚖️ Penalty: {penalty}", "blue"), callback_data="set_toggle_edit_checks_penalty")],
     ]
     
     if penalty.lower() != "off":
         keyboard.append([
-            InlineKeyboardButton("➖", callback_data="set_edit_warn_sub"),
-            InlineKeyboardButton(f"⚠ Limit: {limit}", callback_data="set_none"),
-            InlineKeyboardButton("➕", callback_data="set_edit_warn_add")
+            InlineKeyboardButton(colored_button("➖", "blue"), callback_data="set_edit_warn_sub"),
+            InlineKeyboardButton(colored_button(f"⚠ Limit: {limit}", "blue"), callback_data="set_none"),
+            InlineKeyboardButton(colored_button("➕", "blue"), callback_data="set_edit_warn_add")
         ])
         
-    keyboard.append([InlineKeyboardButton("🔙 Back", callback_data="set_view_deleting")])
+    keyboard.append([InlineKeyboardButton(colored_button("🔙 Back", "red"), callback_data="set_view_deleting")])
     return InlineKeyboardMarkup(keyboard)
 
 def get_members_mgmt_keyboard():
     """Get members management keyboard."""
     keyboard = [
         [
-            InlineKeyboardButton("🔊 Unmute all", callback_data="mgmt_unmute_all"),
-            InlineKeyboardButton("🚫 Unban all", callback_data="mgmt_unban_all")
+            InlineKeyboardButton(colored_button("🔊 Unmute all", "blue"), callback_data="mgmt_unmute_all"),
+            InlineKeyboardButton(colored_button("🚫 Unban all", "red"), callback_data="mgmt_unban_all")
         ],
-        [InlineKeyboardButton("❗ Kick muted/restricted users", callback_data="mgmt_kick_restricted")],
-        [InlineKeyboardButton("💀 Kick deleted accounts", callback_data="mgmt_kick_deleted")],
-        [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
+        [InlineKeyboardButton(colored_button("❗ Kick muted/restricted users", "red"), callback_data="mgmt_kick_restricted")],
+        [InlineKeyboardButton(colored_button("💀 Kick deleted accounts", "red"), callback_data="mgmt_kick_deleted")],
+        [InlineKeyboardButton(colored_button("🔙 Back", "red"), callback_data="set_view_main")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
 def get_regulations_keyboard():
     """Get regulations main keyboard."""
     keyboard = [
-        [InlineKeyboardButton("✍️ Customize message", callback_data="set_view_regulations_custom")],
-        [InlineKeyboardButton("🕹️ Commands Permissions", callback_data="set_view_command_permissions")],
-        [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
+        [InlineKeyboardButton(colored_button("✍️ Customize message", "blue"), callback_data="set_view_regulations_custom")],
+        [InlineKeyboardButton(colored_button("🕹️ Commands Permissions", "blue"), callback_data="set_view_command_permissions")],
+        [InlineKeyboardButton(colored_button("🔙 Back", "red"), callback_data="set_view_main")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -456,14 +456,14 @@ def get_regulations_custom_keyboard(settings):
     btns_icon = "✅" if settings.get("rules_buttons") else "❌"
     
     keyboard = [
-        [InlineKeyboardButton("📄 Text", callback_data="set_config_rules_text"),
-         InlineKeyboardButton("👀 See", callback_data="set_preview_rules_text")],
-        [InlineKeyboardButton("📸 Media", callback_data="set_config_rules_media"),
-         InlineKeyboardButton("👀 See", callback_data="set_preview_rules_media")],
-        [InlineKeyboardButton("🔡 Url Buttons", callback_data="set_config_rules_buttons"),
-         InlineKeyboardButton("👀 See", callback_data="set_preview_rules_buttons")],
-        [InlineKeyboardButton("👀 Full preview", callback_data="set_preview_rules_full")],
-        [InlineKeyboardButton("🔙 Back", callback_data="set_view_regulations")]
+        [InlineKeyboardButton(colored_button("📄 Text", "blue"), callback_data="set_config_rules_text"),
+         InlineKeyboardButton(colored_button("👀 See", "blue"), callback_data="set_preview_rules_text")],
+        [InlineKeyboardButton(colored_button("📸 Media", "blue"), callback_data="set_config_rules_media"),
+         InlineKeyboardButton(colored_button("👀 See", "blue"), callback_data="set_preview_rules_media")],
+        [InlineKeyboardButton(colored_button("🔡 Url Buttons", "blue"), callback_data="set_config_rules_buttons"),
+         InlineKeyboardButton(colored_button("👀 See", "blue"), callback_data="set_preview_rules_buttons")],
+        [InlineKeyboardButton(colored_button("👀 Full preview", "blue"), callback_data="set_preview_rules_full")],
+        [InlineKeyboardButton(colored_button("🔙 Back", "red"), callback_data="set_view_regulations")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -485,7 +485,7 @@ def get_command_permissions_keyboard(settings):
     
     for cmd in commands:
         current = perms.get(cmd, "all")
-        row = [InlineKeyboardButton(f"/{cmd}", callback_data="set_none")]
+        row = [InlineKeyboardButton(colored_button(f"/{cmd}", "blue"), callback_data="set_none")]
         
         for level in ["nobody", "staff", "all", "private"]:
             icon = icon_map[level]
@@ -498,7 +498,7 @@ def get_command_permissions_keyboard(settings):
             row.append(InlineKeyboardButton(label, callback_data=f"set_perm_{cmd}_{level}"))
         keyboard.append(row)
         
-    keyboard.append([InlineKeyboardButton("🔙 Back", callback_data="set_view_regulations")])
+    keyboard.append([InlineKeyboardButton(colored_button("🔙 Back", "red"), callback_data="set_view_regulations")])
     return InlineKeyboardMarkup(keyboard)
 
 def get_welcome_settings_keyboard(settings):
@@ -512,18 +512,18 @@ def get_welcome_settings_keyboard(settings):
     welcome_buttons = settings.get("welcome_buttons", [])
     
     keyboard = [
-        [InlineKeyboardButton(f"Welcome: {welcome_status}", callback_data="set_toggle_welcome_enabled")],
-        [InlineKeyboardButton(f"Welcome on Re-join: {rejoin_status}", callback_data="set_toggle_welcome_rejoin_enabled")],
-        [InlineKeyboardButton(f"Auto-Delete Previous: {clean_status}", callback_data="set_toggle_welcome_clean_enabled")],
-        [InlineKeyboardButton(f"Timed Deletion: {delete_enabled_status}", callback_data="set_toggle_welcome_delete_enabled")],
+        [InlineKeyboardButton(colored_button(f"Welcome: {welcome_status}", "blue"), callback_data="set_toggle_welcome_enabled")],
+        [InlineKeyboardButton(colored_button(f"Welcome on Re-join: {rejoin_status}", "blue"), callback_data="set_toggle_welcome_rejoin_enabled")],
+        [InlineKeyboardButton(colored_button(f"Auto-Delete Previous: {clean_status}", "red"), callback_data="set_toggle_welcome_clean_enabled")],
+        [InlineKeyboardButton(colored_button(f"Timed Deletion: {delete_enabled_status}", "red"), callback_data="set_toggle_welcome_delete_enabled")],
         [
-            InlineKeyboardButton(f"Media: {media_status}", callback_data="set_toggle_welcome_media_enabled"),
-            InlineKeyboardButton("🖼️ Set Media", callback_data="set_config_welcome_media")
+            InlineKeyboardButton(colored_button(f"Media: {media_status}", "blue"), callback_data="set_toggle_welcome_media_enabled"),
+            InlineKeyboardButton(colored_button("🖼️ Set Media", "blue"), callback_data="set_config_welcome_media")
         ],
         [
-            InlineKeyboardButton(f"Button: {button_status}", callback_data="set_toggle_welcome_button_enabled"),
-            InlineKeyboardButton("➕ Add Button", callback_data="set_config_welcome_buttons_add"),
-            InlineKeyboardButton("🗑️ Clear", callback_data="set_config_welcome_buttons_clear")
+            InlineKeyboardButton(colored_button(f"Button: {button_status}", "blue"), callback_data="set_toggle_welcome_button_enabled"),
+            InlineKeyboardButton(colored_button("➕ Add Button", "green"), callback_data="set_config_welcome_buttons_add"),
+            InlineKeyboardButton(colored_button("🗑️ Clear", "blue"), callback_data="set_config_welcome_buttons_clear")
         ]
     ]
     
@@ -531,16 +531,16 @@ def get_welcome_settings_keyboard(settings):
     if welcome_buttons:
         for idx, btn in enumerate(welcome_buttons):
             btn_text = btn.get("text", f"Btn {idx+1}")
-            keyboard.append([InlineKeyboardButton(f"Button {idx+1}: {btn_text}", callback_data=f"set_config_welcome_btn_manage_{idx}")])
+            keyboard.append([InlineKeyboardButton(colored_button(f"Button {idx+1}: {btn_text}", "blue"), callback_data=f"set_config_welcome_btn_manage_{idx}")])
     
     keyboard.extend([
-        [InlineKeyboardButton("📝 Set Welcome Text", callback_data="set_config_welcome_text")],
+        [InlineKeyboardButton(colored_button("📝 Set Welcome Text", "blue"), callback_data="set_config_welcome_text")],
         [
-            InlineKeyboardButton("-10s", callback_data="set_welcome_time_sub_10"),
-            InlineKeyboardButton(f"🗑️ Delete: {delete_time}s", callback_data="set_none"),
-            InlineKeyboardButton("+10s", callback_data="set_welcome_time_add_10")
+            InlineKeyboardButton(colored_button("-10s", "blue"), callback_data="set_welcome_time_sub_10"),
+            InlineKeyboardButton(colored_button(f"🗑️ Delete: {delete_time}s", "red"), callback_data="set_none"),
+            InlineKeyboardButton(colored_button("+10s", "blue"), callback_data="set_welcome_time_add_10")
         ],
-        [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
+        [InlineKeyboardButton(colored_button("🔙 Back", "red"), callback_data="set_view_main")]
     ])
     return InlineKeyboardMarkup(keyboard)
 
@@ -548,13 +548,13 @@ def get_welcome_button_manage_keyboard(idx):
     """Keyboard for managing a specific welcome button."""
     keyboard = [
         [
-            InlineKeyboardButton("🗑️ Remove", callback_data=f"set_config_welcome_btn_remove_{idx}")
+            InlineKeyboardButton(colored_button("🗑️ Remove", "red"), callback_data=f"set_config_welcome_btn_remove_{idx}")
         ],
         [
-            InlineKeyboardButton("✍️ Modify Text", callback_data=f"set_config_welcome_btn_modtext_{idx}"),
-            InlineKeyboardButton("🔗 Modify Link", callback_data=f"set_config_welcome_btn_modlink_{idx}")
+            InlineKeyboardButton(colored_button("✍️ Modify Text", "blue"), callback_data=f"set_config_welcome_btn_modtext_{idx}"),
+            InlineKeyboardButton(colored_button("🔗 Modify Link", "blue"), callback_data=f"set_config_welcome_btn_modlink_{idx}")
         ],
-        [InlineKeyboardButton("🔙 Back", callback_data="set_view_welcome")]
+        [InlineKeyboardButton(colored_button("🔙 Back", "red"), callback_data="set_view_welcome")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -568,14 +568,14 @@ def get_clean_settings_keyboard(settings):
     scheduled_status = "✅" if settings.get("clean_video_chat_scheduled", True) else "❌"
     
     keyboard = [
-        [InlineKeyboardButton(f"Master Clean: {master_status}", callback_data="set_toggle_clean_service_enabled")],
-        [InlineKeyboardButton(f"Clean Join: {join_status}", callback_data="set_toggle_clean_join")],
-        [InlineKeyboardButton(f"Clean Left: {left_status}", callback_data="set_toggle_clean_left")],
-        [InlineKeyboardButton(f"Voice Chat Started: {started_status}", callback_data="set_toggle_clean_video_chat_started")],
-        [InlineKeyboardButton(f"Voice Chat Ended: {ended_status}", callback_data="set_toggle_clean_video_chat_ended")],
-        [InlineKeyboardButton(f"Voice Chat Invited: {invited_status}", callback_data="set_toggle_clean_video_chat_invited")],
-        [InlineKeyboardButton(f"Voice Chat Scheduled: {scheduled_status}", callback_data="set_toggle_clean_video_chat_scheduled")],
-        [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
+        [InlineKeyboardButton(colored_button(f"Master Clean: {master_status}", "blue"), callback_data="set_toggle_clean_service_enabled")],
+        [InlineKeyboardButton(colored_button(f"Clean Join: {join_status}", "blue"), callback_data="set_toggle_clean_join")],
+        [InlineKeyboardButton(colored_button(f"Clean Left: {left_status}", "blue"), callback_data="set_toggle_clean_left")],
+        [InlineKeyboardButton(colored_button(f"Voice Chat Started: {started_status}", "blue"), callback_data="set_toggle_clean_video_chat_started")],
+        [InlineKeyboardButton(colored_button(f"Voice Chat Ended: {ended_status}", "blue"), callback_data="set_toggle_clean_video_chat_ended")],
+        [InlineKeyboardButton(colored_button(f"Voice Chat Invited: {invited_status}", "blue"), callback_data="set_toggle_clean_video_chat_invited")],
+        [InlineKeyboardButton(colored_button(f"Voice Chat Scheduled: {scheduled_status}", "blue"), callback_data="set_toggle_clean_video_chat_scheduled")],
+        [InlineKeyboardButton(colored_button("🔙 Back", "red"), callback_data="set_view_main")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -592,26 +592,26 @@ def get_auto_delete_settings_keyboard(settings):
     s = total_seconds % 60
     
     keyboard = [
-        [InlineKeyboardButton(f"Self-Destruction: {status}", callback_data="set_toggle_auto_delete_enabled")],
-        [InlineKeyboardButton(f"Text Messages: {text_status}", callback_data="set_toggle_auto_delete_text")],
-        [InlineKeyboardButton(f"Stickers: {stickers_status}", callback_data="set_toggle_auto_delete_stickers")],
-        [InlineKeyboardButton(f"Media: {media_status}", callback_data="set_toggle_auto_delete_media")],
+        [InlineKeyboardButton(colored_button(f"Self-Destruction: {status}", "blue"), callback_data="set_toggle_auto_delete_enabled")],
+        [InlineKeyboardButton(colored_button(f"Text Messages: {text_status}", "blue"), callback_data="set_toggle_auto_delete_text")],
+        [InlineKeyboardButton(colored_button(f"Stickers: {stickers_status}", "blue"), callback_data="set_toggle_auto_delete_stickers")],
+        [InlineKeyboardButton(colored_button(f"Media: {media_status}", "blue"), callback_data="set_toggle_auto_delete_media")],
         [
-            InlineKeyboardButton("-H", callback_data="set_time_sub_3600"),
-            InlineKeyboardButton(f"{h} Hours", callback_data="set_none"),
-            InlineKeyboardButton("+H", callback_data="set_time_add_3600")
+            InlineKeyboardButton(colored_button("-H", "blue"), callback_data="set_time_sub_3600"),
+            InlineKeyboardButton(colored_button(f"{h} Hours", "blue"), callback_data="set_none"),
+            InlineKeyboardButton(colored_button("+H", "blue"), callback_data="set_time_add_3600")
         ],
         [
-            InlineKeyboardButton("-M", callback_data="set_time_sub_60"),
-            InlineKeyboardButton(f"{m} Minutes", callback_data="set_none"),
-            InlineKeyboardButton("+M", callback_data="set_time_add_60")
+            InlineKeyboardButton(colored_button("-M", "blue"), callback_data="set_time_sub_60"),
+            InlineKeyboardButton(colored_button(f"{m} Minutes", "blue"), callback_data="set_none"),
+            InlineKeyboardButton(colored_button("+M", "blue"), callback_data="set_time_add_60")
         ],
         [
-            InlineKeyboardButton("-S", callback_data="set_time_sub_1"),
-            InlineKeyboardButton(f"{s} Seconds", callback_data="set_none"),
-            InlineKeyboardButton("+S", callback_data="set_time_add_1")
+            InlineKeyboardButton(colored_button("-S", "blue"), callback_data="set_time_sub_1"),
+            InlineKeyboardButton(colored_button(f"{s} Seconds", "blue"), callback_data="set_none"),
+            InlineKeyboardButton(colored_button("+S", "blue"), callback_data="set_time_add_1")
         ],
-        [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
+        [InlineKeyboardButton(colored_button("🔙 Back", "red"), callback_data="set_view_main")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -621,20 +621,20 @@ def get_msg_length_settings_keyboard(settings):
     
     keyboard = [
         [
-            InlineKeyboardButton("-", callback_data="set_msg_length_minus"),
-            InlineKeyboardButton(f"Limit: {status}", callback_data="set_none"),
-            InlineKeyboardButton("+", callback_data="set_msg_length_plus")
+            InlineKeyboardButton(colored_button("-", "blue"), callback_data="set_msg_length_minus"),
+            InlineKeyboardButton(colored_button(f"Limit: {status}", "blue"), callback_data="set_none"),
+            InlineKeyboardButton(colored_button("+", "blue"), callback_data="set_msg_length_plus")
         ],
         [
-            InlineKeyboardButton("100", callback_data="set_msg_length_100"),
-            InlineKeyboardButton("200", callback_data="set_msg_length_200"),
-            InlineKeyboardButton("300", callback_data="set_msg_length_300")
+            InlineKeyboardButton(colored_button("100", "blue"), callback_data="set_msg_length_100"),
+            InlineKeyboardButton(colored_button("200", "blue"), callback_data="set_msg_length_200"),
+            InlineKeyboardButton(colored_button("300", "blue"), callback_data="set_msg_length_300")
         ],
         [
-            InlineKeyboardButton("Custom", callback_data="set_config_msg_length_limit"),
-            InlineKeyboardButton("Disable", callback_data="set_msg_length_0")
+            InlineKeyboardButton(colored_button("Custom", "blue"), callback_data="set_config_msg_length_limit"),
+            InlineKeyboardButton(colored_button("Disable", "blue"), callback_data="set_msg_length_0")
         ],
-        [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
+        [InlineKeyboardButton(colored_button("🔙 Back", "red"), callback_data="set_view_main")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -644,29 +644,29 @@ def get_mod_settings_keyboard(settings):
     
     keyboard = [
         [
-            InlineKeyboardButton("-", callback_data="set_warn_limit_sub"),
-            InlineKeyboardButton(f"Warn Limit: {limit}", callback_data="set_none"),
-            InlineKeyboardButton("+", callback_data="set_warn_limit_add")
+            InlineKeyboardButton(colored_button("-", "blue"), callback_data="set_warn_limit_sub"),
+            InlineKeyboardButton(colored_button(f"Warn Limit: {limit}", "blue"), callback_data="set_none"),
+            InlineKeyboardButton(colored_button("+", "blue"), callback_data="set_warn_limit_add")
         ],
-        [InlineKeyboardButton(f"Warn Penalty: {penalty}", callback_data="set_toggle_warn_penalty")],
-        [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
+        [InlineKeyboardButton(colored_button(f"Warn Penalty: {penalty}", "blue"), callback_data="set_toggle_warn_penalty")],
+        [InlineKeyboardButton(colored_button("🔙 Back", "red"), callback_data="set_view_main")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
 def get_command_deletion_keyboard(settings):
     status = "✅" if settings.get("command_deletion", False) else "❌"
     keyboard = [
-        [InlineKeyboardButton(f"Delete Admin Commands: {status}", callback_data="set_toggle_command_deletion")],
-        [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
+        [InlineKeyboardButton(colored_button(f"Delete Admin Commands: {status}", "red"), callback_data="set_toggle_command_deletion")],
+        [InlineKeyboardButton(colored_button("🔙 Back", "red"), callback_data="set_view_main")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
 def get_command_access_keyboard(settings):
     access = settings.get("command_access", "all").title()
     keyboard = [
-        [InlineKeyboardButton(f"Command Access: {access}", callback_data="set_toggle_command_access")],
-        [InlineKeyboardButton("ℹ️ Global setting for basic commands", callback_data="set_none")],
-        [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
+        [InlineKeyboardButton(colored_button(f"Command Access: {access}", "blue"), callback_data="set_toggle_command_access")],
+        [InlineKeyboardButton(colored_button("ℹ️ Global setting for basic commands", "blue"), callback_data="set_none")],
+        [InlineKeyboardButton(colored_button("🔙 Back", "red"), callback_data="set_view_main")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -715,30 +715,30 @@ def get_command_permissions_keyboard(settings):
     
     keyboard = []
     for category, cmds in commands:
-        keyboard.append([InlineKeyboardButton(f"── {category} ──", callback_data="set_none")])
+        keyboard.append([InlineKeyboardButton(colored_button(f"── {category} ──", "blue"), callback_data="set_none")])
         for cmd_name, cmd_key in cmds:
             current_access = settings.get(cmd_key, "admin").title()
-            keyboard.append([InlineKeyboardButton(f"/{cmd_name.lower()}: {current_access}", callback_data=f"set_cmd_perm_{cmd_key}")])
+            keyboard.append([InlineKeyboardButton(colored_button(f"/{cmd_name.lower()}: {current_access}", "blue"), callback_data=f"set_cmd_perm_{cmd_key}")])
     
-    keyboard.append([InlineKeyboardButton("ℹ️ Tap a command to toggle access level", callback_data="set_none")])
-    keyboard.append([InlineKeyboardButton("🔙 Back", callback_data="set_view_main")])
+    keyboard.append([InlineKeyboardButton(colored_button("ℹ️ Tap a command to toggle access level", "blue"), callback_data="set_none")])
+    keyboard.append([InlineKeyboardButton(colored_button("🔙 Back", "red"), callback_data="set_view_main")])
     
     return InlineKeyboardMarkup(keyboard)
 
 def get_pinned_message_settings_keyboard(settings):
     pinned_status = "✅" if settings.get("clean_pinned_message", True) else "❌"
     keyboard = [
-        [InlineKeyboardButton(f"Clean Pinned Message: {pinned_status}", callback_data="set_toggle_clean_pinned_message")],
-        [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
+        [InlineKeyboardButton(colored_button(f"Clean Pinned Message: {pinned_status}", "blue"), callback_data="set_toggle_clean_pinned_message")],
+        [InlineKeyboardButton(colored_button("🔙 Back", "red"), callback_data="set_view_main")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
 def get_bot_protection_settings_keyboard(settings):
     status = "✅" if settings.get("bot_protection_enabled", False) else "❌"
     keyboard = [
-        [InlineKeyboardButton(f"Bot Protection: {status}", callback_data="set_toggle_bot_protection_enabled")],
-        [InlineKeyboardButton("ℹ️ Only affects members (not admins)", callback_data="set_none")],
-        [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
+        [InlineKeyboardButton(colored_button(f"Bot Protection: {status}", "blue"), callback_data="set_toggle_bot_protection_enabled")],
+        [InlineKeyboardButton(colored_button("ℹ️ Only affects members (not admins)", "blue"), callback_data="set_none")],
+        [InlineKeyboardButton(colored_button("🔙 Back", "red"), callback_data="set_view_main")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -746,9 +746,9 @@ def get_link_spam_settings_keyboard(settings):
     status = "✅" if settings.get("link_spam_protection_enabled", False) else "❌"
     apply_on = settings.get("link_spam_apply_on", "members").capitalize()
     keyboard = [
-        [InlineKeyboardButton(f"Link Protection: {status}", callback_data="set_toggle_link_spam_protection_enabled")],
-        [InlineKeyboardButton(f"Apply On: {apply_on}", callback_data="set_toggle_link_spam_apply_on")],
-        [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
+        [InlineKeyboardButton(colored_button(f"Link Protection: {status}", "blue"), callback_data="set_toggle_link_spam_protection_enabled")],
+        [InlineKeyboardButton(colored_button(f"Apply On: {apply_on}", "blue"), callback_data="set_toggle_link_spam_apply_on")],
+        [InlineKeyboardButton(colored_button("🔙 Back", "red"), callback_data="set_view_main")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -756,9 +756,9 @@ def get_forward_protection_settings_keyboard(settings):
     status = "✅" if settings.get("forward_protection_enabled", False) else "❌"
     apply_on = settings.get("forward_protection_apply_on", "members").capitalize()
     keyboard = [
-        [InlineKeyboardButton(f"Forward Protection: {status}", callback_data="set_toggle_forward_protection_enabled")],
-        [InlineKeyboardButton(f"Apply On: {apply_on}", callback_data="set_toggle_forward_protection_apply_on")],
-        [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
+        [InlineKeyboardButton(colored_button(f"Forward Protection: {status}", "blue"), callback_data="set_toggle_forward_protection_enabled")],
+        [InlineKeyboardButton(colored_button(f"Apply On: {apply_on}", "blue"), callback_data="set_toggle_forward_protection_apply_on")],
+        [InlineKeyboardButton(colored_button("🔙 Back", "red"), callback_data="set_view_main")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -777,16 +777,16 @@ def get_language_filter_settings_keyboard(settings):
     block_punct_only = "✅" if settings.get("block_punctuation_only", True) else "❌"
     
     keyboard = [
-        [InlineKeyboardButton(f"Language Filter: {status}", callback_data="set_toggle_language_filter_enabled")],
-        [InlineKeyboardButton(f"🇬🇧 English: {en_status}", callback_data="set_toggle_lang_en")],
-        [InlineKeyboardButton(f"🇮🇳 Hindi: {hi_status}", callback_data="set_toggle_lang_hi")],
-        [InlineKeyboardButton(f"💬 Hinglish: {hinglish_status}", callback_data="set_toggle_lang_hinglish")],
-        [InlineKeyboardButton("── Emoji & Symbols ──", callback_data="set_none")],
-        [InlineKeyboardButton(f"Block Emojis: {emoji_block}", callback_data="set_toggle_emoji_block_enabled")],
-        [InlineKeyboardButton(f"  Emoji Only: {block_emoji_only}", callback_data="set_toggle_block_emoji_only")],
-        [InlineKeyboardButton(f"  Punctuation Only: {block_punct_only}", callback_data="set_toggle_block_punctuation_only")],
-        [InlineKeyboardButton("ℹ️ Deletes messages in other languages", callback_data="set_none")],
-        [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
+        [InlineKeyboardButton(colored_button(f"Language Filter: {status}", "blue"), callback_data="set_toggle_language_filter_enabled")],
+        [InlineKeyboardButton(colored_button(f"🇬🇧 English: {en_status}", "blue"), callback_data="set_toggle_lang_en")],
+        [InlineKeyboardButton(colored_button(f"🇮🇳 Hindi: {hi_status}", "blue"), callback_data="set_toggle_lang_hi")],
+        [InlineKeyboardButton(colored_button(f"💬 Hinglish: {hinglish_status}", "blue"), callback_data="set_toggle_lang_hinglish")],
+        [InlineKeyboardButton(colored_button("── Emoji & Symbols ──", "blue"), callback_data="set_none")],
+        [InlineKeyboardButton(colored_button(f"Block Emojis: {emoji_block}", "blue"), callback_data="set_toggle_emoji_block_enabled")],
+        [InlineKeyboardButton(colored_button(f"  Emoji Only: {block_emoji_only}", "blue"), callback_data="set_toggle_block_emoji_only")],
+        [InlineKeyboardButton(colored_button(f"  Punctuation Only: {block_punct_only}", "blue"), callback_data="set_toggle_block_punctuation_only")],
+        [InlineKeyboardButton(colored_button("ℹ️ Deletes messages in other languages", "red"), callback_data="set_none")],
+        [InlineKeyboardButton(colored_button("🔙 Back", "red"), callback_data="set_view_main")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -819,34 +819,34 @@ def get_blocking_settings_keyboard(settings):
     reaction_status = "✅" if settings.get("block_reactions", False) else "❌"
     
     keyboard = [
-        [InlineKeyboardButton(f"Master Blocking: {master_status}", callback_data="set_toggle_blocking_enabled")],
-        [InlineKeyboardButton("🔔 Notification Settings", callback_data="set_view_blocking_notifications")],
-        [InlineKeyboardButton("── Stickers ──", callback_data="set_none")],
-        [InlineKeyboardButton(f"Block Stickers: {stickers_status}", callback_data="set_toggle_block_stickers")],
-        [InlineKeyboardButton(f"Block Premium Stickers: {premium_sticker_status}", callback_data="set_toggle_block_premium_sticker")],
-        [InlineKeyboardButton("── Links ──", callback_data="set_none")],
-        [InlineKeyboardButton(f"Block Links: {link_status}", callback_data="set_toggle_block_link")],
-        [InlineKeyboardButton(f"Block Embed Links: {embed_link_status}", callback_data="set_toggle_block_embed_link")],
-        [InlineKeyboardButton("── Media & Files ──", callback_data="set_none")],
-        [InlineKeyboardButton(f"Block Media: {media_status}", callback_data="set_toggle_block_media")],
-        [InlineKeyboardButton(f"Block Documents: {documents_status}", callback_data="set_toggle_block_documents")],
-        [InlineKeyboardButton(f"Block Audio/Music: {audio_status}", callback_data="set_toggle_block_audio")],
-        [InlineKeyboardButton("── Messages ──", callback_data="set_none")],
-        [InlineKeyboardButton(f"Block Forward: {forward_status}", callback_data="set_toggle_block_forward")],
-        [InlineKeyboardButton(f"Block Channel Posts: {channel_post_status}", callback_data="set_toggle_block_channel_post")],
-        [InlineKeyboardButton(f"Block Commands: {command_status}", callback_data="set_toggle_block_command")],
-        [InlineKeyboardButton("── Other ──", callback_data="set_none")],
-        [InlineKeyboardButton(f"Block Contact: {contact_status}", callback_data="set_toggle_block_contact")],
-        [InlineKeyboardButton(f"Block Text Messages: {text_status}", callback_data="set_toggle_block_text")],
-        [InlineKeyboardButton(f"Block Location: {location_status}", callback_data="set_toggle_block_location")],
-        [InlineKeyboardButton(f"Block Voice: {voice_status}", callback_data="set_toggle_block_voice")],
-        [InlineKeyboardButton(f"Block Video Note: {video_note_status}", callback_data="set_toggle_block_video_note")],
-        [InlineKeyboardButton(f"Block Poll: {poll_status}", callback_data="set_toggle_block_poll")],
-        [InlineKeyboardButton(f"Block Dice: {dice_status}", callback_data="set_toggle_block_dice")],
-        [InlineKeyboardButton(f"Block Game: {game_status}", callback_data="set_toggle_block_game")],
-        [InlineKeyboardButton(f"Block Reactions: {reaction_status}", callback_data="set_toggle_block_reactions")],
-        [InlineKeyboardButton("ℹ️ Toggle to block content instantly", callback_data="set_none")],
-        [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
+        [InlineKeyboardButton(colored_button(f"Master Blocking: {master_status}", "blue"), callback_data="set_toggle_blocking_enabled")],
+        [InlineKeyboardButton(colored_button("🔔 Notification Settings", "blue"), callback_data="set_view_blocking_notifications")],
+        [InlineKeyboardButton(colored_button("── Stickers ──", "blue"), callback_data="set_none")],
+        [InlineKeyboardButton(colored_button(f"Block Stickers: {stickers_status}", "blue"), callback_data="set_toggle_block_stickers")],
+        [InlineKeyboardButton(colored_button(f"Block Premium Stickers: {premium_sticker_status}", "blue"), callback_data="set_toggle_block_premium_sticker")],
+        [InlineKeyboardButton(colored_button("── Links ──", "blue"), callback_data="set_none")],
+        [InlineKeyboardButton(colored_button(f"Block Links: {link_status}", "blue"), callback_data="set_toggle_block_link")],
+        [InlineKeyboardButton(colored_button(f"Block Embed Links: {embed_link_status}", "blue"), callback_data="set_toggle_block_embed_link")],
+        [InlineKeyboardButton(colored_button("── Media & Files ──", "blue"), callback_data="set_none")],
+        [InlineKeyboardButton(colored_button(f"Block Media: {media_status}", "blue"), callback_data="set_toggle_block_media")],
+        [InlineKeyboardButton(colored_button(f"Block Documents: {documents_status}", "blue"), callback_data="set_toggle_block_documents")],
+        [InlineKeyboardButton(colored_button(f"Block Audio/Music: {audio_status}", "blue"), callback_data="set_toggle_block_audio")],
+        [InlineKeyboardButton(colored_button("── Messages ──", "blue"), callback_data="set_none")],
+        [InlineKeyboardButton(colored_button(f"Block Forward: {forward_status}", "blue"), callback_data="set_toggle_block_forward")],
+        [InlineKeyboardButton(colored_button(f"Block Channel Posts: {channel_post_status}", "blue"), callback_data="set_toggle_block_channel_post")],
+        [InlineKeyboardButton(colored_button(f"Block Commands: {command_status}", "blue"), callback_data="set_toggle_block_command")],
+        [InlineKeyboardButton(colored_button("── Other ──", "blue"), callback_data="set_none")],
+        [InlineKeyboardButton(colored_button(f"Block Contact: {contact_status}", "blue"), callback_data="set_toggle_block_contact")],
+        [InlineKeyboardButton(colored_button(f"Block Text Messages: {text_status}", "blue"), callback_data="set_toggle_block_text")],
+        [InlineKeyboardButton(colored_button(f"Block Location: {location_status}", "blue"), callback_data="set_toggle_block_location")],
+        [InlineKeyboardButton(colored_button(f"Block Voice: {voice_status}", "blue"), callback_data="set_toggle_block_voice")],
+        [InlineKeyboardButton(colored_button(f"Block Video Note: {video_note_status}", "blue"), callback_data="set_toggle_block_video_note")],
+        [InlineKeyboardButton(colored_button(f"Block Poll: {poll_status}", "blue"), callback_data="set_toggle_block_poll")],
+        [InlineKeyboardButton(colored_button(f"Block Dice: {dice_status}", "blue"), callback_data="set_toggle_block_dice")],
+        [InlineKeyboardButton(colored_button(f"Block Game: {game_status}", "blue"), callback_data="set_toggle_block_game")],
+        [InlineKeyboardButton(colored_button(f"Block Reactions: {reaction_status}", "blue"), callback_data="set_toggle_block_reactions")],
+        [InlineKeyboardButton(colored_button("ℹ️ Toggle to block content instantly", "blue"), callback_data="set_none")],
+        [InlineKeyboardButton(colored_button("🔙 Back", "red"), callback_data="set_view_main")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -859,21 +859,21 @@ def get_antiflood_settings_keyboard(settings):
     apply_on = settings.get("antiflood_apply_on", "members").title()
     
     keyboard = [
-        [InlineKeyboardButton(f"Anti-Flood: {status}", callback_data="set_toggle_antiflood_enabled")],
+        [InlineKeyboardButton(colored_button(f"Anti-Flood: {status}", "blue"), callback_data="set_toggle_antiflood_enabled")],
         [
-            InlineKeyboardButton("-", callback_data="set_antiflood_limit_sub"),
-            InlineKeyboardButton(f"Limit: {limit} msgs", callback_data="set_none"),
-            InlineKeyboardButton("+", callback_data="set_antiflood_limit_add")
+            InlineKeyboardButton(colored_button("-", "blue"), callback_data="set_antiflood_limit_sub"),
+            InlineKeyboardButton(colored_button(f"Limit: {limit} msgs", "blue"), callback_data="set_none"),
+            InlineKeyboardButton(colored_button("+", "blue"), callback_data="set_antiflood_limit_add")
         ],
         [
-            InlineKeyboardButton("-", callback_data="set_antiflood_window_sub"),
-            InlineKeyboardButton(f"Window: {window}s", callback_data="set_none"),
-            InlineKeyboardButton("+", callback_data="set_antiflood_window_add")
+            InlineKeyboardButton(colored_button("-", "blue"), callback_data="set_antiflood_window_sub"),
+            InlineKeyboardButton(colored_button(f"Window: {window}s", "blue"), callback_data="set_none"),
+            InlineKeyboardButton(colored_button("+", "blue"), callback_data="set_antiflood_window_add")
         ],
-        [InlineKeyboardButton(f"Penalty: {penalty}", callback_data="set_toggle_antiflood_penalty")],
-        [InlineKeyboardButton(f"Apply On: {apply_on}", callback_data="set_toggle_antiflood_apply_on")],
-        [InlineKeyboardButton("ℹ️ Protects against fast messaging", callback_data="set_none")],
-        [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
+        [InlineKeyboardButton(colored_button(f"Penalty: {penalty}", "blue"), callback_data="set_toggle_antiflood_penalty")],
+        [InlineKeyboardButton(colored_button(f"Apply On: {apply_on}", "blue"), callback_data="set_toggle_antiflood_apply_on")],
+        [InlineKeyboardButton(colored_button("ℹ️ Protects against fast messaging", "blue"), callback_data="set_none")],
+        [InlineKeyboardButton(colored_button("🔙 Back", "red"), callback_data="set_view_main")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -888,21 +888,21 @@ def get_nightmode_settings_keyboard(settings):
     apply_on = settings.get("nightmode_apply_on", "members").capitalize()
     
     keyboard = [
-        [InlineKeyboardButton(f"{status}", callback_data="set_toggle_nightmode_enabled")],
+        [InlineKeyboardButton(colored_button(f"{status}", "blue"), callback_data="set_toggle_nightmode_enabled")],
         [
-            InlineKeyboardButton(f"📸 Medias {media_status}", callback_data="set_toggle_nightmode_restrict_media"),
-            InlineKeyboardButton(f"🗑 Stickers {sticker_status}", callback_data="set_toggle_nightmode_restrict_stickers")
+            InlineKeyboardButton(colored_button(f"📸 Medias {media_status}", "blue"), callback_data="set_toggle_nightmode_restrict_media"),
+            InlineKeyboardButton(colored_button(f"🗑 Stickers {sticker_status}", "blue"), callback_data="set_toggle_nightmode_restrict_stickers")
         ],
         [
-            InlineKeyboardButton(f"🔗 Links {link_status}", callback_data="set_toggle_nightmode_restrict_links"),
-            InlineKeyboardButton(f"🤫 Silence {silence_status}", callback_data="set_toggle_nightmode_global_silence")
+            InlineKeyboardButton(colored_button(f"🔗 Links {link_status}", "blue"), callback_data="set_toggle_nightmode_restrict_links"),
+            InlineKeyboardButton(colored_button(f"🤫 Silence {silence_status}", "blue"), callback_data="set_toggle_nightmode_global_silence")
         ],
-        [InlineKeyboardButton(f"Apply On: {apply_on}", callback_data="set_toggle_nightmode_apply_on")],
-        [InlineKeyboardButton("🕒 Set time slot", callback_data="set_view_nightmode_start_grid")],
-        [InlineKeyboardButton(f"📣 Start&End advises {advise_status}", callback_data="set_toggle_nightmode_advise_enabled")],
+        [InlineKeyboardButton(colored_button(f"Apply On: {apply_on}", "blue"), callback_data="set_toggle_nightmode_apply_on")],
+        [InlineKeyboardButton(colored_button("🕒 Set time slot", "blue"), callback_data="set_view_nightmode_start_grid")],
+        [InlineKeyboardButton(colored_button(f"📣 Start&End advises {advise_status}", "blue"), callback_data="set_toggle_nightmode_advise_enabled")],
         [
-            InlineKeyboardButton("⬅️ Back", callback_data="set_view_main"),
-            InlineKeyboardButton("🌍 Time Zone", callback_data="set_config_nightmode_timezone_private")
+            InlineKeyboardButton(colored_button("⬅️ Back", "red"), callback_data="set_view_main"),
+            InlineKeyboardButton(colored_button("🌍 Time Zone", "blue"), callback_data="set_config_nightmode_timezone_private")
         ]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -919,7 +919,7 @@ def get_nightmode_hour_grid(user_id, is_start=True):
             row.append(InlineKeyboardButton(str(hour), callback_data=f"{callback_prefix}{hour}"))
         keyboard.append(row)
         
-    keyboard.append([InlineKeyboardButton("⬅️ Back", callback_data="set_view_nightmode")])
+    keyboard.append([InlineKeyboardButton(colored_button("⬅️ Back", "red"), callback_data="set_view_nightmode")])
     return InlineKeyboardMarkup(keyboard)
 
 def get_vc_settings_keyboard(settings):
@@ -931,13 +931,13 @@ def get_vc_settings_keyboard(settings):
     vc_panic_status = "✅" if settings.get("vc_panic_mode_enabled", False) else "❌"
     
     keyboard = [
-        [InlineKeyboardButton(f"User Join Notification: {vc_user_join_status}", callback_data="set_toggle_vc_user_join_enabled")],
-        [InlineKeyboardButton(f"User Leave Notification: {vc_user_leave_status}", callback_data="set_toggle_vc_user_leave_enabled")],
-        [InlineKeyboardButton(f"Invite Notification: {vc_invite_status}", callback_data="set_toggle_vc_invite_notification_enabled")],
-        [InlineKeyboardButton(f"VC Safety (Anti-Ghost): {vc_safety_status}", callback_data="set_toggle_vc_safety_enabled")],
-        [InlineKeyboardButton(f"VC Panic Mode: {vc_panic_status}", callback_data="set_toggle_vc_panic_mode_enabled")],
-        [InlineKeyboardButton("ℹ️ Voice chat related notifications", callback_data="set_none")],
-        [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
+        [InlineKeyboardButton(colored_button(f"User Join Notification: {vc_user_join_status}", "blue"), callback_data="set_toggle_vc_user_join_enabled")],
+        [InlineKeyboardButton(colored_button(f"User Leave Notification: {vc_user_leave_status}", "blue"), callback_data="set_toggle_vc_user_leave_enabled")],
+        [InlineKeyboardButton(colored_button(f"Invite Notification: {vc_invite_status}", "blue"), callback_data="set_toggle_vc_invite_notification_enabled")],
+        [InlineKeyboardButton(colored_button(f"VC Safety (Anti-Ghost): {vc_safety_status}", "blue"), callback_data="set_toggle_vc_safety_enabled")],
+        [InlineKeyboardButton(colored_button(f"VC Panic Mode: {vc_panic_status}", "blue"), callback_data="set_toggle_vc_panic_mode_enabled")],
+        [InlineKeyboardButton(colored_button("ℹ️ Voice chat related notifications", "blue"), callback_data="set_none")],
+        [InlineKeyboardButton(colored_button("🔙 Back", "red"), callback_data="set_view_main")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -946,10 +946,10 @@ def get_tagger_settings_keyboard(settings):
     tagger_status = "✅" if settings.get("tagger_enabled", True) else "❌"
     
     keyboard = [
-        [InlineKeyboardButton(f"Tagger Feature: {tagger_status}", callback_data="set_toggle_tagger_enabled")],
-        [InlineKeyboardButton("ℹ️ Tag everyone with /tag", callback_data="set_none")],
-        [InlineKeyboardButton("ℹ️ Tag admins with /atag", callback_data="set_none")],
-        [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
+        [InlineKeyboardButton(colored_button(f"Tagger Feature: {tagger_status}", "blue"), callback_data="set_toggle_tagger_enabled")],
+        [InlineKeyboardButton(colored_button("ℹ️ Tag everyone with /tag", "blue"), callback_data="set_none")],
+        [InlineKeyboardButton(colored_button("ℹ️ Tag admins with /atag", "blue"), callback_data="set_none")],
+        [InlineKeyboardButton(colored_button("🔙 Back", "red"), callback_data="set_view_main")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -971,27 +971,27 @@ def get_manager_settings_keyboard(settings):
     info_status = "✅" if settings.get("manager_info_enabled", True) else "❌"
     
     keyboard = [
-        [InlineKeyboardButton("── Moderation Actions ──", callback_data="set_none")],
-        [InlineKeyboardButton(f"Ban: {ban_status}", callback_data="set_toggle_manager_ban_enabled")],
-        [InlineKeyboardButton(f"Unban: {unban_status}", callback_data="set_toggle_manager_unban_enabled")],
-        [InlineKeyboardButton(f"Mute: {mute_status}", callback_data="set_toggle_manager_mute_enabled")],
-        [InlineKeyboardButton(f"Unmute: {unmute_status}", callback_data="set_toggle_manager_unmute_enabled")],
-        [InlineKeyboardButton(f"Kick: {kick_status}", callback_data="set_toggle_manager_kick_enabled")],
-        [InlineKeyboardButton("── Admin Management ──", callback_data="set_none")],
-        [InlineKeyboardButton(f"Promote: {promote_status}", callback_data="set_toggle_manager_promote_enabled")],
-        [InlineKeyboardButton(f"Demote: {demote_status}", callback_data="set_toggle_manager_demote_enabled")],
-        [InlineKeyboardButton("── Message Control ──", callback_data="set_none")],
-        [InlineKeyboardButton(f"Purge: {purge_status}", callback_data="set_toggle_manager_purge_enabled")],
-        [InlineKeyboardButton(f"Pin/Unpin: {pin_status}", callback_data="set_toggle_manager_pin_enabled")],
-        [InlineKeyboardButton("── Mass Actions ──", callback_data="set_none")],
-        [InlineKeyboardButton(f"Mass Actions: {mass_status}", callback_data="set_toggle_manager_mass_actions_enabled")],
-        [InlineKeyboardButton("── Utilities ──", callback_data="set_none")],
-        [InlineKeyboardButton(f"Zombie Clean: {zombie_status}", callback_data="set_toggle_manager_zombie_enabled")],
-        [InlineKeyboardButton(f"Username History (SG): {sg_status}", callback_data="set_toggle_manager_sg_enabled")],
-        [InlineKeyboardButton(f"ID Command: {id_status}", callback_data="set_toggle_manager_id_enabled")],
-        [InlineKeyboardButton(f"Info Command: {info_status}", callback_data="set_toggle_manager_info_enabled")],
-        [InlineKeyboardButton("ℹ️ Toggle to enable/disable commands", callback_data="set_none")],
-        [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
+        [InlineKeyboardButton(colored_button("── Moderation Actions ──", "blue"), callback_data="set_none")],
+        [InlineKeyboardButton(colored_button(f"Ban: {ban_status}", "red"), callback_data="set_toggle_manager_ban_enabled")],
+        [InlineKeyboardButton(colored_button(f"Unban: {unban_status}", "red"), callback_data="set_toggle_manager_unban_enabled")],
+        [InlineKeyboardButton(colored_button(f"Mute: {mute_status}", "blue"), callback_data="set_toggle_manager_mute_enabled")],
+        [InlineKeyboardButton(colored_button(f"Unmute: {unmute_status}", "blue"), callback_data="set_toggle_manager_unmute_enabled")],
+        [InlineKeyboardButton(colored_button(f"Kick: {kick_status}", "red"), callback_data="set_toggle_manager_kick_enabled")],
+        [InlineKeyboardButton(colored_button("── Admin Management ──", "blue"), callback_data="set_none")],
+        [InlineKeyboardButton(colored_button(f"Promote: {promote_status}", "blue"), callback_data="set_toggle_manager_promote_enabled")],
+        [InlineKeyboardButton(colored_button(f"Demote: {demote_status}", "blue"), callback_data="set_toggle_manager_demote_enabled")],
+        [InlineKeyboardButton(colored_button("── Message Control ──", "blue"), callback_data="set_none")],
+        [InlineKeyboardButton(colored_button(f"Purge: {purge_status}", "blue"), callback_data="set_toggle_manager_purge_enabled")],
+        [InlineKeyboardButton(colored_button(f"Pin/Unpin: {pin_status}", "blue"), callback_data="set_toggle_manager_pin_enabled")],
+        [InlineKeyboardButton(colored_button("── Mass Actions ──", "blue"), callback_data="set_none")],
+        [InlineKeyboardButton(colored_button(f"Mass Actions: {mass_status}", "blue"), callback_data="set_toggle_manager_mass_actions_enabled")],
+        [InlineKeyboardButton(colored_button("── Utilities ──", "blue"), callback_data="set_none")],
+        [InlineKeyboardButton(colored_button(f"Zombie Clean: {zombie_status}", "blue"), callback_data="set_toggle_manager_zombie_enabled")],
+        [InlineKeyboardButton(colored_button(f"Username History (SG): {sg_status}", "blue"), callback_data="set_toggle_manager_sg_enabled")],
+        [InlineKeyboardButton(colored_button(f"ID Command: {id_status}", "blue"), callback_data="set_toggle_manager_id_enabled")],
+        [InlineKeyboardButton(colored_button(f"Info Command: {info_status}", "blue"), callback_data="set_toggle_manager_info_enabled")],
+        [InlineKeyboardButton(colored_button("ℹ️ Toggle to enable/disable commands", "blue"), callback_data="set_none")],
+        [InlineKeyboardButton(colored_button("🔙 Back", "red"), callback_data="set_view_main")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -1002,15 +1002,15 @@ def get_blocking_notification_settings_keyboard(settings):
     custom_text = "✅ Set" if settings.get("blocking_custom_text") else "❌ Not Set"
     
     keyboard = [
-        [InlineKeyboardButton(f"Delete Notifications: {delete_status}", callback_data="set_toggle_blocking_delete_notifications")],
+        [InlineKeyboardButton(colored_button(f"Delete Notifications: {delete_status}", "red"), callback_data="set_toggle_blocking_delete_notifications")],
         [
-            InlineKeyboardButton("-5s", callback_data="set_blocking_timer_sub_5"),
-            InlineKeyboardButton(f"🕒 Timer: {timer}s", callback_data="set_none"),
-            InlineKeyboardButton("+5s", callback_data="set_blocking_timer_add_5")
+            InlineKeyboardButton(colored_button("-5s", "blue"), callback_data="set_blocking_timer_sub_5"),
+            InlineKeyboardButton(colored_button(f"🕒 Timer: {timer}s", "blue"), callback_data="set_none"),
+            InlineKeyboardButton(colored_button("+5s", "blue"), callback_data="set_blocking_timer_add_5")
         ],
-        [InlineKeyboardButton(f"Custom Block Text: {custom_text}", callback_data="set_config_blocking_custom_text")],
-        [InlineKeyboardButton("🗑️ Clear Custom Text", callback_data="set_clear_blocking_custom_text")],
-        [InlineKeyboardButton("🔙 Back", callback_data="set_view_blocking")]
+        [InlineKeyboardButton(colored_button(f"Custom Block Text: {custom_text}", "blue"), callback_data="set_config_blocking_custom_text")],
+        [InlineKeyboardButton(colored_button("🗑️ Clear Custom Text", "blue"), callback_data="set_clear_blocking_custom_text")],
+        [InlineKeyboardButton(colored_button("🔙 Back", "red"), callback_data="set_view_blocking")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -1024,18 +1024,18 @@ def get_time_picker_keyboard(settings, setting_key):
         
     keyboard = [
         [
-            InlineKeyboardButton("➕ Hour", callback_data=f"set_time_adj_{setting_key}_h+"),
-            InlineKeyboardButton("➕ Minute", callback_data=f"set_time_adj_{setting_key}_m+")
+            InlineKeyboardButton(colored_button("➕ Hour", "blue"), callback_data=f"set_time_adj_{setting_key}_h+"),
+            InlineKeyboardButton(colored_button("➕ Minute", "blue"), callback_data=f"set_time_adj_{setting_key}_m+")
         ],
         [
-            InlineKeyboardButton(f"⏰ {h:02d}:{m:02d}", callback_data="set_none")
+            InlineKeyboardButton(colored_button(f"⏰ {h:02d}:{m:02d}", "blue"), callback_data="set_none")
         ],
         [
-            InlineKeyboardButton("➖ Hour", callback_data=f"set_time_adj_{setting_key}_h-"),
-            InlineKeyboardButton("➖ Minute", callback_data=f"set_time_adj_{setting_key}_m-")
+            InlineKeyboardButton(colored_button("➖ Hour", "blue"), callback_data=f"set_time_adj_{setting_key}_h-"),
+            InlineKeyboardButton(colored_button("➖ Minute", "blue"), callback_data=f"set_time_adj_{setting_key}_m-")
         ],
-        [InlineKeyboardButton("✍️ Manual Input", callback_data=f"set_manual_time_{setting_key}")],
-        [InlineKeyboardButton("✅ Save & Back", callback_data="set_view_emergency")]
+        [InlineKeyboardButton(colored_button("✍️ Manual Input", "blue"), callback_data=f"set_manual_time_{setting_key}")],
+        [InlineKeyboardButton(colored_button("✅ Save & Back", "red"), callback_data="set_view_emergency")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -1072,11 +1072,11 @@ def get_emergency_settings_keyboard(settings):
         [InlineKeyboardButton(audio, callback_data="set_toggle_emergency_block_audio"),
          InlineKeyboardButton(forward, callback_data="set_toggle_emergency_block_forward")],
         [InlineKeyboardButton(poll, callback_data="set_toggle_emergency_block_poll"),
-         InlineKeyboardButton(f"Mode: {mode}", callback_data="set_toggle_emergency_mode")],
-        [InlineKeyboardButton(f"Apply on: {apply_on}", callback_data="set_toggle_emergency_apply_on")],
-        [InlineKeyboardButton(f"🕒 Start: {start}", callback_data="set_config_emergency_start_time"),
-         InlineKeyboardButton(f"🕒 End: {end}", callback_data="set_config_emergency_end_time")],
-        [InlineKeyboardButton("🔙 Back", callback_data="set_view_main")]
+         InlineKeyboardButton(colored_button(f"Mode: {mode}", "blue"), callback_data="set_toggle_emergency_mode")],
+        [InlineKeyboardButton(colored_button(f"Apply on: {apply_on}", "blue"), callback_data="set_toggle_emergency_apply_on")],
+        [InlineKeyboardButton(colored_button(f"🕒 Start: {start}", "blue"), callback_data="set_config_emergency_start_time"),
+         InlineKeyboardButton(colored_button(f"🕒 End: {end}", "blue"), callback_data="set_config_emergency_end_time")],
+        [InlineKeyboardButton(colored_button("🔙 Back", "red"), callback_data="set_view_main")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -1100,7 +1100,7 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # Send message with button to go to private
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("💬 Click Here to Open in Private", url=f"https://t.me/{bot_username}?start=settings_{group_chat_id}")]
+            [InlineKeyboardButton(colored_button("💬 Click Here to Open in Private", "blue"), url=f"https://t.me/{bot_username}?start=settings_{group_chat_id}")]
         ])
         
         await query.edit_message_text(
@@ -1445,8 +1445,8 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             # In group, prompt to go private
             keyboard = InlineKeyboardMarkup([
-                [InlineKeyboardButton("👤 Open in Private Chat", url=f"https://t.me/{bot_username}?start=tz_{chat_id}")],
-                [InlineKeyboardButton("⬅️ Back", callback_data="set_view_nightmode")]
+                [InlineKeyboardButton(colored_button("👤 Open in Private Chat", "blue"), url=f"https://t.me/{bot_username}?start=tz_{chat_id}")],
+                [InlineKeyboardButton(colored_button("⬅️ Back", "red"), callback_data="set_view_nightmode")]
             ])
             try:
                 await query.edit_message_text(
@@ -1548,7 +1548,7 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text += ", ".join([f"<code>{w}</code>" for w in words])
             
         try:
-            await edit_bot_response(query, context, text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="set_view_banned_words")]]), parse_mode='HTML')
+            await edit_bot_response(query, context, text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(colored_button("🔙 Back", "red"), callback_data="set_view_banned_words")]]), parse_mode='HTML')
         except BadRequest: pass
         await query.answer()
         return
@@ -2066,9 +2066,9 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         keyboard = []
         if has_perms:
-            keyboard.append([InlineKeyboardButton("🚀 Start Global Purge", callback_data="mgmt_confirm_delete_all")])
+            keyboard.append([InlineKeyboardButton(colored_button("🚀 Start Global Purge", "blue"), callback_data="mgmt_confirm_delete_all")])
         
-        keyboard.append([InlineKeyboardButton("🔙 Back", callback_data="set_view_deleting")])
+        keyboard.append([InlineKeyboardButton(colored_button("🔙 Back", "red"), callback_data="set_view_deleting")])
         
         try:
             await edit_bot_response(
@@ -2103,9 +2103,9 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         keyboard = []
         if has_perms:
-            keyboard.append([InlineKeyboardButton("🚀 Start Event Purge", callback_data="mgmt_confirm_purge_service")])
+            keyboard.append([InlineKeyboardButton(colored_button("🚀 Start Event Purge", "blue"), callback_data="mgmt_confirm_purge_service")])
         
-        keyboard.append([InlineKeyboardButton("🔙 Back", callback_data="set_view_deleting")])
+        keyboard.append([InlineKeyboardButton(colored_button("🔙 Back", "red"), callback_data="set_view_deleting")])
         
         try:
             await edit_bot_response(
@@ -2726,7 +2726,7 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await edit_bot_response(
             query, context, 
             f"📥 **Configuring {section.title()} {config_type.replace('_', ' ').title()}**\n\n{prompt_map.get(config_type, 'Please send the value.')}", 
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Cancel", callback_data=f"set_view_{section}")]]),
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(colored_button("Cancel", "blue"), callback_data=f"set_view_{section}")]]),
             parse_mode="HTML"
         )
         await query.answer()
@@ -2897,7 +2897,7 @@ async def handle_setting_input(update: Update, context: ContextTypes.DEFAULT_TYP
         del context.user_data["waiting_for_config"]
         view_map = {"rules": "regulations_custom", "emergency": "emergency"}
         target_view = view_map.get(section, section)
-        await update.message.reply_text(f"✅ {section.replace('_', ' ').title()} updated successfully!", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(f"Back to Settings", callback_data=f"set_view_{target_view}")]]))
+        await update.message.reply_text(f"✅ {section.replace('_', ' ').title()} updated successfully!", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(colored_button(f"Back to Settings", "red"), callback_data=f"set_view_{target_view}")]]))
     else:
         await update.message.reply_text("❌ Failed to update setting. Please try again.")
 

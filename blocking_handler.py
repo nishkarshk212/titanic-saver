@@ -9,7 +9,7 @@ import asyncio
 import re
 import httpx
 
-from config import OWNER_ID, send_bot_response
+from config import OWNER_ID, send_bot_response, colored_button
 from settings_manager_mongo import get_chat_settings, update_chat_setting
 from user_manager_mongo import is_user_admin, cache_user, can_user_configure_settings, get_user_id
 from moderation import can_user_ban, can_user_mute
@@ -719,7 +719,7 @@ async def free_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Create keyboard with permission button
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🛡 Permissions", callback_data=f"free_perms_{chat_id}_{target_user_id}")]
+        [InlineKeyboardButton(colored_button("🛡 Permissions", "blue"), callback_data=f"free_perms_{chat_id}_{target_user_id}")]
     ])
     
     await send_bot_response(update, context, message_text, reply_markup=keyboard, parse_mode="HTML")
@@ -792,7 +792,7 @@ async def list_freed_members(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     if not user_permissions:
         text = "📋 <b>ꜰʀᴇᴇᴅ ᴍᴇᴍʙᴇʀꜱ ʟɪꜱᴛ</b>\n\nɴᴏ ᴍᴇᴍʙᴇʀꜱ ᴀʀᴇ ᴄᴜʀʀᴇɴᴛʟʏ ᴇxᴇᴍᴘᴛᴇᴅ ꜰʀᴏᴍ ʙʟᴏᴄᴋɪɴɢ ʀᴜʟᴇꜱ."
-        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="set_view_blocking")]])
+        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton(colored_button("🔙 Back", "red"), callback_data="set_view_blocking")]])
         await query.edit_message_text(text, reply_markup=keyboard, parse_mode='HTML')
         return
 
@@ -829,12 +829,12 @@ async def list_freed_members(update: Update, context: ContextTypes.DEFAULT_TYPE)
             active_exemptions = [blocking_labels[k] for k, v in perms.items() if v and k in blocking_labels]
             exempt_str = " ".join(active_exemptions) if active_exemptions else "None"
             
-            keyboard_buttons.append([InlineKeyboardButton(f"👤 {user_name} ({len(active_exemptions)})", callback_data=f"free_perms_{chat_id}_{uid}")])
+            keyboard_buttons.append([InlineKeyboardButton(colored_button(f"👤 {user_name} ({len(active_exemptions)})", "blue"), callback_data=f"free_perms_{chat_id}_{uid}")])
             text += f"• <b>{user_name}</b> (<code>{uid}</code>)\n  └ ᴇxᴇᴍᴘᴛ: {exempt_str}\n\n"
         except:
             continue
 
-    keyboard_buttons.append([InlineKeyboardButton("🔙 Back", callback_data="set_view_blocking")])
+    keyboard_buttons.append([InlineKeyboardButton(colored_button("🔙 Back", "red"), callback_data="set_view_blocking")])
     keyboard = InlineKeyboardMarkup(keyboard_buttons)
     
     await query.edit_message_text(text, reply_markup=keyboard, parse_mode='HTML')
@@ -963,18 +963,18 @@ def get_user_permission_keyboard(chat_id, user_id, settings):
         # True = FREED/ALLOWED ✅, False = BLOCKED ❌
         value1 = user_perms.get(key1, False)
         status1 = "✅" if value1 else "❌"
-        row.append(InlineKeyboardButton(f"{label1} {status1}", callback_data=f"free_toggle_{chat_id}_{user_id}_{key1}"))
+        row.append(InlineKeyboardButton(colored_button(f"{label1} {status1}", "blue"), callback_data=f"free_toggle_{chat_id}_{user_id}_{key1}"))
         
         if i + 1 < len(blocking_options):
             key2, label2 = blocking_options[i + 1]
             value2 = user_perms.get(key2, False)
             status2 = "✅" if value2 else "❌"
-            row.append(InlineKeyboardButton(f"{label2} {status2}", callback_data=f"free_toggle_{chat_id}_{user_id}_{key2}"))
+            row.append(InlineKeyboardButton(colored_button(f"{label2} {status2}", "blue"), callback_data=f"free_toggle_{chat_id}_{user_id}_{key2}"))
         
         keyboard.append(row)
     
     # Add save button
-    keyboard.append([InlineKeyboardButton("💾 Save", callback_data=f"free_save_{chat_id}_{user_id}")])
+    keyboard.append([InlineKeyboardButton(colored_button("💾 Save", "green"), callback_data=f"free_save_{chat_id}_{user_id}")])
     
     return InlineKeyboardMarkup(keyboard)
 

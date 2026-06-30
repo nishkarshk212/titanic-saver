@@ -156,3 +156,29 @@ def colored_button(text, color="default"):
     }
     emoji = color_map.get(color, "⚪")
     return f"{emoji} {text}"
+
+# --- Monkey-patch telegram.InlineKeyboardButton to support native background styling ---
+try:
+    import telegram
+    _original_inline_init = telegram.InlineKeyboardButton.__init__
+
+    def _patched_inline_init(self, text, *args, **kwargs):
+        style = None
+        # Use emojis added by colored_button to determine the native Telegram style
+        if text.startswith("🟢 "):
+            style = "success"
+        elif text.startswith("🔴 "):
+            style = "danger"
+        elif text.startswith("🔵 "):
+            style = "primary"
+            
+        if style:
+            api_kwargs = kwargs.get('api_kwargs', {})
+            api_kwargs['style'] = style
+            kwargs['api_kwargs'] = api_kwargs
+            
+        _original_inline_init(self, text, *args, **kwargs)
+
+    telegram.InlineKeyboardButton.__init__ = _patched_inline_init
+except ImportError:
+    pass
