@@ -1,0 +1,16 @@
+[Unit]
+Description=Colored Buttons Bot Service
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/colored-buttons-bot
+ExecStart=/usr/bin/python3 colored_buttons_bot.py
+Restart=always
+RestartSec=10
+StandardOutput=append:/root/colored-buttons-bot/bot.log
+StandardError=append:/root/colored-buttons-bot/bot.log
+
+[Install]
+WantedBy=multi-user.target
