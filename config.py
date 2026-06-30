@@ -127,3 +127,22 @@ async def delete_message_job(context):
         await context.bot.delete_message(chat_id=data["chat_id"], message_id=data["message_id"])
     except Exception:
         pass
+
+def colored_button(text, color="default"):
+    """Add emoji color indicator to button text for visual distinction.
+    
+    Args:
+        text: Button text
+        color: 'green', 'red', 'blue', or 'default'
+    
+    Returns:
+        Text with color emoji prefix
+    """
+    color_map = {
+        "green": "🟢",
+        "red": "🔴", 
+        "blue": "🔵",
+        "default": "⚪"
+    }
+    emoji = color_map.get(color, "⚪")
+    return f"{emoji} {text}"

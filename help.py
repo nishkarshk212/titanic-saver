@@ -1,7 +1,7 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler
 from telegram.constants import ParseMode
-from config import send_bot_response, edit_bot_response
+from config import send_bot_response, edit_bot_response, colored_button
 from settings_manager_mongo import get_chat_settings
 from user_manager_mongo import is_user_admin
 
@@ -28,28 +28,28 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def get_help_keyboard():
     keyboard = [
         [
-            InlineKeyboardButton("🛡️ Moderation", callback_data="help_mod"),
-            InlineKeyboardButton("⚙️ Settings", callback_data="help_settings")
+            InlineKeyboardButton(colored_button("🛡️ Moderation", "red"), callback_data="help_mod"),
+            InlineKeyboardButton(colored_button("⚙️ Settings", "blue"), callback_data="help_settings")
         ],
         [
-            InlineKeyboardButton("👋 Welcome", callback_data="help_welcome"),
-            InlineKeyboardButton("🧹 Clean Service", callback_data="help_clean")
+            InlineKeyboardButton(colored_button("👋 Welcome", "green"), callback_data="help_welcome"),
+            InlineKeyboardButton(colored_button("🧹 Clean Service", "default"), callback_data="help_clean")
         ],
         [
-            InlineKeyboardButton("💣 Auto Delete", callback_data="help_auto"),
-            InlineKeyboardButton("🔍 Filters", callback_data="help_filters")
+            InlineKeyboardButton(colored_button("💣 Auto Delete", "red"), callback_data="help_auto"),
+            InlineKeyboardButton(colored_button("🔍 Filters", "blue"), callback_data="help_filters")
         ],
         [
-            InlineKeyboardButton("🚫 Block Content", callback_data="help_block"),
-            InlineKeyboardButton("📌 Pinned", callback_data="help_pinned")
+            InlineKeyboardButton(colored_button("🚫 Block Content", "red"), callback_data="help_block"),
+            InlineKeyboardButton(colored_button("📌 Pinned", "default"), callback_data="help_pinned")
         ],
         [
-            InlineKeyboardButton("🤖 Bot Protect", callback_data="help_bot_prot"),
-            InlineKeyboardButton("🧠 AI Chat", callback_data="help_ai")
+            InlineKeyboardButton(colored_button("🤖 Bot Protect", "blue"), callback_data="help_bot_prot"),
+            InlineKeyboardButton(colored_button("🧠 AI Chat", "green"), callback_data="help_ai")
         ],
         [
-            InlineKeyboardButton("🌐 Translator", callback_data="help_tr"),
-            InlineKeyboardButton("❌ Close", callback_data="help_close")
+            InlineKeyboardButton(colored_button("🌐 Translator", "default"), callback_data="help_tr"),
+            InlineKeyboardButton(colored_button("❌ Close", "red"), callback_data="help_close")
         ]
     ]
     return InlineKeyboardMarkup(keyboard)

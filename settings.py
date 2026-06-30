@@ -3,7 +3,7 @@ from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler, Mes
 from telegram.error import BadRequest
 from settings_manager_mongo import get_chat_settings, update_chat_setting
 from database import get_collection, COLLECTIONS
-from config import OWNER_ID, send_bot_response, edit_bot_response
+from config import OWNER_ID, send_bot_response, edit_bot_response, colored_button
 from user_manager_mongo import can_user_configure_settings
 from anonymous_admin import is_anonymous_admin, check_anonymous_admin_change_info_permission
 from blocking_handler import DEFAULT_BLOCKING_SETTINGS
@@ -69,7 +69,7 @@ async def settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         keyboard = []
         for group in groups:
-            keyboard.append([InlineKeyboardButton(group['title'], callback_data=f"set_view_main_for_{group['id']}")])
+            keyboard.append([InlineKeyboardButton(colored_button(group['title'], "blue"), callback_data=f"set_view_main_for_{group['id']}")])
         
         message_text = (
             "Manage group Settings\n"
@@ -98,8 +98,8 @@ async def settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data['settings_chat_id'] = chat_id
     
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("📖 Open Here", callback_data=f"settings_open_here_{chat_id}")],
-        [InlineKeyboardButton("💬 Open in Private", url=f"https://t.me/{bot_username}?start=settings_{chat_id}")]
+        [InlineKeyboardButton(colored_button("📖 Open Here", "green"), callback_data=f"settings_open_here_{chat_id}")],
+        [InlineKeyboardButton(colored_button("💬 Open in Private", "blue"), url=f"https://t.me/{bot_username}?start=settings_{chat_id}")]
     ])
     
     settings_text = (
@@ -248,54 +248,54 @@ def get_main_settings_keyboard(chat_id):
     if layout_type == 2:
         # Compact layout (Small)
         keyboard = [
-            [InlineKeyboardButton("👋 Welcome", callback_data="set_view_welcome"),
-             InlineKeyboardButton("📏 Length", callback_data="set_view_msg_length")],
-            [InlineKeyboardButton("🛡️ Mod", callback_data="set_view_mod"),
-             InlineKeyboardButton("🤖 BotProt", callback_data="set_view_bot_protection")],
-            [InlineKeyboardButton("🔗 LinkProt", callback_data="set_view_link_spam"),
-             InlineKeyboardButton("🔄 Fwd", callback_data="set_view_forward_protection")],
-            [InlineKeyboardButton("🔑 Cmd", callback_data="set_view_command_access"),
-             InlineKeyboardButton("🎛️ Perms", callback_data="set_view_command_permissions")],
-            [InlineKeyboardButton("🕒 Recur", callback_data="set_view_recurring"),
-             InlineKeyboardButton("🌊 Flood", callback_data="set_view_antiflood")],
-            [InlineKeyboardButton("🚫 Words", callback_data="set_view_banned_words"),
-             InlineKeyboardButton("🏷️ Tag", callback_data="set_view_tagger")],
-            [InlineKeyboardButton("🔗 Link", callback_data="set_view_group_link"),
-             InlineKeyboardButton("👥 Mem", callback_data="set_view_members_mgmt")],
-            [InlineKeyboardButton("🎙 VC", callback_data="set_view_vc"),
-             InlineKeyboardButton("🗑️ Del", callback_data="set_view_deleting")],
-            [InlineKeyboardButton("👥 Mgr", callback_data="set_view_manager"),
-             InlineKeyboardButton("🚨 Emergency", callback_data="set_view_emergency")],
-            [InlineKeyboardButton("📋 Freed", callback_data="free_list_members")],
-            [InlineKeyboardButton("🎨 Layout: Small", callback_data="set_toggle_ui_layout")],
-            [InlineKeyboardButton("❌ Close", callback_data="set_close")]
+            [InlineKeyboardButton(colored_button("👋 Welcome", "green"), callback_data="set_view_welcome"),
+             InlineKeyboardButton(colored_button("📏 Length", "blue"), callback_data="set_view_msg_length")],
+            [InlineKeyboardButton(colored_button("🛡️ Mod", "red"), callback_data="set_view_mod"),
+             InlineKeyboardButton(colored_button("🤖 BotProt", "blue"), callback_data="set_view_bot_protection")],
+            [InlineKeyboardButton(colored_button("🔗 LinkProt", "red"), callback_data="set_view_link_spam"),
+             InlineKeyboardButton(colored_button("🔄 Fwd", "default"), callback_data="set_view_forward_protection")],
+            [InlineKeyboardButton(colored_button("🔑 Cmd", "green"), callback_data="set_view_command_access"),
+             InlineKeyboardButton(colored_button("🎛️ Perms", "red"), callback_data="set_view_command_permissions")],
+            [InlineKeyboardButton(colored_button("🕒 Recur", "blue"), callback_data="set_view_recurring"),
+             InlineKeyboardButton(colored_button("🌊 Flood", "red"), callback_data="set_view_antiflood")],
+            [InlineKeyboardButton(colored_button("🚫 Words", "red"), callback_data="set_view_banned_words"),
+             InlineKeyboardButton(colored_button("🏷️ Tag", "default"), callback_data="set_view_tagger")],
+            [InlineKeyboardButton(colored_button("🔗 Link", "blue"), callback_data="set_view_group_link"),
+             InlineKeyboardButton(colored_button("👥 Mem", "green"), callback_data="set_view_members_mgmt")],
+            [InlineKeyboardButton(colored_button("🎙 VC", "default"), callback_data="set_view_vc"),
+             InlineKeyboardButton(colored_button("🗑️ Del", "red"), callback_data="set_view_deleting")],
+            [InlineKeyboardButton(colored_button("👥 Mgr", "green"), callback_data="set_view_manager"),
+             InlineKeyboardButton(colored_button("🚨 Emergency", "red"), callback_data="set_view_emergency")],
+            [InlineKeyboardButton(colored_button("📋 Freed", "blue"), callback_data="free_list_members")],
+            [InlineKeyboardButton(colored_button("🎨 Layout: Small", "default"), callback_data="set_toggle_ui_layout")],
+            [InlineKeyboardButton(colored_button("❌ Close", "red"), callback_data="set_close")]
         ]
     else:
         # Standard layout (Large)
         keyboard = [
-            [InlineKeyboardButton("👋 Welcome", callback_data="set_view_welcome")],
-            [InlineKeyboardButton("📏 Message Length", callback_data="set_view_msg_length"),
-             InlineKeyboardButton("🛡️ Moderation", callback_data="set_view_mod")],
-            [InlineKeyboardButton("🤖 Bot Protection", callback_data="set_view_bot_protection"),
-             InlineKeyboardButton("🔗 Link Protection", callback_data="set_view_link_spam")],
-            [InlineKeyboardButton("🔄 Forward Protect", callback_data="set_view_forward_protection"),
-             InlineKeyboardButton("🔑 Cmd Access", callback_data="set_view_command_access")],
-            [InlineKeyboardButton("🎛️ Command Perms", callback_data="set_view_command_permissions"),
-             InlineKeyboardButton("🌐 Language Filter", callback_data="set_view_language_filter")],
-            [InlineKeyboardButton("🕒 Recurring Msg", callback_data="set_view_recurring"),
-             InlineKeyboardButton("🌊 Anti-Flood", callback_data="set_view_antiflood")],
-            [InlineKeyboardButton("🚫 Banned Words", callback_data="set_view_banned_words"),
-             InlineKeyboardButton("🏷️ Tagger", callback_data="set_view_tagger")],
-            [InlineKeyboardButton("🔗 Group Link", callback_data="set_view_group_link"),
-             InlineKeyboardButton("📜 Regulations", callback_data="set_view_regulations")],
-            [InlineKeyboardButton("👥 Members Mgmt", callback_data="set_view_members_mgmt"),
-             InlineKeyboardButton("🎙 Voice Chat", callback_data="set_view_vc")],
-            [InlineKeyboardButton("🗑️ Deleting Messages", callback_data="set_view_deleting"),
-             InlineKeyboardButton("👥 Manager", callback_data="set_view_manager")],
-            [InlineKeyboardButton("🚨 Emergency", callback_data="set_view_emergency")],
-            [InlineKeyboardButton("📋 Freed Members", callback_data="free_list_members")],
-            [InlineKeyboardButton("🎨 Layout: Large", callback_data="set_toggle_ui_layout")],
-            [InlineKeyboardButton("❌ Close Menu", callback_data="set_close")]
+            [InlineKeyboardButton(colored_button("👋 Welcome", "green"), callback_data="set_view_welcome")],
+            [InlineKeyboardButton(colored_button("📏 Message Length", "blue"), callback_data="set_view_msg_length"),
+             InlineKeyboardButton(colored_button("🛡️ Moderation", "red"), callback_data="set_view_mod")],
+            [InlineKeyboardButton(colored_button("🤖 Bot Protection", "blue"), callback_data="set_view_bot_protection"),
+             InlineKeyboardButton(colored_button("🔗 Link Protection", "red"), callback_data="set_view_link_spam")],
+            [InlineKeyboardButton(colored_button("🔄 Forward Protect", "default"), callback_data="set_view_forward_protection"),
+             InlineKeyboardButton(colored_button("🔑 Cmd Access", "green"), callback_data="set_view_command_access")],
+            [InlineKeyboardButton(colored_button("🎛️ Command Perms", "red"), callback_data="set_view_command_permissions"),
+             InlineKeyboardButton(colored_button("🌐 Language Filter", "blue"), callback_data="set_view_language_filter")],
+            [InlineKeyboardButton(colored_button("🕒 Recurring Msg", "default"), callback_data="set_view_recurring"),
+             InlineKeyboardButton(colored_button("🌊 Anti-Flood", "red"), callback_data="set_view_antiflood")],
+            [InlineKeyboardButton(colored_button("🚫 Banned Words", "red"), callback_data="set_view_banned_words"),
+             InlineKeyboardButton(colored_button("🏷️ Tagger", "default"), callback_data="set_view_tagger")],
+            [InlineKeyboardButton(colored_button("🔗 Group Link", "blue"), callback_data="set_view_group_link"),
+             InlineKeyboardButton(colored_button("📜 Regulations", "default"), callback_data="set_view_regulations")],
+            [InlineKeyboardButton(colored_button("👥 Members Mgmt", "green"), callback_data="set_view_members_mgmt"),
+             InlineKeyboardButton(colored_button("🎙 Voice Chat", "default"), callback_data="set_view_vc")],
+            [InlineKeyboardButton(colored_button("🗑️ Deleting Messages", "red"), callback_data="set_view_deleting"),
+             InlineKeyboardButton(colored_button("👥 Manager", "green"), callback_data="set_view_manager")],
+            [InlineKeyboardButton(colored_button("🚨 Emergency", "red"), callback_data="set_view_emergency")],
+            [InlineKeyboardButton(colored_button("📋 Freed Members", "blue"), callback_data="free_list_members")],
+            [InlineKeyboardButton(colored_button("🎨 Layout: Large", "default"), callback_data="set_toggle_ui_layout")],
+            [InlineKeyboardButton(colored_button("❌ Close Menu", "red"), callback_data="set_close")]
         ]
     return InlineKeyboardMarkup(keyboard)
 
