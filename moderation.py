@@ -422,7 +422,7 @@ async def muter_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             update, context,
             "🛡️ <b>мυтєя List:</b>\n" + "\n".join(muter_list),
             parse_mode=ParseMode.HTML,
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Close", callback_data="close_moderation")]])
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(colored_button("❌ Close", "default"), callback_data="close_moderation")]])
         )
         return
 
@@ -559,7 +559,7 @@ async def voicechatmgr_command(update: Update, context: ContextTypes.DEFAULT_TYP
             update, context,
             "🎙️ <b>Voice Chat Managers:</b>\n" + "\n".join(manager_list),
             parse_mode=ParseMode.HTML,
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("❌ Close", callback_data="close_moderation")]])
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(colored_button("❌ Close", "default"), callback_data="close_moderation")]])
         )
         return
 

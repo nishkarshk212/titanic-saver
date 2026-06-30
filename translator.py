@@ -6,6 +6,7 @@ Adds reply-to-translate functionality with TranslateAI API
 import http.client
 import json
 import logging
+from config import colored_button
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler
 from telegram.constants import ParseMode
@@ -248,26 +249,26 @@ async def translate_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Create keyboard with popular languages
     keyboard = [
         [
-            InlineKeyboardButton("🇬🇧 English", callback_data="translate_en"),
-            InlineKeyboardButton("🇮🇳 Hindi", callback_data="translate_hi"),
+            InlineKeyboardButton(colored_button("🇬🇧 English", "default"), callback_data="translate_en"),
+            InlineKeyboardButton(colored_button("🇮🇳 Hindi", "default"), callback_data="translate_hi"),
         ],
         [
-            InlineKeyboardButton("🇪🇸 Spanish", callback_data="translate_es"),
-            InlineKeyboardButton("🇫🇷 French", callback_data="translate_fr"),
+            InlineKeyboardButton(colored_button("🇪🇸 Spanish", "default"), callback_data="translate_es"),
+            InlineKeyboardButton(colored_button("🇫🇷 French", "default"), callback_data="translate_fr"),
         ],
         [
-            InlineKeyboardButton("🇩🇪 German", callback_data="translate_de"),
-            InlineKeyboardButton("🇮🇹 Italian", callback_data="translate_it"),
+            InlineKeyboardButton(colored_button("🇩🇪 German", "default"), callback_data="translate_de"),
+            InlineKeyboardButton(colored_button("🇮🇹 Italian", "default"), callback_data="translate_it"),
         ],
         [
-            InlineKeyboardButton("🇷🇺 Russian", callback_data="translate_ru"),
-            InlineKeyboardButton("🇨🇳 Chinese", callback_data="translate_zh"),
+            InlineKeyboardButton(colored_button("🇷🇺 Russian", "default"), callback_data="translate_ru"),
+            InlineKeyboardButton(colored_button("🇨🇳 Chinese", "default"), callback_data="translate_zh"),
         ],
         [
-            InlineKeyboardButton("🇯🇵 Japanese", callback_data="translate_ja"),
-            InlineKeyboardButton("🇸🇦 Arabic", callback_data="translate_ar"),
+            InlineKeyboardButton(colored_button("🇯🇵 Japanese", "default"), callback_data="translate_ja"),
+            InlineKeyboardButton(colored_button("🇸🇦 Arabic", "default"), callback_data="translate_ar"),
         ],
-        [InlineKeyboardButton("❌ Cancel", callback_data="translate_cancel")]
+        [InlineKeyboardButton(colored_button("❌ Cancel", "default"), callback_data="translate_cancel")]
     ]
     
     reply_markup = InlineKeyboardMarkup(keyboard)

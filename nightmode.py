@@ -5,6 +5,7 @@ Night Mode Module - Restrict group activities during specified hours
 import logging
 from datetime import datetime
 import pytz
+from config import colored_button
 from telegram import Update, ChatPermissions
 from telegram.ext import ContextTypes, MessageHandler, filters
 from settings_manager_mongo import get_chat_settings
@@ -175,7 +176,7 @@ async def handle_nightmode_config_input(update: Update, context: ContextTypes.DE
             )
             
             keyboard = InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔙 Back", callback_data="set_view_nightmode")]
+                [InlineKeyboardButton(colored_button("🔙 Back", "default"), callback_data="set_view_nightmode")]
             ])
             
             # Reset state
@@ -243,7 +244,7 @@ async def handle_nightmode_config_input(update: Update, context: ContextTypes.DE
             )
             
             keyboard = InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔙 Back", callback_data="set_view_nightmode")]
+                [InlineKeyboardButton(colored_button("🔙 Back", "default"), callback_data="set_view_nightmode")]
             ])
             
             await update.message.reply_text(success_text, parse_mode='HTML', reply_markup=keyboard)

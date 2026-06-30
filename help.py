@@ -173,7 +173,7 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Example: <code>/tr hi Hello</code> translates 'Hello' to Hindi."
         )
 
-    keyboard = [[InlineKeyboardButton("🔙 Back", callback_data="help_main")]]
+    keyboard = [[InlineKeyboardButton(colored_button("🔙 Back", "default"), callback_data="help_main")]]
     
     if data == "help_main":
         await edit_bot_response(

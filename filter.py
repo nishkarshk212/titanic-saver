@@ -1,5 +1,6 @@
 import logging
 import shlex
+from config import colored_button
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes, CommandHandler, MessageHandler, filters, CallbackQueryHandler
@@ -99,7 +100,7 @@ async def list_filters(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for trigger in chat_filters.keys():
         msg += f"• `{trigger}`\n"
     
-    keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Close", callback_data="close_filter")]])
+    keyboard = InlineKeyboardMarkup([[InlineKeyboardButton(colored_button("❌ Close", "default"), callback_data="close_filter")]])
     await update.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN, reply_markup=keyboard)
 
 async def close_filter(update: Update, context: ContextTypes.DEFAULT_TYPE):

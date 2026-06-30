@@ -9,6 +9,7 @@ from telethon.tl.types import UpdateGroupCallParticipants, PeerChat, PeerChannel
 from telethon.tl.functions.channels import GetFullChannelRequest
 from telethon.tl.functions.messages import GetFullChatRequest
 from telethon.sessions import StringSession
+from config import colored_button
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, ChatMemberBanned
 from telegram.constants import ParseMode
 import config
@@ -692,7 +693,7 @@ async def _process_single_participant(call_id, participant, chat_entity, is_join
             )
             
             keyboard = InlineKeyboardMarkup([
-                [InlineKeyboardButton("𝐉𝐨𝐢𝐧 𝐕𝐨𝐢𝐜𝐞 𝐂𝐡𝐚𝐭", url=join_link)],
+                [InlineKeyboardButton(colored_button("𝐉𝐨𝐢𝐧 𝐕𝐨𝐢𝐜𝐞 𝐂𝐡𝐚𝐭", "default"), url=join_link)],
                 [InlineKeyboardButton(to_small_caps("+ ᴀᴅᴅ ᴍᴇ ɪɴ ɢʀᴏᴜᴘ +"), url=f"https://t.me/{bot_info.username}?startgroup=true")]
             ])
             
@@ -793,7 +794,7 @@ async def vc_join_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # Edit the message to provide the direct join button since answer(url=) is unreliable
             await query.edit_message_reply_markup(
                 reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("✅ ᴄʟɪᴄᴋ ᴛᴏ ᴊᴏɪɴ", url=join_link)],
+                    [InlineKeyboardButton(colored_button("✅ ᴄʟɪᴄᴋ ᴛᴏ ᴊᴏɪɴ", "default"), url=join_link)],
                     [InlineKeyboardButton(to_small_caps("+ ᴀᴅᴅ ᴍᴇ ɪɴ ɢʀᴏᴜᴘ +"), url=f"https://t.me/{(await context.bot.get_me()).username}?startgroup=true")]
                 ])
             )

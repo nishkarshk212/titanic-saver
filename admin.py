@@ -1,4 +1,5 @@
 import logging
+from config import colored_button
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ChatPermissions, ChatAdministratorRights
 from telegram.ext import ContextTypes, CallbackQueryHandler, CommandHandler
 from telegram.error import BadRequest
@@ -326,20 +327,20 @@ def get_promotion_keyboard(user_id, current_perms, back_to_info=False):
         row = []
         key1 = keys[i]
         status1 = "✅" if current_perms.get(key1) else "❌"
-        row.append(InlineKeyboardButton(f"{grid_labels[key1]} {status1}", callback_data=f"toggle_{user_id}_{key1}"))
+        row.append(InlineKeyboardButton(colored_button(f"{grid_labels[key1]} {status1}", "default"), callback_data=f"toggle_{user_id}_{key1}"))
         
         if i + 1 < len(keys):
             key2 = keys[i+1]
             status2 = "✅" if current_perms.get(key2) else "❌"
-            row.append(InlineKeyboardButton(f"{grid_labels[key2]} {status2}", callback_data=f"toggle_{user_id}_{key2}"))
+            row.append(InlineKeyboardButton(colored_button(f"{grid_labels[key2]} {status2}", "default"), callback_data=f"toggle_{user_id}_{key2}"))
         keyboard.append(row)
     
-    keyboard.append([InlineKeyboardButton("Confirm Promotion", callback_data=f"confirm_{user_id}")])
+    keyboard.append([InlineKeyboardButton(colored_button("Confirm Promotion", "default"), callback_data=f"confirm_{user_id}")])
     
     if back_to_info:
-        keyboard.append([InlineKeyboardButton("🔙 Back to Roles", callback_data=f"info_roles_{user_id}")])
+        keyboard.append([InlineKeyboardButton(colored_button("🔙 Back to Roles", "default"), callback_data=f"info_roles_{user_id}")])
     else:
-        keyboard.append([InlineKeyboardButton("Cancel", callback_data=f"cancel_{user_id}")])
+        keyboard.append([InlineKeyboardButton(colored_button("Cancel", "default"), callback_data=f"cancel_{user_id}")])
     
     return InlineKeyboardMarkup(keyboard)
 

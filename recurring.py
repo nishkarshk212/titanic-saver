@@ -1,3 +1,4 @@
+from config import colored_button
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler, MessageHandler, filters
 from settings_manager_mongo import get_chat_settings, update_chat_setting
@@ -12,7 +13,7 @@ async def get_recurring_keyboard(settings):
     
     # "Add message" button
     if len(recurring_messages) < 5: # Limit to 5 slots
-        keyboard.append([InlineKeyboardButton("➕ Add message", callback_data="set_recurring_add")])
+        keyboard.append([InlineKeyboardButton(colored_button("➕ Add message", "default"), callback_data="set_recurring_add")])
     
     for msg in recurring_messages:
         msg_id = msg['id']
@@ -20,12 +21,12 @@ async def get_recurring_keyboard(settings):
         
         # Row with [Slot Button] [Active/Inactive Toggle] [Delete Button]
         keyboard.append([
-            InlineKeyboardButton(f"🗯 {msg_id}", callback_data=f"set_recurring_config_text_{msg_id}"),
-            InlineKeyboardButton(f"{active_status}", callback_data=f"set_recurring_toggle_active_{msg_id}"),
-            InlineKeyboardButton("🗑", callback_data=f"set_recurring_delete_{msg_id}")
+            InlineKeyboardButton(colored_button(f"🗯 {msg_id}", "default"), callback_data=f"set_recurring_config_text_{msg_id}"),
+            InlineKeyboardButton(colored_button(f"{active_status}", "default"), callback_data=f"set_recurring_toggle_active_{msg_id}"),
+            InlineKeyboardButton(colored_button("🗑", "default"), callback_data=f"set_recurring_delete_{msg_id}")
         ])
         
-    keyboard.append([InlineKeyboardButton("🔙 Back", callback_data="set_view_main")])
+    keyboard.append([InlineKeyboardButton(colored_button("🔙 Back", "default"), callback_data="set_view_main")])
     return InlineKeyboardMarkup(keyboard)
 
 async def recurring_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -159,10 +160,10 @@ async def recurring_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         type_label = "🕒 Time" if msg_type == 'time' else "💬 Messages"
         
         keyboard = [
-            [InlineKeyboardButton(f"Type: {type_label}", callback_data=f"set_recurring_toggle_type_{msg_id}")],
-            [InlineKeyboardButton("⚙️ Set Interval", callback_data=f"set_recurring_config_interval_{msg_id}")],
-            [InlineKeyboardButton("📝 Set Message Text/Media", callback_data=f"set_recurring_prompt_text_{msg_id}")],
-            [InlineKeyboardButton("🔙 Back to List", callback_data="set_view_recurring")]
+            [InlineKeyboardButton(colored_button(f"Type: {type_label}", "default"), callback_data=f"set_recurring_toggle_type_{msg_id}")],
+            [InlineKeyboardButton(colored_button("⚙️ Set Interval", "default"), callback_data=f"set_recurring_config_interval_{msg_id}")],
+            [InlineKeyboardButton(colored_button("📝 Set Message Text/Media", "default"), callback_data=f"set_recurring_prompt_text_{msg_id}")],
+            [InlineKeyboardButton(colored_button("🔙 Back to List", "default"), callback_data="set_view_recurring")]
         ]
         
         await edit_bot_response(
@@ -190,7 +191,7 @@ async def recurring_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await edit_bot_response(
             query, context,
             f"⚙️ <b>Configuring Interval for Message {msg_id}</b>\n\n{instruction}",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Cancel", callback_data=f"set_recurring_config_text_{msg_id}")]]),
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(colored_button("Cancel", "default"), callback_data=f"set_recurring_config_text_{msg_id}")]]),
             parse_mode='HTML'
         )
         await query.answer()
@@ -216,7 +217,7 @@ async def recurring_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await edit_bot_response(
             query, context,
             f"📝 <b>Configuring Text for Message {msg_id}</b>\n\nPlease send the message you want to be sent repeatedly. You can include media (photo/video).",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Cancel", callback_data="set_view_recurring")]]),
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(colored_button("Cancel", "default"), callback_data="set_view_recurring")]]),
             parse_mode='HTML'
         )
         await query.answer()

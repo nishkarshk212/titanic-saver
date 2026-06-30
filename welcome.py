@@ -139,20 +139,52 @@ async def set_welcome_button(update: Update, context: ContextTypes.DEFAULT_TYPE)
             await update.message.reply_text("Admin only command.")
             return
 
-    args = context.args
-    if len(args) < 2:
-        await update.message.reply_text("Usage: /setbutton <button_text> <button_url>")
+    text_parts = update.message.text.split(maxsplit=1)
+    if len(text_parts) < 2:
+        await update.message.reply_text("Usage: /setbutton #color Button text - http://link.com\nColors: #g, #r, #b, #default")
         return
 
-    button_text = args[0]
-    button_url = args[1]
+    input_str = text_parts[1].strip()
     
+    parts = input_str.split(" - ", 1)
+    if len(parts) != 2:
+        await update.message.reply_text("❌ Invalid format. Please use: #color Button text - http://link.com")
+        return
+        
+    button_left = parts[0].strip()
+    button_url = parts[1].strip()
+    
+    import re
+    color_tag = "default"
+    color_match = re.match(r'^(#g|#r|#p|#b|#o|#y|#pu|#cy|#pk|#go|#success|#green|#danger|#red|#primary|#blue|#default|#orange|#yellow|#purple|#cyan|#pink|#gold)\s+', button_left)
+    
+    if color_match:
+        tag = color_match.group(1)
+        button_text = button_left[len(tag):].strip()
+        
+        tag_map = {
+            "#g": "green", "#success": "green", "#green": "green",
+            "#r": "red", "#danger": "red", "#red": "red",
+            "#p": "blue", "#b": "blue", "#primary": "blue", "#blue": "blue",
+            "#o": "orange", "#orange": "orange",
+            "#y": "yellow", "#yellow": "yellow",
+            "#pu": "purple", "#purple": "purple",
+            "#cy": "cyan", "#cyan": "cyan",
+            "#pk": "pink", "#pink": "pink",
+            "#go": "gold", "#gold": "gold",
+            "#default": "default"
+        }
+        color_tag = tag_map.get(tag, "default")
+    else:
+        button_text = button_left
+
     if not button_url.startswith("http"):
         await update.message.reply_text("❌ URL must start with http:// or https://")
         return
         
+    settings = get_chat_settings(chat_id)
     welcome_buttons = settings.get("welcome_buttons", [])
-    welcome_buttons.append({"text": button_text, "url": button_url})
+    welcome_buttons.append({"text": button_text, "url": button_url, "color": color_tag})
     
     update_chat_setting(chat_id, "welcome_buttons", welcome_buttons)
     update_chat_setting(chat_id, "welcome_button_enabled", True)
@@ -181,7 +213,10 @@ async def send_welcome(chat, user, context: ContextTypes.DEFAULT_TYPE):
         # Add multiple buttons if they exist
         for btn in welcome_buttons:
             if btn.get("text") and btn.get("url"):
-                keyboard.append([InlineKeyboardButton(btn["text"], url=btn["url"])])
+                btn_color = btn.get("color", "default")
+                from config import colored_button
+                final_text = colored_button(btn["text"], btn_color)
+                keyboard.append([InlineKeyboardButton(final_text, url=btn["url"])])
         
         if keyboard:
             reply_markup = InlineKeyboardMarkup(keyboard)
