@@ -22,15 +22,18 @@ def parse_button(button_str):
     style = None
     text = button_str.strip()
     
-    color_match = re.match(r'^(#g|#r|#p|#success|#green|#danger|#red|#primary|#blue|#default)\s+', text)
+    color_match = re.match(
+        r'^(#g|#r|#p|#o|#y|#pu|#cy|#pk|#go|'
+        r'#success|#green|#danger|#red|#primary|#blue|#default|'
+        r'#orange|#yellow|#purple|#cyan|#pink|#gold)\s+', text)
     if color_match:
         color_tag = color_match.group(1)
         text = text[len(color_match.group(0)):].strip()
-        if color_tag in ["#g", "#success", "#green"]:
+        if color_tag in ["#g", "#success", "#green", "#cy", "#cyan", "#pk", "#pink"]:
             style = enums.ButtonStyle.SUCCESS
-        elif color_tag in ["#r", "#danger", "#red"]:
+        elif color_tag in ["#r", "#danger", "#red", "#pu", "#purple"]:
             style = enums.ButtonStyle.DANGER
-        elif color_tag in ["#p", "#primary", "#blue"]:
+        elif color_tag in ["#p", "#primary", "#blue", "#o", "#orange", "#y", "#yellow", "#go", "#gold"]:
             style = enums.ButtonStyle.PRIMARY
         elif color_tag in ["#default"]:
             style = enums.ButtonStyle.DEFAULT
@@ -92,10 +95,16 @@ async def start(client, message):
         "Send me button definitions in this format:\n"
         "`Button text - button link`\n\n"
         "For colored buttons:\n"
-        "Green/SUCCESS: `#g Green button - https://example.com` or `#success` or `#green`\n"
-        "Red/DANGER: `#r Red button - https://example.com` or `#danger` or `#red`\n"
-        "Blue/PRIMARY: `#p Primary button - https://example.com` or `#primary` or `#blue`\n"
-        "Default: `#default Default button - https://example.com`\n\n"
+        "🟢 Green/SUCCESS: `#g Green button - https://example.com` or `#success` or `#green`\n"
+        "🔴 Red/DANGER:   `#r Red button - https://example.com` or `#danger` or `#red`\n"
+        "🔵 Blue/PRIMARY: `#p Primary button - https://example.com` or `#primary` or `#blue`\n"
+        "🟠 Orange:       `#o Orange button - https://example.com` or `#orange`\n"
+        "🟡 Yellow:       `#y Yellow button - https://example.com` or `#yellow`\n"
+        "🟣 Purple:       `#pu Purple button - https://example.com` or `#purple`\n"
+        "🔷 Cyan:         `#cy Cyan button - https://example.com` or `#cyan`\n"
+        "🩷 Pink:         `#pk Pink button - https://example.com` or `#pink`\n"
+        "✨ Gold:         `#go Gold button - https://example.com` or `#gold`\n"
+        "⚪ Default:      `#default Default button - https://example.com`\n\n"
         "For multiple buttons on the same line, use `&&`:\n"
         "`Button1 - link1 && Button2 - link2`\n\n"
         "For multiple rows, use new lines."
