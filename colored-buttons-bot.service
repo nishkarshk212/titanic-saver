@@ -6,6 +6,7 @@ After=network.target
 Type=simple
 User=root
 WorkingDirectory=/root/colored-buttons-bot
+EnvironmentFile=/root/colored-buttons-bot/.env
 ExecStart=/usr/bin/python3 colored_buttons_bot.py
 Restart=always
 RestartSec=10
