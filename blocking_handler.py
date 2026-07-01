@@ -963,18 +963,20 @@ def get_user_permission_keyboard(chat_id, user_id, settings):
         # True = FREED/ALLOWED ✅, False = BLOCKED ❌
         value1 = user_perms.get(key1, False)
         status1 = "✅" if value1 else "❌"
-        row.append(InlineKeyboardButton(colored_button(f"{label1} {status1}", "blue"), callback_data=f"free_toggle_{chat_id}_{user_id}_{key1}"))
+        color1 = "green" if value1 else "red"
+        row.append(InlineKeyboardButton(colored_button(f"{label1} {status1}", color1), callback_data=f"free_toggle_{chat_id}_{user_id}_{key1}"))
         
         if i + 1 < len(blocking_options):
             key2, label2 = blocking_options[i + 1]
             value2 = user_perms.get(key2, False)
             status2 = "✅" if value2 else "❌"
-            row.append(InlineKeyboardButton(colored_button(f"{label2} {status2}", "blue"), callback_data=f"free_toggle_{chat_id}_{user_id}_{key2}"))
+            color2 = "green" if value2 else "red"
+            row.append(InlineKeyboardButton(colored_button(f"{label2} {status2}", color2), callback_data=f"free_toggle_{chat_id}_{user_id}_{key2}"))
         
         keyboard.append(row)
     
     # Add save button
-    keyboard.append([InlineKeyboardButton(colored_button("💾 Save", "green"), callback_data=f"free_save_{chat_id}_{user_id}")])
+    keyboard.append([InlineKeyboardButton(colored_button("💾 Save", "blue"), callback_data=f"free_save_{chat_id}_{user_id}")])
     
     return InlineKeyboardMarkup(keyboard)
 
