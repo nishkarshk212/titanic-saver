@@ -88,8 +88,8 @@ async def apply_bio_penalty(update: Update, context, user_id: int, bio: str):
     
     keyboard = [
         [
-            InlineKeyboardButton(colored_button("➕ Add Warn", "default"), callback_data=f"edit_warn_add_{user_id}"),
-            InlineKeyboardButton(colored_button("🔄 Reset Warns", "default"), callback_data=f"edit_warn_reset_{user_id}")
+            InlineKeyboardButton(colored_button("➕ Add Warn", "red"), callback_data=f"edit_warn_add_{user_id}"),
+            InlineKeyboardButton(colored_button("🔄 Reset Warns", "green"), callback_data=f"edit_warn_reset_{user_id}")
         ]
     ]
     
@@ -102,7 +102,7 @@ async def apply_bio_penalty(update: Update, context, user_id: int, bio: str):
         if penalty == "mute" or penalty == "warn":
             try:
                 await bot.restrict_chat_member(chat_id, user_id, permissions=ChatPermissions(can_send_messages=False))
-                keyboard.insert(0, [InlineKeyboardButton(colored_button("🔊 Unmute", "default"), callback_data=f"edit_unmute_{user_id}")])
+                keyboard.insert(0, [InlineKeyboardButton(colored_button("🔊 Unmute", "green"), callback_data=f"edit_unmute_{user_id}")])
                 msg_text = f"🚫 User {user_id_str} has been muted for reaching the warn limit (Link in bio)."
             except Exception as e:
                 logging.error(f"Failed to mute user in bio check: {e}")

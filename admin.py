@@ -327,12 +327,14 @@ def get_promotion_keyboard(user_id, current_perms, back_to_info=False):
         row = []
         key1 = keys[i]
         status1 = "✅" if current_perms.get(key1) else "❌"
-        row.append(InlineKeyboardButton(colored_button(f"{grid_labels[key1]} {status1}", "default"), callback_data=f"toggle_{user_id}_{key1}"))
+        color1 = "green" if current_perms.get(key1) else "red"
+        row.append(InlineKeyboardButton(colored_button(f"{grid_labels[key1]} {status1}", color1), callback_data=f"toggle_{user_id}_{key1}"))
         
         if i + 1 < len(keys):
             key2 = keys[i+1]
             status2 = "✅" if current_perms.get(key2) else "❌"
-            row.append(InlineKeyboardButton(colored_button(f"{grid_labels[key2]} {status2}", "default"), callback_data=f"toggle_{user_id}_{key2}"))
+            color2 = "green" if current_perms.get(key2) else "red"
+            row.append(InlineKeyboardButton(colored_button(f"{grid_labels[key2]} {status2}", color2), callback_data=f"toggle_{user_id}_{key2}"))
         keyboard.append(row)
     
     keyboard.append([InlineKeyboardButton(colored_button("Confirm Promotion", "default"), callback_data=f"confirm_{user_id}")])

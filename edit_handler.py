@@ -65,8 +65,8 @@ async def edited_message_handler(update: Update, context: ContextTypes.DEFAULT_T
     
     keyboard = [
         [
-            InlineKeyboardButton(colored_button("➕ Add Warn", "default"), callback_data=f"edit_warn_add_{user_id}"),
-            InlineKeyboardButton(colored_button("🔄 Reset Warns", "default"), callback_data=f"edit_warn_reset_{user_id}")
+            InlineKeyboardButton(colored_button("➕ Add Warn", "red"), callback_data=f"edit_warn_add_{user_id}"),
+            InlineKeyboardButton(colored_button("🔄 Reset Warns", "green"), callback_data=f"edit_warn_reset_{user_id}")
         ]
     ]
     
@@ -76,7 +76,7 @@ async def edited_message_handler(update: Update, context: ContextTypes.DEFAULT_T
         
         if penalty == "mute" or penalty == "warn": # 'warn' defaults to mute in original code
             await mute_user(update, context, user_id, reason="Reached warn limit for editing messages")
-            keyboard.insert(0, [InlineKeyboardButton(colored_button("🔊 Unmute", "default"), callback_data=f"edit_unmute_{user_id}")])
+            keyboard.insert(0, [InlineKeyboardButton(colored_button("🔊 Unmute", "green"), callback_data=f"edit_unmute_{user_id}")])
             msg_text = f"🚫 User {user_id_str} has been muted for reaching the warn limit (editing messages)."
         elif penalty == "kick":
             await kick_user(update, context, user_id, reason="Reached warn limit for editing messages")

@@ -393,8 +393,8 @@ async def info_callback_handler(update: Update, context: ContextTypes.DEFAULT_TY
         text_override = f"⚠️ <b>Warn Management</b> for user <code>{user_id}</code>\n\nCurrent Warns: <code>{warns}</code>"
         keyboard = [
             [
-                InlineKeyboardButton(colored_button("➕ Add Warn", "default"), callback_data=f"info_addwarn_{user_id}"),
-                InlineKeyboardButton(colored_button("🔄 Reset Warns", "default"), callback_data=f"info_resetwarn_{user_id}")
+                InlineKeyboardButton(colored_button("➕ Add Warn", "red"), callback_data=f"info_addwarn_{user_id}"),
+                InlineKeyboardButton(colored_button("🔄 Reset Warns", "green"), callback_data=f"info_resetwarn_{user_id}")
             ],
             [InlineKeyboardButton(colored_button("🔙 Back", "default"), callback_data=f"info_back_{user_id}"), InlineKeyboardButton(colored_button("❌ Close", "default"), callback_data="info_close")]
         ]
