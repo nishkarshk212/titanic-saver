@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # Server Details
-IP="140.245.56.100"
+IP="168.144.157.140"
 USER="root"
-export SSHPASS="Akshay343402355468"
+export SSHPASS="Sjdfddfh3fhfh4Hf"
 PORT="22"
 REPO_URL="https://github.com/nishkarshk212/titanic-saver.git"
 BOT_DIR="/root/bot"

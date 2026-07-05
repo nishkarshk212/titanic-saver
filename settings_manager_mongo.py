@@ -46,6 +46,7 @@ DEFAULT_CHAT_SETTINGS = {
     "command_deletion": False,
     "command_access": "all",
     "bot_protection_enabled": False,
+    "bot_protection_apply_on": "members", # members, admins, everyone
     "link_spam_protection_enabled": False,
     "link_spam_apply_on": "members", # members, admins, everyone
     "forward_protection_enabled": False,

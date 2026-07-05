@@ -735,9 +735,11 @@ def get_pinned_message_settings_keyboard(settings):
 
 def get_bot_protection_settings_keyboard(settings):
     status = "✅" if settings.get("bot_protection_enabled", False) else "❌"
+    apply_on = settings.get("bot_protection_apply_on", "members").capitalize()
     keyboard = [
         [InlineKeyboardButton(colored_button(f"Bot Protection: {status}", "blue"), callback_data="set_toggle_bot_protection_enabled")],
-        [InlineKeyboardButton(colored_button("ℹ️ Only affects members (not admins)", "blue"), callback_data="set_none")],
+        [InlineKeyboardButton(colored_button(f"Apply On: {apply_on}", "blue"), callback_data="set_toggle_bot_protection_apply_on")],
+        [InlineKeyboardButton(colored_button("ℹ️ Admins need Change Info + Ban Users to add bots", "blue"), callback_data="set_none")],
         [InlineKeyboardButton(colored_button("🔙 Back", "red"), callback_data="set_view_main")]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -2220,6 +2222,13 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             next_idx = (options.index(current) + 1) % len(options)
             new_val = options[next_idx]
             update_chat_setting(chat_id, "link_spam_apply_on", new_val)
+        elif key == "bot_protection_apply_on":
+            # Rotate: members -> admins -> everyone -> members
+            options = ["members", "admins", "everyone"]
+            current = settings.get("bot_protection_apply_on", "members")
+            next_idx = (options.index(current) + 1) % len(options)
+            new_val = options[next_idx]
+            update_chat_setting(chat_id, "bot_protection_apply_on", new_val)
         elif key == "forward_protection_apply_on":
             # Rotate: members -> admins -> everyone -> members
             options = ["members", "admins", "everyone"]

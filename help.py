@@ -151,8 +151,10 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         help_text = (
             "🤖 <b>Bot Protection</b>\n\n"
             "Prevents other bots from being added to the group.\n"
-            "• If enabled, any bot added to the group will be automatically kicked.\n"
-            "• Enable/Disable in /config > Bot Protection.\n\n"
+            "• If enabled, added bots can be removed automatically based on the selected Apply On mode.\n"
+            "• Apply On supports Members, Admins, and Everyone.\n"
+            "• Admins need both Change Group Info and Ban Users to add bots when the protection applies.\n"
+            "• Configure it in /config > Bot Protection.\n\n"
             "<i>Note: This bot itself is exempt.</i>"
         )
     elif data == "help_ai":
