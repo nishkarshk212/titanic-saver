@@ -338,6 +338,72 @@ async def handle_admin_mention(update: Update, context: ContextTypes.DEFAULT_TYP
     # Reuse the report command logic
     await report_command(update, context)
 
+async def groupdetail_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show group details - bot owner only."""
+    user_id = update.effective_user.id
+    
+    # Check if user is bot owner
+    if user_id != OWNER_ID:
+        await send_bot_response(update, context, "❌ This command is only available to the bot owner.")
+        return
+    
+    try:
+        # Get all chats from MongoDB database
+        from database import get_all_chats
+        chats = get_all_chats()
+        
+        if not chats:
+            await send_bot_response(update, context, "📊 <b>Group Details</b>\n\nNo groups found in database.")
+            return
+        
+        dialogs = []
+        for chat_data in chats:
+            chat_id = chat_data.get('chat_id')
+            if not chat_id:
+                continue
+            
+            # Skip private chats and channels
+            if str(chat_id).startswith('-100'):
+                try:
+                    chat = await context.bot.get_chat(chat_id)
+                    if chat.type in ['group', 'supergroup']:
+                        member_count = await context.bot.get_chat_member_count(chat_id)
+                        dialogs.append({
+                            'id': chat_id,
+                            'title': chat.title,
+                            'username': f"@{chat.username}" if chat.username else "Private",
+                            'member_count': member_count,
+                            'type': chat.type
+                        })
+                except Exception as e:
+                    logging.error(f"Error getting chat info for {chat_id}: {e}")
+        
+        if not dialogs:
+            await send_bot_response(update, context, "📊 <b>Group Details</b>\n\nNo groups found.")
+            return
+        
+        # Sort by member count
+        dialogs.sort(key=lambda x: x['member_count'] if isinstance(x['member_count'], int) else 0, reverse=True)
+        
+        # Build response message
+        response_text = f"📊 <b>Group Details</b>\n\n"
+        response_text += f"📈 Total Groups: <code>{len(dialogs)}</code>\n\n"
+        
+        for i, group in enumerate(dialogs, 1):
+            response_text += (
+                f"<b>{i}. {html.escape(group['title'])}</b>\n"
+                f"   🆔 ID: <code>{group['id']}</code>\n"
+                f"   👥 Members: <code>{group['member_count']}</code>\n"
+                f"   🔗 {group['username']}\n"
+                f"   📁 Type: {group['type']}\n\n"
+            )
+        
+        await send_bot_response(update, context, response_text, parse_mode=ParseMode.HTML)
+        
+    except Exception as e:
+        logging.error(f"Error in groupdetail command: {e}")
+        await send_bot_response(update, context, f"❌ Error fetching group details: {e}")
+
 async def info_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle management buttons from the /info command."""
     query = update.callback_query
@@ -1104,6 +1170,7 @@ def main():
     application.add_handler(CommandHandler("translate", translate_command))
     application.add_handler(CommandHandler("info", info_command))
     application.add_handler(CommandHandler("report", report_command))
+    application.add_handler(CommandHandler("groupdetail", groupdetail_command))
     application.add_handler(MessageHandler(
         filters.Regex(r'^@admin(s)?\b') & filters.ChatType.GROUPS,
         handle_admin_mention

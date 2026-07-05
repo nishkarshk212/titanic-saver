@@ -132,6 +132,21 @@ COLLECTIONS = {
     "hidden_messages": "hidden_messages"
 }
 
+def get_all_chats():
+    """Get all unique chat IDs from the settings collection."""
+    database = get_database()
+    if database is None:
+        logging.error("Cannot get chats - database not connected")
+        return []
+    
+    try:
+        settings_col = database[COLLECTIONS["settings"]]
+        chats = settings_col.find({}, {"chat_id": 1})
+        return list(chats)
+    except Exception as e:
+        logging.error(f"Error getting all chats: {e}")
+        return []
+
 def initialize_collections():
     """Initialize all collections with proper indexes."""
     database = get_database()
