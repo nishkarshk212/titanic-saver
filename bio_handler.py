@@ -12,7 +12,10 @@ from telegram.error import BadRequest
 from config import delete_message_job
 
 # URL Regex to detect links and usernames in bio
-URL_PATTERN = re.compile(r'(https?://\S+|www\.\S+|t\.me\S*|@\w+|[\w-]+\.(com|net|org|me|info|biz|io|co|xyz|top|link|tk|ga|ml|cf|gq))', re.IGNORECASE)
+URL_PATTERN = re.compile(
+    r'(https?://\S+|www\.\S+|t\.me\S*|telegram\.me\S*|@\w+|(?:[\w-]+\.)+(com|net|org|me|info|biz|io|co|xyz|top|link|tk|ga|ml|cf|gq|in|us|uk|dev|app|online|store|tech|site|club|ru|br|au|ca|de|fr|es|it|nl|se|no|dk|fi|pl|cz|hu|ro|sk|hr|si|bg|rs|ua|tr|ae|sa|il|eg|za|ng|ke|pk|bd|in|ph|id|my|sg|th|vn|cn|hk|tw|jp|kr))',
+    re.IGNORECASE
+)
 
 # Cache to avoid repeated API calls (user_id -> timestamp)
 # Bio doesn't change per chat, so we can cache per user globally
