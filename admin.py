@@ -736,7 +736,7 @@ async def logs_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         import subprocess
         # Get last 100 lines of systemd journal logs
         result = subprocess.run(
-            ["journalctl", "-u", "telegram-bot.service", "-n", "100", "--no-pager"],
+            ["journalctl", "-u", "titanic-bot.service", "-n", "100", "--no-pager"],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True
@@ -778,7 +778,7 @@ async def update_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await status_msg.edit_text(f"📥 Git Pull Output:\n<pre>{pull_output}</pre>\n\n🔄 Restarting bot service...", parse_mode="HTML")
         
         # Restart the systemd service.
-        subprocess.Popen(["systemctl", "restart", "telegram-bot.service"])
+        subprocess.Popen(["systemctl", "restart", "titanic-bot.service"])
     except Exception as e:
         await status_msg.edit_text(f"❌ Update failed: {str(e)}")
 
