@@ -266,7 +266,8 @@ def get_main_settings_keyboard(chat_id):
              InlineKeyboardButton(colored_button("🗑️ Del", "red"), callback_data="set_view_deleting")],
             [InlineKeyboardButton(colored_button("👥 Mgr", "green"), callback_data="set_view_manager"),
              InlineKeyboardButton(colored_button("🚨 Emergency", "red"), callback_data="set_view_emergency")],
-            [InlineKeyboardButton(colored_button("📋 Freed", "blue"), callback_data="free_list_members")],
+            [InlineKeyboardButton(colored_button("📋 Freed", "blue"), callback_data="free_list_members"),
+             InlineKeyboardButton(colored_button("🔞 NSFW", "red"), callback_data="set_view_nsfw")],
             [InlineKeyboardButton(colored_button("🎨 Layout: Small", "default"), callback_data="set_toggle_ui_layout")],
             [InlineKeyboardButton(colored_button("❌ Close", "red"), callback_data="set_close")]
         ]
@@ -292,7 +293,8 @@ def get_main_settings_keyboard(chat_id):
              InlineKeyboardButton(colored_button("🎙 Voice Chat", "default"), callback_data="set_view_vc")],
             [InlineKeyboardButton(colored_button("🗑️ Deleting Messages", "red"), callback_data="set_view_deleting"),
              InlineKeyboardButton(colored_button("👥 Manager", "green"), callback_data="set_view_manager")],
-            [InlineKeyboardButton(colored_button("🚨 Emergency", "red"), callback_data="set_view_emergency")],
+            [InlineKeyboardButton(colored_button("🚨 Emergency", "red"), callback_data="set_view_emergency"),
+             InlineKeyboardButton(colored_button("🔞 NSFW Filter", "red"), callback_data="set_view_nsfw")],
             [InlineKeyboardButton(colored_button("📋 Freed Members", "blue"), callback_data="free_list_members")],
             [InlineKeyboardButton(colored_button("🎨 Layout: Large", "default"), callback_data="set_toggle_ui_layout")],
             [InlineKeyboardButton(colored_button("❌ Close Menu", "red"), callback_data="set_close")]
@@ -304,6 +306,66 @@ def get_group_link_keyboard(settings):
     keyboard = [
         [InlineKeyboardButton(colored_button("✍️ Set", "blue"), callback_data="set_config_group_link")],
         [InlineKeyboardButton(colored_button("🔙 Back", "red"), callback_data="set_view_main")]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+def get_nsfw_settings_keyboard(settings):
+    """Get NSFW filter settings keyboard."""
+    enabled = "✅ Enabled" if settings.get("nsfw_filter_enabled", False) else "❌ Disabled"
+    action = settings.get("nsfw_action", "delete").lower()
+    threshold = settings.get("nsfw_threshold", 0.7)
+    
+    # Action labels
+    actions = ["delete", "warn", "mute", "ban", "kick"]
+    action_buttons = []
+    for a in actions:
+        label = f"🎯 {a.title()}" if action == a else a.title()
+        color = "green" if action == a else "default"
+        action_buttons.append(InlineKeyboardButton(colored_button(label, color), callback_data=f"set_nsfw_action_{a}"))
+        
+    # Strictness: Low (0.85), Medium (0.70), High (0.50)
+    strictness = "Medium"
+    if threshold <= 0.55:
+        strictness = "High"
+    elif threshold >= 0.80:
+        strictness = "Low"
+        
+    keyboard = [
+        [
+            InlineKeyboardButton(colored_button(f"Filter: {enabled}", "blue" if settings.get("nsfw_filter_enabled", False) else "red"), 
+                                 callback_data="set_toggle_nsfw_filter")
+        ],
+        [
+            InlineKeyboardButton(colored_button(f"Strictness: {strictness} ({threshold:.2f})", "blue"),
+                                 callback_data="set_view_nsfw_threshold_options")
+        ],
+        [
+            InlineKeyboardButton(colored_button("Penalty Action:", "default"))
+        ],
+        action_buttons[:3],
+        action_buttons[3:],
+        [
+            InlineKeyboardButton(colored_button("🔙 Back", "red"), callback_data="set_view_main")
+        ]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+def get_nsfw_threshold_keyboard(settings):
+    """Get threshold options keyboard."""
+    threshold = settings.get("nsfw_threshold", 0.7)
+    keyboard = [
+        [
+            InlineKeyboardButton(colored_button(f"{'✅ ' if threshold == 0.85 else ''}Low Strictness (0.85)", "green"), callback_data="set_nsfw_threshold_0.85"),
+        ],
+        [
+            InlineKeyboardButton(colored_button(f"{'✅ ' if threshold == 0.70 else ''}Medium Strictness (0.70)", "blue"), callback_data="set_nsfw_threshold_0.70"),
+        ],
+        [
+            InlineKeyboardButton(colored_button(f"{'✅ ' if threshold == 0.50 else ''}High Strictness (0.50)", "red"), callback_data="set_nsfw_threshold_0.50")
+        ],
+        [
+            InlineKeyboardButton(colored_button("🔙 Back", "red"), callback_data="set_view_nsfw")
+        ]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -1918,6 +1980,93 @@ async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         except BadRequest: pass
         await query.answer()
+        return
+
+    if data == "set_view_nsfw":
+        settings = get_chat_settings(chat_id)
+        try:
+            await edit_bot_response(
+                query, context,
+                "🔞 <b>NSFW Filter Settings</b>\n\n"
+                "Automatically detect and filter NSFW/adult content (images, webp and webm stickers) using AI vision models.\n\n"
+                "Note: Webm animated/video stickers are supported by extracting a frame and inspecting it.\n\n"
+                "Current settings:",
+                reply_markup=get_nsfw_settings_keyboard(settings),
+                parse_mode='HTML'
+            )
+        except BadRequest: pass
+        await query.answer()
+        return
+
+    if data == "set_view_nsfw_threshold_options":
+        settings = get_chat_settings(chat_id)
+        try:
+            await edit_bot_response(
+                query, context,
+                "🔞 <b>NSFW Strictness Threshold</b>\n\n"
+                "Configure how sensitive the NSFW filter is. A higher strictness (lower threshold number) will match and flag content more easily.\n\n"
+                "Select a strictness level:",
+                reply_markup=get_nsfw_threshold_keyboard(settings),
+                parse_mode='HTML'
+            )
+        except BadRequest: pass
+        await query.answer()
+        return
+
+    if data == "set_toggle_nsfw_filter":
+        settings = get_chat_settings(chat_id)
+        current = settings.get("nsfw_filter_enabled", False)
+        update_chat_setting(chat_id, "nsfw_filter_enabled", not current)
+        settings = get_chat_settings(chat_id)
+        try:
+            await edit_bot_response(
+                query, context,
+                "🔞 <b>NSFW Filter Settings</b>\n\n"
+                "Automatically detect and filter NSFW/adult content (images, webp and webm stickers) using AI vision models.\n\n"
+                "Note: Webm animated/video stickers are supported by extracting a frame and inspecting it.\n\n"
+                "Current settings:",
+                reply_markup=get_nsfw_settings_keyboard(settings),
+                parse_mode='HTML'
+            )
+        except BadRequest: pass
+        await query.answer(f"NSFW filter {'enabled' if not current else 'disabled'}")
+        return
+
+    if data.startswith("set_nsfw_action_"):
+        action = data.replace("set_nsfw_action_", "")
+        update_chat_setting(chat_id, "nsfw_action", action)
+        settings = get_chat_settings(chat_id)
+        try:
+            await edit_bot_response(
+                query, context,
+                "🔞 <b>NSFW Filter Settings</b>\n\n"
+                "Automatically detect and filter NSFW/adult content (images, webp and webm stickers) using AI vision models.\n\n"
+                "Note: Webm animated/video stickers are supported by extracting a frame and inspecting it.\n\n"
+                "Current settings:",
+                reply_markup=get_nsfw_settings_keyboard(settings),
+                parse_mode='HTML'
+            )
+        except BadRequest: pass
+        await query.answer(f"NSFW penalty action set to {action}")
+        return
+
+    if data.startswith("set_nsfw_threshold_"):
+        threshold_str = data.replace("set_nsfw_threshold_", "")
+        threshold = float(threshold_str)
+        update_chat_setting(chat_id, "nsfw_threshold", threshold)
+        settings = get_chat_settings(chat_id)
+        try:
+            await edit_bot_response(
+                query, context,
+                "🔞 <b>NSFW Filter Settings</b>\n\n"
+                "Automatically detect and filter NSFW/adult content (images, webp and webm stickers) using AI vision models.\n\n"
+                "Note: Webm animated/video stickers are supported by extracting a frame and inspecting it.\n\n"
+                "Current settings:",
+                reply_markup=get_nsfw_settings_keyboard(settings),
+                parse_mode='HTML'
+            )
+        except BadRequest: pass
+        await query.answer(f"NSFW strictness threshold set to {threshold}")
         return
 
     if data == "set_toggle_ui_layout":

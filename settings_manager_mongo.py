@@ -57,6 +57,10 @@ DEFAULT_CHAT_SETTINGS = {
     # Language filter settings
     "language_filter_enabled": False,
     "allowed_languages": ["en", "hi", "hinglish"],
+    # NSFW filter settings
+    "nsfw_filter_enabled": False,
+    "nsfw_action": "delete", # delete, warn, mute, ban, kick
+    "nsfw_threshold": 0.7,   # Relevance threshold for NSFW match
     # Emoji and special character blocking
     "emoji_block_enabled": False,
     "block_emoji_only": True,
