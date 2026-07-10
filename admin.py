@@ -725,6 +725,63 @@ async def staffstats_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     await send_bot_response(update, context, text, parse_mode=ParseMode.HTML)
 
+async def logs_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Command to get bot logs (OWNER only)."""
+    user_id = update.effective_user.id
+    if user_id != OWNER_ID:
+        await update.message.reply_text("❌ Only the bot owner can access system logs.")
+        return
+        
+    try:
+        import subprocess
+        # Get last 100 lines of systemd journal logs
+        result = subprocess.run(
+            ["journalctl", "-u", "telegram-bot.service", "-n", "100", "--no-pager"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        logs = result.stdout
+        if not logs.strip():
+            logs = "No logs found or failed to read journalctl."
+            
+        # If too long, send as a text file
+        if len(logs) > 3000:
+            import io
+            bio = io.BytesIO(logs.encode('utf-8'))
+            bio.name = "bot_logs.txt"
+            await update.message.reply_document(document=bio, filename="bot_logs.txt", caption="📋 Here are the latest bot logs:")
+        else:
+            await update.message.reply_text(f"<pre>{logs}</pre>", parse_mode="HTML")
+    except Exception as e:
+        await update.message.reply_text(f"❌ Failed to retrieve logs: {str(e)}")
+
+async def update_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Command to pull latest changes from git and restart the bot (OWNER only)."""
+    user_id = update.effective_user.id
+    if user_id != OWNER_ID:
+        await update.message.reply_text("❌ Only the bot owner can trigger updates.")
+        return
+        
+    status_msg = await update.message.reply_text("🔄 Initiating git pull and update process...")
+    try:
+        import subprocess
+        # Run git pull
+        git_res = subprocess.run(
+            ["git", "pull"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        pull_output = git_res.stdout or git_res.stderr
+        
+        await status_msg.edit_text(f"📥 Git Pull Output:\n<pre>{pull_output}</pre>\n\n🔄 Restarting bot service...", parse_mode="HTML")
+        
+        # Restart the systemd service.
+        subprocess.Popen(["systemctl", "restart", "telegram-bot.service"])
+    except Exception as e:
+        await status_msg.edit_text(f"❌ Update failed: {str(e)}")
+
 def get_admin_handlers():
     return [
         CommandHandler("promote", promote_user),
@@ -735,6 +792,8 @@ def get_admin_handlers():
         CommandHandler("staffstats", staffstats_command),
         CommandHandler("setadmintitle", set_admin_title_command),
         CommandHandler("deladmintitle", delete_admin_title_command),
+        CommandHandler("logs", logs_command),
+        CommandHandler("update", update_command),
         CallbackQueryHandler(toggle_permission, pattern="^toggle_"),
         CallbackQueryHandler(confirm_promotion, pattern="^confirm_"),
         CallbackQueryHandler(cancel_promotion, pattern="^cancel_")
