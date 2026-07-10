@@ -1146,6 +1146,7 @@ def get_emergency_settings_keyboard(settings):
 
 async def settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
+    logging.info(f"[SETTINGS_CALLBACK] Received callback: {query.data if query else 'None'} from user {update.effective_user.id if update.effective_user else 'unknown'}")
     interaction_chat_id = update.effective_chat.id
     user_id = update.effective_user.id
     
