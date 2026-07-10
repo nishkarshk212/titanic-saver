@@ -117,8 +117,8 @@ async def edit_bot_response(query, context, text, **kwargs):
     formatted_text = to_small_caps(text)
     try:
         await query.edit_message_text(formatted_text, **kwargs)
-    except Exception:
-        pass
+    except Exception as e:
+        logging.error(f"[edit_bot_response] Error: {e}", exc_info=True)
 
 async def delete_message_job(context):
     """Job function to delete a message."""

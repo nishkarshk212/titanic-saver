@@ -340,7 +340,7 @@ def get_nsfw_settings_keyboard(settings):
                                  callback_data="set_view_nsfw_threshold_options")
         ],
         [
-            InlineKeyboardButton(colored_button("Penalty Action:", "default"))
+            InlineKeyboardButton(colored_button("Penalty Action:", "default"), callback_data="set_none")
         ],
         action_buttons[:3],
         action_buttons[3:],
