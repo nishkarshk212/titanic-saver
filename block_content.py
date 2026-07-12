@@ -251,10 +251,19 @@ async def check_blocked_content_handler(update: Update, context: ContextTypes.DE
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
     
-    # Check if content is blocked (applies to EVERYONE including admins/owner)
+    # Check if content is blocked
     is_blocked, reason = is_content_blocked(chat_id, update.message)
     
     if is_blocked:
+        # Respect freed users: if this is a sticker and the user is exempt from
+        # sticker blocking, do not delete or penalize them.
+        if update.message.sticker:
+            settings = get_chat_settings(chat_id)
+            user_perms = settings.get("user_permissions", {}).get(str(user_id), {})
+            if user_perms.get("block_stickers", False):
+                logging.info(f"[BLOCK] Sticker blocked ({reason}) but user {user_id} is FREED, skipping")
+                return
+
         # 1. Always delete the message first
         try:
             await update.message.delete()

@@ -499,9 +499,13 @@ async def handle_blocking(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if msg.sticker and msg.sticker.set_name:
             logging.info(f"[BLOCKING] Checking sticker set: {msg.sticker.set_name} against {blocked.get('stickerpack', [])}")
             if msg.sticker.set_name in blocked.get("stickerpack", []):
-                logging.info(f"[BLOCKING] Sticker set {msg.sticker.set_name} IS BLOCKED")
-                should_delete = True
-                custom_block_matched = True
+                # Respect freed users: if the user is exempt from sticker blocking, do not delete
+                if await is_user_freed("block_stickers", "stickers"):
+                    logging.info(f"[BLOCKING] Sticker set {msg.sticker.set_name} is blocked but user {user_id} is FREED, skipping")
+                else:
+                    logging.info(f"[BLOCKING] Sticker set {msg.sticker.set_name} IS BLOCKED")
+                    should_delete = True
+                    custom_block_matched = True
 
     if should_delete:
         try:
