@@ -29,7 +29,44 @@ async def get_telethon_client():
     except ImportError:
         return None
 
-async def check_user_bio(user_id):
+async def _resolve_user_entity(client, user_id, chat_id=None):
+    """Resolve a Telethon input entity for user_id.
+
+    A bare user_id usually has no cached access_hash, so GetFullUserRequest
+    fails with 'Could not find the input entity'. The reliable path is to
+    resolve the user via the group they just messaged in (which carries the
+    access_hash), so we try that first when a chat_id is available.
+    """
+    # 1. Try resolving via the group's participant list (has access_hash)
+    if chat_id is not None:
+        try:
+            from telethon.tl.functions.channels import GetParticipantRequest
+            res = await client(GetParticipantRequest(channel=chat_id, participant=user_id))
+            users = getattr(res, 'users', None)
+            if users:
+                return users[0]
+        except Exception:
+            pass
+        # Fallback: search the participant list for this user
+        try:
+            entity = await client.get_entity(user_id)
+            return entity
+        except Exception:
+            try:
+                participants = await client.get_participants(chat_id, search='')
+                for p in participants:
+                    if getattr(p, 'id', None) == user_id:
+                        return p
+            except Exception:
+                pass
+    # 2. Last resort: let Telethon try its cache directly
+    try:
+        return await client.get_entity(user_id)
+    except Exception:
+        return user_id
+
+
+async def check_user_bio(user_id, chat_id=None):
     """Checks user bio for links using Telethon."""
     client = await get_telethon_client()
     if not client:
@@ -44,21 +81,11 @@ async def check_user_bio(user_id):
         from telethon.tl.functions.users import GetFullUserRequest
         # Use a timeout for Telethon calls to prevent "stuck" behavior
         async def fetch_bio():
-            # Ensure we have the entity from cache if possible
-            try:
-                # Telethon can usually handle user_id directly if it has seen the user
-                full_user = await client(GetFullUserRequest(user_id))
-                return full_user.full_user.about
-            except Exception as e:
-                # If it hasn't seen the user, try to get entity first
-                try:
-                    entity = await client.get_entity(user_id)
-                    full_user = await client(GetFullUserRequest(entity))
-                    return full_user.full_user.about
-                except:
-                    raise e
+            entity = await _resolve_user_entity(client, user_id, chat_id)
+            full_user = await client(GetFullUserRequest(entity))
+            return full_user.full_user.about
 
-        bio = await asyncio.wait_for(fetch_bio(), timeout=5.0)
+        bio = await asyncio.wait_for(fetch_bio(), timeout=8.0)
         # logging.info(f"Bio found for {user_id}: {bio}")
         
         if bio:
@@ -190,7 +217,7 @@ async def bio_link_message_handler(update: Update, context: ContextTypes.DEFAULT
         try:
             # Small delay to ensure Telethon has a chance to "see" the user
             await asyncio.sleep(0.5)
-            has_link, bio = await check_user_bio(user_id)
+            has_link, bio = await check_user_bio(user_id, chat_id)
             if has_link:
                 # If bio link detected, delete the triggering message immediately if it exists
                 if update.message:
