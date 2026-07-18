@@ -26,6 +26,7 @@ from sticker_manager import get_sticker_handlers
 from blocking_handler import get_blocking_handlers, get_blocking_command_handlers
 from edit_handler import get_edit_handlers
 from bio_handler import get_bio_handlers
+from broadcast import broadcast_command
 from antiflood import get_antiflood_handlers
 from nightmode import get_nightmode_handlers
 from font_normalizer import normalize_text
@@ -1226,6 +1227,7 @@ def main():
     from blocking_handler import handle_reaction_blocking
     application.add_handler(MessageReactionHandler(handle_reaction_blocking), group=0)
     application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("broadcast", broadcast_command))
     application.add_handler(CommandHandler("id", get_id_command))
     application.add_handler(CommandHandler("link", get_link_command))
     application.add_handler(CommandHandler("adminlist", adminlist_command))
