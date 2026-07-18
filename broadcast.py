@@ -77,29 +77,34 @@ async def broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     mode = (context.args[0].lower() if context.args else "users")
     if mode == "chats":
-        targets, label = _get_all_chat_ids(), "groups"
+        do_users, do_chats, label = False, True, "groups"
     elif mode == "all":
-        targets, label = _get_all_user_ids() + _get_all_chat_ids(), "users + groups"
+        do_users, do_chats, label = True, True, "users + groups"
     else:
-        targets, label = _get_all_user_ids(), "users"
+        do_users, do_chats, label = True, False, "users"
 
-    targets = list(dict.fromkeys(targets))  # dedupe, preserve order
-    if not targets:
+    users = list(dict.fromkeys(_get_all_user_ids())) if do_users else []
+    chats = list(dict.fromkeys(_get_all_chat_ids())) if do_chats else []
+    total = len(users) + len(chats)
+    if not total:
         await update.message.reply_text("⚠️ No targets found.")
         return
 
     status = await update.message.reply_text(
-        f"📢 Broadcasting to {len(targets)} {label}…", parse_mode="HTML"
+        f"📢 Broadcasting to {total} {label}…", parse_mode="HTML"
     )
-    sent, failed = await _deliver(context.bot, targets, msg)
+    u_sent, u_failed = await _deliver(context.bot, users, msg)
+    c_sent, c_failed = await _deliver(context.bot, chats, msg)
+
+    lines = ["✅ <b>Broadcast complete</b>\n"]
+    if do_users:
+        lines.append(f"👤 <b>Users:</b> {len(users)}  •  ✅ {u_sent}  ❌ {u_failed}")
+    if do_chats:
+        lines.append(f"👥 <b>Groups:</b> {len(chats)}  •  ✅ {c_sent}  ❌ {c_failed}")
+    lines.append(f"\n📊 <b>Total sent:</b> <code>{u_sent + c_sent}</code>  |  "
+                 f"<b>Failed:</b> <code>{u_failed + c_failed}</code>")
     try:
-        await status.edit_text(
-            f"✅ <b>Broadcast complete</b>\n\n"
-            f"• Target: {label}\n"
-            f"• Sent: <code>{sent}</code>\n"
-            f"• Failed: <code>{failed}</code>",
-            parse_mode="HTML",
-        )
+        await status.edit_text("\n".join(lines), parse_mode="HTML")
     except Exception:
         pass
 
