@@ -21,12 +21,16 @@ def _get_all_user_ids():
 
 
 def _get_all_chat_ids():
-    """Return every group chat id the bot knows about."""
+    """Return every group chat id the bot knows about (as int)."""
     ids = []
     for doc in get_all_chats():
         cid = doc.get("chat_id")
-        if cid:
-            ids.append(cid)
+        if cid is None or cid == "":
+            continue
+        try:
+            ids.append(int(cid))  # DB stores chat_id as str; Bot API needs int
+        except (TypeError, ValueError):
+            continue
     return ids
 
 
