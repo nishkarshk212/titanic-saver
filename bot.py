@@ -48,9 +48,38 @@ logging.getLogger("apscheduler").setLevel(logging.WARNING)
 logging.getLogger("telegram.ext.Application").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
+def _start_keyboard(add_to_group_url):
+    """Build the /start inline keyboard (shared by start + Back nav)."""
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton(colored_button("+ ᴀᴅᴅ ᴍᴇ ɪɴ ɢʀᴏᴜᴘ +", "green"), url=add_to_group_url)],
+        [
+            InlineKeyboardButton(colored_button("🎶 𝗠𝘂𝘀𝗶𝗰 𝗪𝗼𝗿𝗹𝗱", "blue"), callback_data="music_world"),
+            InlineKeyboardButton(colored_button("⚙️ 𝗦𝗲𝘁𝘁𝗶𝗻𝗴𝘀", "blue"), callback_data="help_open")
+        ],
+        [
+            InlineKeyboardButton(colored_button(to_small_caps("「 Support 」"), "blue"), url="https://t.me/jayden_clan"),
+            InlineKeyboardButton(colored_button(to_small_caps("「 Updates 」"), "red"), url="https://t.me/Tele_212_bots")
+        ],
+        [
+            InlineKeyboardButton(colored_button(to_small_caps("「 Owner 」"), "red"), url=f"tg://user?id={OWNER_ID}")
+        ]
+    ])
+
+def _start_caption(bot_mention, user_mention):
+    """Build the /start caption (shared by start + Back nav)."""
+    return (
+        f"── 「 {bot_mention} 」 ──\n\n"
+        f"<blockquote>"
+        f"<b>💜 𝐇єу 𝐓нєяє • 🎙 {user_mention} ! 🎶</b>"
+        f"</blockquote>\n"
+        f"<blockquote>"
+        f"<b>» ᴅɪᴛᴄʜ ᴛʜᴇ ᴛʜʀᴇᴀᴅs, ʟᴇᴛ's ᴠɪʙᴇ ᴛᴏ ᴛʜᴇ ʀʜʏᴛʜᴍ.\n"
+        f"◎ ᴊᴏɪɴ ᴍᴇ ᴏɴ ᴛᴇʟᴇɢʀᴀᴍ's ᴄᴜᴛɪᴇsᴛ ʙᴏᴛ. 🎶</b>"
+        f"</blockquote>"
+    )
+
 async def start(update, context):
     """Start command handler."""
-    # Check if this is a deep link for settings
     if context.args:
         arg = context.args[0]
         if arg.startswith('settings_'):
@@ -87,32 +116,12 @@ async def start(update, context):
     bot_username = bot_info.username
     bot_mention = f"@{bot_username}" if bot_username else bot_name
     add_to_group_url = f"https://t.me/{bot_username}?startgroup=true"
-    
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton(colored_button("+ ᴀᴅᴅ ᴍᴇ ɪɴ ɢʀᴏᴜᴘ +", "green"), url=add_to_group_url)],
-        [
-            InlineKeyboardButton(colored_button(to_small_caps("「 Support 」"), "blue"), url="https://t.me/jayden_clan"),
-            InlineKeyboardButton(colored_button(to_small_caps("「 Updates 」"), "red"), url="https://t.me/Tele_212_bots")
-        ],
-        [
-            InlineKeyboardButton(colored_button(to_small_caps("「 Owner 」"), "red"), url=f"tg://user?id={OWNER_ID}")
-        ]
-    ])
-    
+
+    keyboard = _start_keyboard(add_to_group_url)
     photo_url = random.choice(START_IMG)
-    
     user_mention = update.effective_user.mention_html()
-    start_message = (
-        f"── 「 {bot_mention} 」 ──\n\n"
-        f"<blockquote>"
-        f"<b>💜 𝐇єу 𝐓нєяє • 🎙 {user_mention} ! 🎶</b>"
-        f"</blockquote>\n"
-        f"<blockquote>"
-        f"<b>» ᴅɪᴛᴄʜ ᴛʜᴇ ᴛʜʀᴇᴀᴅs, ʟᴇᴛ's ᴠɪʙᴇ ᴛᴏ ᴛʜᴇ ʀʜʏᴛʜᴍ.\n"
-        f"◎ ᴊᴏɪɴ ᴍᴇ ᴏɴ ᴛᴇʟᴇɢʀᴀᴍ's ᴄᴜᴛɪᴇsᴛ ʙᴏᴛ. 🎶</b>"
-        f"</blockquote>"
-    )
-    
+    start_message = _start_caption(bot_mention, user_mention)
+
     await send_bot_media(
         update, context,
         photo=photo_url,
@@ -120,6 +129,63 @@ async def start(update, context):
         reply_markup=keyboard,
         parse_mode=ParseMode.HTML
     )
+
+# Music World bots (label -> username link)
+MUSIC_WORLD_BOTS = [
+    ("𝑳𝒊𝒍𝒚 🦢 ♪", "https://t.me/Lilyy_music_bot"),
+    ("𓂃❛ ⟶̽ 𝑺𝒉𝒓𝒂𝒅𝒉𝒂 ⌯ <𝟑⤹🤍", "https://t.me/shraddha_musicbot"),
+    ("❛ 𝙄𝙨𝙝𝙪 ✗ 𝙈𝙪𝙨𝙞𝙘 ❜", "https://t.me/Ishu_musics_bot"),
+    ("❛ ʀᴀᴅʜɪᴋᴀ ✗ ᴍᴜѕɪᴄ ❜🥂", "https://t.me/RadhikaX_bot"),
+    ("ɪɴꜰɪ x ᴍᴜꜱɪᴄ 🥂", "https://t.me/infixmusicx_bot"),
+    ("вιℓℓυ χ мυѕι¢ 🎶", "https://t.me/billuxmusicc_bot"),
+    ("❛ 𝑳𝒊𝒍𝒚 ✗ 𝑴𝒖𝒔𝒊𝒄 ❜", "https://t.me/lilly_music_pro_bot"),
+]
+
+async def music_world_callback(update, context):
+    """Handle Music World panel, Settings (help menu), and Back navigation."""
+    query = update.callback_query
+    data = query.data
+    await query.answer()
+
+    if data == "help_open":
+        from help import get_help_keyboard
+        text = ("📚 <b>Bot Help Menu</b>\n\n"
+                "Select a category below to see available commands and features.")
+        try:
+            await query.edit_message_caption(caption=text, reply_markup=get_help_keyboard(), parse_mode=ParseMode.HTML)
+        except Exception:
+            await query.edit_message_text(text, reply_markup=get_help_keyboard(), parse_mode=ParseMode.HTML)
+        return
+
+    if data == "music_back":
+        bot_info = await context.bot.get_me()
+        add_url = f"https://t.me/{bot_info.username}?startgroup=true"
+        bot_mention = f"@{bot_info.username}" if bot_info.username else bot_info.first_name
+        keyboard = _start_keyboard(add_url)
+        caption = _start_caption(bot_mention, update.effective_user.mention_html())
+        try:
+            await query.edit_message_caption(caption=caption, reply_markup=keyboard, parse_mode=ParseMode.HTML)
+        except Exception:
+            await query.edit_message_text(caption, reply_markup=keyboard, parse_mode=ParseMode.HTML)
+        return
+
+    # music_world
+    rows = [[InlineKeyboardButton(colored_button(label, "blue"), url=url)]
+            for label, url in MUSIC_WORLD_BOTS]
+    rows.append([InlineKeyboardButton(colored_button("« Back", "red"), callback_data="music_back")])
+    keyboard = InlineKeyboardMarkup(rows)
+
+    # Custom emoji 5470135030393090150 renders via <tg-emoji> in text (not on buttons)
+    caption = (
+        '<tg-emoji emoji-id="5470135030393090150">🎶</tg-emoji> '
+        "<b>𝗠𝘂𝘀𝗶𝗰 𝗪𝗼𝗿𝗹𝗱</b>\n\n"
+        "<blockquote>» ᴄʜᴏᴏsᴇ ʏᴏᴜʀ ꜰᴀᴠᴏᴜʀɪᴛᴇ ᴍᴜsɪᴄ ʙᴏᴛ ᴀɴᴅ ꜱᴛᴀʀᴛ ᴠɪʙɪɴɢ 🎧</blockquote>"
+    )
+    try:
+        await query.edit_message_caption(caption=caption, reply_markup=keyboard, parse_mode=ParseMode.HTML)
+    except Exception:
+        await query.edit_message_text(caption, reply_markup=keyboard, parse_mode=ParseMode.HTML)
+
 
 async def cache_user_handler_old(update, context):
     """Legacy MessageHandler to cache user data to MongoDB for resolution."""
@@ -1176,6 +1242,7 @@ def main():
         handle_admin_mention
     ))
     application.add_handler(CallbackQueryHandler(info_callback_handler, pattern="^info_"))
+    application.add_handler(CallbackQueryHandler(music_world_callback, pattern="^(music_world|music_back|help_open)$"))
     application.add_handler(MessageHandler(filters.ALL & (filters.ChatType.GROUPS | filters.ChatType.SUPERGROUP), cache_user_handler), group=-1)
 
     # Add support for commands in channels
