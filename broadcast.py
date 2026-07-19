@@ -1,20 +1,22 @@
 import asyncio
 import logging
+import re
 from telegram import Update
 from telegram.ext import ContextTypes, CommandHandler
 from telegram.error import Forbidden, BadRequest, RetryAfter
 
 from config import OWNER_ID
 from database import get_collection, get_all_chats, COLLECTIONS
+from sudo import is_sudo
 
 
 def _get_all_user_ids():
-    """Return every cached user id from MongoDB."""
+    """Return every cached user id from MongoDB (deduped)."""
     users_col = get_collection(COLLECTIONS["users"])
     if users_col is None:
         return []
     try:
-        return [d["id"] for d in users_col.find({}, {"id": 1}) if d.get("id")]
+        return list(dict.fromkeys(d["id"] for d in users_col.find({}, {"id": 1}) if d.get("id")))
     except Exception as e:
         logging.error(f"[BROADCAST] Failed to load users: {e}")
         return []
@@ -31,13 +33,44 @@ def _get_all_chat_ids():
             ids.append(int(cid))  # DB stores chat_id as str; Bot API needs int
         except (TypeError, ValueError):
             continue
-    return ids
+    return list(dict.fromkeys(ids))
 
 
-async def _deliver(bot, targets, source_msg):
-    """Copy source_msg to each target; returns (sent, failed). Handles flood waits."""
+async def _resolve_targets(bot, raw_ids, private_ok=True):
+    """Resolve raw ids to Chat objects via get_chat (carries access_hash).
+
+    copy_message needs the chat's access_hash, which is only available from a
+    fully resolved Chat object -- not from a bare cached id. Resolving each
+    target also lets us skip chats the bot was removed from / private chats.
+
+    Returns (targets, skipped).
+    """
+    targets, skipped = [], 0
+    for tid in raw_ids:
+        try:
+            chat = await bot.get_chat(tid)
+            if not private_ok and chat.type == "private":
+                skipped += 1
+                continue
+            targets.append(chat)
+        except (Forbidden, BadRequest):
+            skipped += 1  # bot removed from chat / invalid
+        except Exception as e:
+            logging.warning(f"[BROADCAST] resolve {tid}: {e}")
+            skipped += 1
+    return targets, skipped
+
+
+async def _deliver(bot, targets, source_msg, progress=None):
+    """Copy source_msg to each resolved target; returns (sent, failed).
+
+    Uses each target's .id (which includes the proper access_hash internally).
+    Handles Telegram flood waits.
+    """
     sent = failed = 0
-    for tid in targets:
+    total = len(targets)
+    for i, chat in enumerate(targets, 1):
+        tid = chat.id
         try:
             await bot.copy_message(tid, source_msg.chat_id, source_msg.message_id)
             sent += 1
@@ -53,18 +86,29 @@ async def _deliver(bot, targets, source_msg):
         except Exception as e:
             logging.error(f"[BROADCAST] {tid}: {e}")
             failed += 1
-        await asyncio.sleep(0.05)  # ~20 msgs/sec, well under Telegram limits
+        # ~20 msgs/sec, safely under Telegram limits
+        await asyncio.sleep(0.05)
+        if progress and (i % 25 == 0 or i == total):
+            try:
+                await progress(f"📢 Broadcasting… {i}/{total}  ✅{sent} ❌{failed}")
+            except Exception:
+                pass
     return sent, failed
 
 
 async def broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Owner-only. Reply to a message with /broadcast to send it to all users.
+    """Owner or sudo. Reply to a message with /broadcast to send it to users/groups.
 
-    Flags: /broadcast chats  -> send to groups instead of users
-           /broadcast all     -> send to both users and groups
+    Flags: /broadcast            -> send to all users
+           /broadcast chats      -> send to all groups
+           /broadcast all        -> send to users + groups
     """
     user_id = update.effective_user.id
-    if user_id != OWNER_ID:
+    if not is_sudo(user_id):
+        await update.message.reply_text(
+            "❌ This command is only available to the <b>bot owner or sudo users</b>.",
+            parse_mode="HTML",
+        )
         return
 
     msg = update.message.reply_to_message
@@ -87,24 +131,34 @@ async def broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         do_users, do_chats, label = True, False, "users"
 
-    users = list(dict.fromkeys(_get_all_user_ids())) if do_users else []
-    chats = list(dict.fromkeys(_get_all_chat_ids())) if do_chats else []
+    await update.message.reply_text(f"🔍 Resolving {label} targets…", parse_mode="HTML")
+
+    raw_users = _get_all_user_ids() if do_users else []
+    raw_chats = _get_all_chat_ids() if do_chats else []
+
+    users, users_skipped = (await _resolve_targets(context.bot, raw_users, private_ok=False)) if do_users else ([], 0)
+    chats, chats_skipped = (await _resolve_targets(context.bot, raw_chats, private_ok=True)) if do_chats else ([], 0)
+
     total = len(users) + len(chats)
     if not total:
-        await update.message.reply_text("⚠️ No targets found.")
+        await update.message.reply_text("⚠️ No reachable targets found.")
         return
 
     status = await update.message.reply_text(
         f"📢 Broadcasting to {total} {label}…", parse_mode="HTML"
     )
-    u_sent, u_failed = await _deliver(context.bot, users, msg)
-    c_sent, c_failed = await _deliver(context.bot, chats, msg)
+
+    u_sent = u_failed = c_sent = c_failed = 0
+    if do_users:
+        u_sent, u_failed = await _deliver(context.bot, users, msg, progress=status.edit_text)
+    if do_chats:
+        c_sent, c_failed = await _deliver(context.bot, chats, msg, progress=status.edit_text)
 
     lines = ["✅ <b>Broadcast complete</b>\n"]
     if do_users:
-        lines.append(f"👤 <b>Users:</b> {len(users)}  •  ✅ {u_sent}  ❌ {u_failed}")
+        lines.append(f"👤 <b>Users:</b> {len(users)} (skipped {users_skipped})  •  ✅ {u_sent}  ❌ {u_failed}")
     if do_chats:
-        lines.append(f"👥 <b>Groups:</b> {len(chats)}  •  ✅ {c_sent}  ❌ {c_failed}")
+        lines.append(f"👥 <b>Groups:</b> {len(chats)} (skipped {chats_skipped})  •  ✅ {c_sent}  ❌ {c_failed}")
     lines.append(f"\n📊 <b>Total sent:</b> <code>{u_sent + c_sent}</code>  |  "
                  f"<b>Failed:</b> <code>{u_failed + c_failed}</code>")
     try:

@@ -1260,6 +1260,11 @@ def main():
     for handler in get_admin_handlers():
         application.add_handler(handler)
 
+    # Add Sudo handlers (Group 0) — owner-only sudo management
+    from sudo import get_sudo_handlers
+    for handler in get_sudo_handlers():
+        application.add_handler(handler)
+
     # Add Blocking commands (Group 0)
     for handler in get_blocking_command_handlers():
         application.add_handler(handler)
