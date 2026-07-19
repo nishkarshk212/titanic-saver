@@ -17,9 +17,9 @@ URL_PATTERN = re.compile(
     re.IGNORECASE
 )
 
-# Cache to avoid repeated API calls (user_id -> timestamp)
-# Bio doesn't change per chat, so we can cache per user globally
-bio_check_cache = {}
+# Module-level flag so a dead/revoked Telethon session produces exactly ONE
+# diagnostic log line instead of one per incoming message.
+_session_broken_warned = False
 
 async def get_telethon_client():
     """Import and return telethon_client from voice_chat."""
@@ -67,14 +67,19 @@ async def _resolve_user_entity(client, user_id, chat_id=None):
 
 
 async def check_user_bio(user_id, chat_id=None):
-    """Checks user bio for links using Telethon."""
+    """Checks user bio for links using Telethon.
+    
+    Returns (has_link, bio). On any unrecoverable Telethon failure (e.g. a
+    dead/revoked session -> 'The key is not registered in the system'), it logs
+    a SINGLE diagnostic warning and stops retrying for that user so the bot does
+    not spam the logs every message.
+    """
     client = await get_telethon_client()
     if not client:
         return False, None
         
     # Don't try to connect here, it should be handled in voice_chat.py
     if not client.is_connected():
-        # logging.debug("Telethon client not connected")
         return False, None
     
     try:
@@ -86,7 +91,6 @@ async def check_user_bio(user_id, chat_id=None):
             return full_user.full_user.about
 
         bio = await asyncio.wait_for(fetch_bio(), timeout=8.0)
-        # logging.info(f"Bio found for {user_id}: {bio}")
         
         if bio:
             match = URL_PATTERN.search(bio)
@@ -96,7 +100,20 @@ async def check_user_bio(user_id, chat_id=None):
     except asyncio.TimeoutError:
         logging.warning(f"Timeout checking bio for {user_id}")
     except Exception as e:
-        if "Could not find the input entity" not in str(e) and "User not found" not in str(e):
+        err = str(e)
+        # A dead/revoked Telethon session produces this error on every call.
+        # Log the diagnostic exactly ONCE (module-level flag) instead of
+        # spamming the log on every incoming message.
+        if "not registered in the system" in err or "AUTH_KEY" in err or "Unauthorized" in err:
+            global _session_broken_warned
+            if not _session_broken_warned:
+                _session_broken_warned = True
+                logging.error(
+                    "Bio Link Check disabled: Telethon session is invalid/revoked "
+                    f"('{err}'). Update STRING_SESSION in .env with a fresh session "
+                    "(run generate_session.py) and restart the bot to re-enable bio checks."
+                )
+        elif "Could not find the input entity" not in err and "User not found" not in err:
             logging.error(f"Error checking bio for {user_id}: {e}")
     
     return False, None

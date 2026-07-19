@@ -1,6 +1,7 @@
 from telegram import Update, MessageEntity, InlineKeyboardButton, InlineKeyboardMarkup, ReactionTypeEmoji
 from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler, MessageHandler, MessageReactionHandler, filters
 from telegram.constants import ParseMode
+import html
 from datetime import datetime, timedelta, timezone
 import logging
 import copy
@@ -661,6 +662,9 @@ async def free_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Resolve the target user
     target_user_id, user_name = await get_user_id(update, context)
+    # Escape user-controlled display name so names containing <, > or & (e.g. "<3")
+    # cannot break the HTML parse mode (fixes "Can't parse entities" crashes).
+    user_name = html.escape(user_name or "User")
     
     if not target_user_id:
         await send_bot_response(update, context, 
@@ -748,6 +752,9 @@ async def unfree_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Resolve target user
     target_user_id, user_name = await get_user_id(update, context)
+    # Escape user-controlled display name so names containing <, > or & cannot
+    # break the HTML parse mode (fixes "Can't parse entities" crashes).
+    user_name = html.escape(user_name or "User")
 
     if not target_user_id:
         await send_bot_response(update, context, 
@@ -828,6 +835,9 @@ async def list_freed_members(update: Update, context: ContextTypes.DEFAULT_TYPE)
                     user_name = chat.first_name or chat.title or user_name
                 except:
                     pass
+            
+            # Escape display name so <, > or & cannot break HTML parse mode
+            user_name = html.escape(user_name)
             
             # Count active exemptions
             active_exemptions = [blocking_labels[k] for k, v in perms.items() if v and k in blocking_labels]
@@ -1012,6 +1022,9 @@ async def free_permission_callback(update: Update, context: ContextTypes.DEFAULT
         user_name = chat.first_name or "Unknown"
     except:
         user_name = "Unknown User"
+    
+    # Escape display name so <, > or & cannot break HTML parse mode
+    user_name = html.escape(user_name)
     
     message_text = (
         f"🛡 <b>ʙʟᴏᴄᴋɪɴɢ ꜱᴇᴛᴛɪɴɢꜱ 🛡</b>\n\n"
