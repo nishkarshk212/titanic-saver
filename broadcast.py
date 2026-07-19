@@ -64,13 +64,15 @@ async def _resolve_targets(bot, raw_ids, private_ok=True):
 async def _deliver(bot, targets, source_msg, progress=None):
     """Copy source_msg to each resolved target; returns (sent, failed).
 
-    Uses each target's .id (which includes the proper access_hash internally).
+    `targets` is a list of either:
+      - Chat objects (groups) -- use chat.id (carries access_hash)
+      - int user ids (best-effort user broadcast, no access_hash available)
     Handles Telegram flood waits.
     """
     sent = failed = 0
     total = len(targets)
-    for i, chat in enumerate(targets, 1):
-        tid = chat.id
+    for i, t in enumerate(targets, 1):
+        tid = t.id if hasattr(t, "id") else t
         try:
             await bot.copy_message(tid, source_msg.chat_id, source_msg.message_id)
             sent += 1
@@ -136,7 +138,12 @@ async def broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     raw_users = _get_all_user_ids() if do_users else []
     raw_chats = _get_all_chat_ids() if do_chats else []
 
-    users, users_skipped = (await _resolve_targets(context.bot, raw_users, private_ok=False)) if do_users else ([], 0)
+    # Groups need get_chat() to obtain the access_hash required by copy_message.
+    # Users are delivered best-effort by raw id: the bot only stores user ids
+    # (no access_hash), so pre-resolving via get_chat would skip ~100% of them
+    # and take hours for large user bases. We deliver directly and count failures.
+    users = raw_users
+    users_skipped = 0
     chats, chats_skipped = (await _resolve_targets(context.bot, raw_chats, private_ok=True)) if do_chats else ([], 0)
 
     total = len(users) + len(chats)
@@ -156,9 +163,15 @@ async def broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     lines = ["✅ <b>Broadcast complete</b>\n"]
     if do_users:
-        lines.append(f"👤 <b>Users:</b> {len(users)} (skipped {users_skipped})  •  ✅ {u_sent}  ❌ {u_failed}")
+        lines.append(f"👤 <b>Users:</b> {len(users)}  •  ✅ {u_sent}  ❌ {u_failed}")
     if do_chats:
         lines.append(f"👥 <b>Groups:</b> {len(chats)} (skipped {chats_skipped})  •  ✅ {c_sent}  ❌ {c_failed}")
+    if do_users and u_sent == 0 and len(users) > 0:
+        lines.append(
+            "\n⚠️ <b>User delivery was 0.</b> The bot can only message users it has "
+            "an active access-hash for (recently interacted). Consider broadcasting "
+            "to <code>/broadcast chats</code> (groups) for reliable reach."
+        )
     lines.append(f"\n📊 <b>Total sent:</b> <code>{u_sent + c_sent}</code>  |  "
                  f"<b>Failed:</b> <code>{u_failed + c_failed}</code>")
     try:

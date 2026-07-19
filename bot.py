@@ -505,7 +505,7 @@ async def info_callback_handler(update: Update, context: ContextTypes.DEFAULT_TY
     # Import handlers locally to avoid circular imports
     from moderation import mute_command, unmute_command, ban_command, warn_command, unwarn_command, unban_command, muter_command
     from moderation_manager_mongo import get_user_warns, is_muter as check_is_muter, is_channel_banned
-    from admin import promote_command, demote_command, DEFAULT_PERMISSIONS, get_promotion_keyboard
+    from admin import promote_user, demote_command, DEFAULT_PERMISSIONS, get_promotion_keyboard
     
     # Create a mock update to reuse existing command logic
     class MockMessage:

@@ -14,6 +14,7 @@ from anonymous_admin import (
 from staff_manager_mongo import get_staff_stats
 from Manager.actions import check_admin_permission, check_bot_permission
 from admin_manager_mongo import sync_admins, update_admin_cache, remove_admin_cache
+import html
 
 # Permission names to display
 PERMISSIONS_MAP = {
@@ -62,8 +63,11 @@ async def promote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not has_bot_perm:
         await send_bot_response(update, context, bot_error_msg)
         return
-
     user_id, user_name = await get_user_id(update, context)
+    # Escape display name so names containing <, > or & (e.g. "<3") cannot
+    # break the HTML parse mode used below (fixes "Can't parse entities").
+    user_name = html.escape(user_name or "User")
+
     if not user_id:
         # If username was provided but not found in cache
         if context.args and context.args[0].startswith('@'):
