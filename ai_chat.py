@@ -135,13 +135,16 @@ async def chatgpt_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     response = await get_chatgpt_response(user_message, user_id)
 
     if response:
+        if update.effective_chat.type != "private":
+            user_mention = update.effective_user.mention_html()
+            response = f"{user_mention} {response}"
         await send_bot_response(update, context, response)
     else:
         await send_bot_response(update, context, "❌ Arre, kuch issue aa gaya. Kuch der baad dubara try kijiye na!")
 
 async def ai_chat_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
-    Handle AI chat messages - Auto reply in private chats or when mentioned/replied in groups.
+    Handle AI chat messages - Auto reply in private chats or when mentioned/replied/greeting in groups.
     """
     if not update.message or not update.message.text:
         return
@@ -159,31 +162,48 @@ async def ai_chat_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if response:
             await send_bot_response(update, context, response)
 
-    # In group chats, reply if mentioned or if replying to bot's message
+    # In group chats, reply if mentioned, replying to bot, or sending greeting/ananya keywords
     elif update.effective_chat.type in ["group", "supergroup"]:
-        is_mentioned = False
+        is_triggered = False
         bot_user = await context.bot.get_me()
+        clean_msg = message.lower()
 
-        # Check mention
+        # 1. Check mention (@bot_username)
         if update.message.entities:
             for entity in update.message.entities:
-                if entity.type == "mention":
+                if entity.type in ["mention", "text_mention"]:
                     mention_str = update.message.text[entity.offset:entity.offset+entity.length]
-                    if f"@{bot_user.username}" == mention_str:
-                        is_mentioned = True
+                    if f"@{bot_user.username}".lower() == mention_str.lower():
+                        is_triggered = True
                         message = message.replace(mention_str, "").strip()
                         break
 
-        # Check reply to bot's message
-        if not is_mentioned and update.message.reply_to_message and update.message.reply_to_message.from_user:
+        # 2. Check reply to bot's message
+        if not is_triggered and update.message.reply_to_message and update.message.reply_to_message.from_user:
             if update.message.reply_to_message.from_user.id == bot_user.id:
-                is_mentioned = True
+                is_triggered = True
 
-        if is_mentioned and message:
+        # 3. Check greeting keywords or "ananya" mentions
+        if not is_triggered:
+            import re
+            greeting_patterns = [
+                r'^\b(hi|hello|hey|hlo|helo|namaste|gm|gn|ssup|yo)\b',
+                r'^\b(good\s+(morning|afternoon|evening|night))\b',
+                r'\b(ananya)\b',
+                r'\b(kaise\s+ho|kaisey\s+ho|kya\s+hal\s+hai)\b'
+            ]
+            for pat in greeting_patterns:
+                if re.search(pat, clean_msg):
+                    is_triggered = True
+                    break
+
+        if is_triggered and message:
             await context.bot.send_chat_action(chat_id=chat_id, action="typing")
             response = await get_chatgpt_response(message, user_id)
             if response:
-                await send_bot_response(update, context, response)
+                user_mention = update.effective_user.mention_html()
+                final_response = f"{user_mention} {response}"
+                await send_bot_response(update, context, final_response)
 
 def get_chatgpt_handlers():
     """Return all Ananya AI handlers."""
