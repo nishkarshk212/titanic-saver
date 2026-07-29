@@ -82,9 +82,22 @@ def _start_caption(bot_mention, user_mention):
 
 async def start(update, context):
     """Start command handler."""
+    if update.effective_chat and update.effective_chat.type == "private" and update.effective_user:
+        from user_manager_mongo import mark_user_started_dm
+        mark_user_started_dm(update.effective_user.id)
+
     if context.args:
         arg = context.args[0]
-        if arg.startswith('settings_'):
+        if arg.startswith('welcome_'):
+            try:
+                group_chat_id = int(arg.split('_')[1])
+                target_chat = await context.bot.get_chat(group_chat_id)
+                from welcome import send_welcome
+                await send_welcome(target_chat, update.effective_user, context)
+                return
+            except Exception as e:
+                logging.error(f"Error serving DM welcome deep link for {arg}: {e}")
+        elif arg.startswith('settings_'):
             group_chat_id = int(arg.split('_')[1])
             context.user_data['settings_chat_id'] = group_chat_id
             from settings import show_settings_panel

@@ -364,6 +364,26 @@ def get_sangmata_handlers():
     """Return Sangmata handlers."""
     return [CommandHandler(["history", "sg"], history_command)]
 
+def mark_user_started_dm(user_id: int):
+    """Mark that user has initiated DM conversation with the bot."""
+    try:
+        users_col = get_collection(COLLECTIONS["users"])
+        if users_col is not None:
+            users_col.update_one({"id": user_id}, {"$set": {"started_dm": True}}, upsert=True)
+    except Exception as e:
+        logging.error(f"Error marking user DM status for {user_id}: {e}")
+
+def has_user_started_dm(user_id: int) -> bool:
+    """Check if user has initiated DM conversation with the bot."""
+    try:
+        users_col = get_collection(COLLECTIONS["users"])
+        if users_col is not None:
+            doc = users_col.find_one({"id": user_id}, {"started_dm": 1})
+            return bool(doc and doc.get("started_dm"))
+    except Exception:
+        pass
+    return False
+
 async def cache_user_handler_legacy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Legacy wrapper for existing bot.py usage if needed."""
     await cache_user_handler(update, context)

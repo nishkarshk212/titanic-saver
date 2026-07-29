@@ -282,7 +282,11 @@ async def send_welcome(chat, user, context: ContextTypes.DEFAULT_TYPE):
             dm_sent = True
             logging.info(f"✅ Sent personal DM welcome to user {user.id} for joining chat {chat_id}")
         except Exception as e:
-            logging.warning(f"⚠️ Could not send DM welcome to user {user.id}: {e}. Falling back to group welcome.")
+            err_msg = str(e)
+            if "Forbidden" in err_msg or "can't initiate" in err_msg or "chat not found" in err_msg.lower():
+                logging.info(f"User {user.id} hasn't started DM conversation yet. Delivering group welcome with DM link.")
+            else:
+                logging.debug(f"DM welcome payload skipped/failed for user {user.id}: {e}")
 
     msg = None
     if not dm_sent:
@@ -295,13 +299,14 @@ async def send_welcome(chat, user, context: ContextTypes.DEFAULT_TYPE):
                 except Exception:
                     pass
 
-        # Build group markup with DM start button if DM failed
+        # Build group markup with personalized DM start button if DM is enabled but not sent
         group_markup = reply_markup
         if welcome_dm_enabled and not dm_sent:
             try:
                 bot_info = await context.bot.get_me()
-                start_dm_url = f"https://t.me/{bot_info.username}?start=welcome"
-                dm_btn = InlineKeyboardButton("💬 Start Bot in DM", url=start_dm_url)
+                start_dm_url = f"https://t.me/{bot_info.username}?start=welcome_{chat_id}"
+                from config import colored_button
+                dm_btn = InlineKeyboardButton(colored_button("💬 Receive Welcome in PM", "blue"), url=start_dm_url)
                 if group_markup and group_markup.inline_keyboard:
                     new_kb = list(group_markup.inline_keyboard) + [[dm_btn]]
                     group_markup = InlineKeyboardMarkup(new_kb)
