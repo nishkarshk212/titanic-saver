@@ -71,8 +71,8 @@ async def send_bot_response(update, context, text, **kwargs):
     # Handle command deletion if enabled for admins (after sending response)
     await delete_admin_command(update, context)
     
-    # Schedule deletion in 30 seconds
-    if context.job_queue:
+    # Schedule deletion in 30 seconds (only in groups, never in private DMs)
+    if update.effective_chat and update.effective_chat.type != "private" and context.job_queue and msg:
         context.job_queue.run_once(
             delete_message_job,
             30,
@@ -81,30 +81,36 @@ async def send_bot_response(update, context, text, **kwargs):
     return msg
 
 async def send_bot_media(update, context, video=None, photo=None, caption="", **kwargs):
-    """Sends a bot media response with formatted caption and auto-deletion in 30s."""
+    """Sends a bot media response with formatted caption and robust text fallback."""
     formatted_caption = to_small_caps(caption)
+    msg = None
     
-    # Send media - Try replying first, fallback to normal media if original is gone
+    # Send media - Try replying first, fallback to direct send, fallback to plain text
     try:
         if video:
             msg = await update.message.reply_video(video, caption=formatted_caption, **kwargs)
         elif photo:
             msg = await update.message.reply_photo(photo, caption=formatted_caption, **kwargs)
-        else:
-            return None
-    except Exception:
-        # Fallback to direct send
-        if video:
-            msg = await context.bot.send_video(chat_id=update.effective_chat.id, video=video, caption=formatted_caption, **kwargs)
-        elif photo:
-            msg = await context.bot.send_photo(chat_id=update.effective_chat.id, photo=photo, caption=formatted_caption, **kwargs)
-        else:
-            return None
+    except Exception as e1:
+        try:
+            if video:
+                msg = await context.bot.send_video(chat_id=update.effective_chat.id, video=video, caption=formatted_caption, **kwargs)
+            elif photo:
+                msg = await context.bot.send_photo(chat_id=update.effective_chat.id, photo=photo, caption=formatted_caption, **kwargs)
+        except Exception as e2:
+            logging.error(f"Failed to send media ({e1}, {e2}). Falling back to text response.")
+            # Media failed (e.g. image URL error or timeout) -> Fallback to text message
+            text_kwargs = {k: v for k, v in kwargs.items() if k in ['reply_markup', 'parse_mode', 'disable_web_page_preview']}
+            try:
+                msg = await update.message.reply_text(formatted_caption, **text_kwargs)
+            except Exception:
+                msg = await context.bot.send_message(chat_id=update.effective_chat.id, text=formatted_caption, **text_kwargs)
 
     # Handle command deletion if enabled for admins (after sending response)
     await delete_admin_command(update, context)
 
-    if context.job_queue:
+    # Schedule deletion in 30 seconds (only in groups, never in private DMs)
+    if update.effective_chat and update.effective_chat.type != "private" and context.job_queue and msg:
         context.job_queue.run_once(
             delete_message_job,
             30,
