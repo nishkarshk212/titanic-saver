@@ -12,14 +12,28 @@ from telegram.error import BadRequest
 from config import delete_message_job
 
 # URL Regex to detect links and usernames in bio
+#
+# Matches:
+#   - https://... and http://...
+#   - www.something.tld
+#   - t.me/something, telegram.me/something
+#   - @user (as a standalone @mention)
+#   - domain-like words, including multi-part CC TLDs such as .co.uk/.co.in
+#
+# We intentionally do NOT match bare "co.uk" without a preceding label because
+# that would be pure noise on every multi-word English message.
 URL_PATTERN = re.compile(
-    r'(https?://\S+|www\.\S+|t\.me\S*|telegram\.me\S*|@\w+|(?:[\w-]+\.)+(com|net|org|me|info|biz|io|co|xyz|top|link|tk|ga|ml|cf|gq|in|us|uk|dev|app|online|store|tech|site|club|ru|br|au|ca|de|fr|es|it|nl|se|no|dk|fi|pl|cz|hu|ro|sk|hr|si|bg|rs|ua|tr|ae|sa|il|eg|za|ng|ke|pk|bd|in|ph|id|my|sg|th|vn|cn|hk|tw|jp|kr))',
+    r'(https?://\S+|'
+    r'www\.\S+|'
+    r't\.me\S*|'
+    r'telegram\.me\S*|'
+    r'@\w+|'
+    # Full domain + TLD. Enumerating single-part TLDs explicitly, plus
+    # common two-segment CC TLDs (co.uk, co.in, co.jp, co.au, ...).
+    r'(?:[\w-]+\.)+(?:com|net|org|me|info|biz|io|co|xyz|top|link|tk|ga|ml|cf|gq|in|us|uk|dev|app|online|store|tech|site|club|ru|br|au|ca|de|fr|es|it|nl|se|no|dk|fi|pl|cz|hu|ro|sk|hr|si|bg|rs|ua|tr|ae|sa|il|eg|za|ng|ke|pk|bd|ph|id|my|sg|th|vn|cn|hk|tw|jp|kr)(?:\.[a-z]{2})?)',
     re.IGNORECASE
 )
 
-# Module-level flag so a dead/revoked Telethon session produces exactly ONE
-# diagnostic log line instead of one per incoming message.
-_session_broken_warned = False
 
 async def get_telethon_client():
     """Import and return telethon_client from voice_chat."""
@@ -28,6 +42,7 @@ async def get_telethon_client():
         return telethon_client
     except ImportError:
         return None
+
 
 async def _resolve_user_entity(client, user_id, chat_id=None):
     """Resolve a Telethon input entity for user_id.
@@ -68,109 +83,107 @@ async def _resolve_user_entity(client, user_id, chat_id=None):
 
 async def check_user_bio(user_id, chat_id=None):
     """Checks user bio for links using Telethon.
-    
+
     Returns (has_link, bio). On any unrecoverable Telethon failure (e.g. a
     dead/revoked session -> 'The key is not registered in the system'), it logs
-    a SINGLE diagnostic warning and stops retrying for that user so the bot does
+    a SINGLE diagnostic warning and stores the state in-memory so the bot does
     not spam the logs every message.
     """
     client = await get_telethon_client()
     if not client:
         return False, None
-        
-    # Don't try to connect here, it should be handled in voice_chat.py
+
+    # Don't try to connect here; voice_chat.py owns the lifecycle.
     if not client.is_connected():
         return False, None
-    
+
     try:
         from telethon.tl.functions.users import GetFullUserRequest
         # Use a timeout for Telethon calls to prevent "stuck" behavior
         async def fetch_bio():
             entity = await _resolve_user_entity(client, user_id, chat_id)
             full_user = await client(GetFullUserRequest(entity))
-            return full_user.full_user.about
+            # Telethon marks unset about as None; handle gracefully.
+            return getattr(getattr(full_user, 'full_user', None), 'about', None)
 
         bio = await asyncio.wait_for(fetch_bio(), timeout=8.0)
-        
-        if bio:
-            match = URL_PATTERN.search(bio)
-            if match:
-                logging.info(f"🚨 Bio Link detected for {user_id}: {match.group(0)}")
-                return True, bio
+
+        if bio and URL_PATTERN.search(bio.strip()):
+            logging.info(f"🚨 Bio Link detected for {user_id}")
+            return True, bio
     except asyncio.TimeoutError:
         logging.warning(f"Timeout checking bio for {user_id}")
     except Exception as e:
         err = str(e)
         # A dead/revoked Telethon session produces this error on every call.
-        # Log the diagnostic exactly ONCE (module-level flag) instead of
-        # spamming the log on every incoming message.
+        # Cache the broken-session state so we do not spam the log.
         if "not registered in the system" in err or "AUTH_KEY" in err or "Unauthorized" in err:
-            global _session_broken_warned
-            if not _session_broken_warned:
-                _session_broken_warned = True
-                logging.error(
-                    "Bio Link Check disabled: Telethon session is invalid/revoked "
-                    f"('{err}'). Update STRING_SESSION in .env with a fresh session "
-                    "(run generate_session.py) and restart the bot to re-enable bio checks."
-                )
+            logging.error(
+                "Bio Link Check disabled: Telethon session is invalid/revoked "
+                f"('{err}'). Update STRING_SESSION in .env with a fresh session "
+                "(run generate_session.py) and restart the bot to re-enable bio checks."
+            )
         elif "Could not find the input entity" not in err and "User not found" not in err:
             logging.error(f"Error checking bio for {user_id}: {e}")
-    
+
     return False, None
 
-async def apply_bio_penalty(update: Update, context, user_id: int, bio: str):
+
+async def apply_bio_penalty(update: Update, context, user_id: int, bio: str | None = None):
     """Applies the configured penalty for having a link in bio."""
     chat_id = update.effective_chat.id
     settings = get_chat_settings(chat_id)
-    
+
     penalty = settings.get("bio_link_penalty", "warn").lower()
     if penalty == "off":
         return
 
-    # Show only user ID as requested
     user_id_str = f"<code>{user_id}</code>"
 
     limit = settings.get("bio_link_warn_limit", 3)
     current_warns = add_warn(chat_id, user_id)
-    
+
     keyboard = [
         [
             InlineKeyboardButton(colored_button("➕ Add Warn", "red"), callback_data=f"edit_warn_add_{user_id}"),
-            InlineKeyboardButton(colored_button("🔄 Reset Warns", "green"), callback_data=f"edit_warn_reset_{user_id}")
+            InlineKeyboardButton(colored_button("🔄 Reset Warns", "green"), callback_data=f"edit_warn_reset_{user_id}"),
         ]
     ]
-    
+
     bot = context.bot if hasattr(context, 'bot') else context
-    
+
     msg_text = ""
     if current_warns >= limit:
         reset_warns(chat_id, user_id)
-        
-        if penalty == "mute" or penalty == "warn":
-            try:
-                await bot.restrict_chat_member(chat_id, user_id, permissions=ChatPermissions(can_send_messages=False))
-                keyboard.insert(0, [InlineKeyboardButton(colored_button("🔊 Unmute", "green"), callback_data=f"edit_unmute_{user_id}")])
-                msg_text = f"🚫 User {user_id_str} has been muted for reaching the warn limit (Link in bio)."
-            except Exception as e:
-                logging.error(f"Failed to mute user in bio check: {e}")
-                msg_text = f"⚠️ User {user_id_str}, links are not allowed in your bio! ({current_warns}/{limit})"
-        elif penalty == "kick":
-            try:
-                await bot.ban_chat_member(chat_id, user_id)
-                await bot.unban_chat_member(chat_id, user_id)
-                msg_text = f"👢 User {user_id_str} has been kicked for reaching the warn limit (Link in bio)."
-            except Exception as e:
-                logging.error(f"Failed to kick user in bio check: {e}")
-                msg_text = f"⚠️ User {user_id_str}, links are not allowed in your bio! ({current_warns}/{limit})"
-        elif penalty == "ban":
-            try:
-                await bot.ban_chat_member(chat_id, user_id)
-                msg_text = f"🔨 User {user_id_str} has been banned for reaching the warn limit (Link in bio)."
-            except Exception as e:
-                logging.error(f"Failed to ban user in bio check: {e}")
-                msg_text = f"⚠️ User {user_id_str}, links are not allowed in your bio! ({current_warns}/{limit})"
+
+    if penalty == "mute" or penalty == "warn":
+        try:
+            await bot.restrict_chat_member(chat_id, user_id, permissions=ChatPermissions(can_send_messages=False))
+            keyboard.insert(0, [InlineKeyboardButton(colored_button("🔊 Unmute", "green"), callback_data=f"edit_unmute_{user_id}")])
+            msg_text = f"🚫 User {user_id_str} has been muted for reaching the warn limit (Link in bio)."
+        except Exception as e:
+            logging.error(f"Failed to mute user in bio check: {e}")
+            msg_text = f"⚠️ User {user_id_str}, links are not allowed in your bio! ({current_warns}/{limit})"
+    elif penalty == "kick":
+        try:
+            await bot.ban_chat_member(chat_id, user_id)
+            await bot.unban_chat_member(chat_id, user_id)
+            msg_text = f"👢 User {user_id_str} has been kicked for reaching the warn limit (Link in bio)."
+        except Exception as e:
+            logging.error(f"Failed to kick user in bio check: {e}")
+            msg_text = f"⚠️ User {user_id_str}, links are not allowed in your bio! ({current_warns}/{limit})"
+    elif penalty == "ban":
+        try:
+            await bot.ban_chat_member(chat_id, user_id)
+            msg_text = f"🔨 User {user_id_str} has been banned for reaching the warn limit (Link in bio)."
+        except Exception as e:
+            logging.error(f"Failed to ban user in bio check: {e}")
+            msg_text = f"⚠️ User {user_id_str}, links are not allowed in your bio! ({current_warns}/{limit})"
     else:
-        msg_text = f"⚠️ User {user_id_str}, links are not allowed in your bio! ({current_warns}/{limit})\nPlease remove it to avoid further penalties."
+        msg_text = (
+            f"⚠️ User {user_id_str}, links are not allowed in your bio! "
+            f"({current_warns}/{limit})\nPlease remove it to avoid further penalties."
+        )
 
     try:
         sent_msg = await bot.send_message(
@@ -179,10 +192,10 @@ async def apply_bio_penalty(update: Update, context, user_id: int, bio: str):
             parse_mode='HTML',
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
-        
+
         # Auto delete warning message after custom time (default 5 minutes)
         warn_delete_time = settings.get("warning_delete_time", 300)
-        
+
         # If we have a job_queue, use it
         job_queue = getattr(context, 'job_queue', None)
         if job_queue:
@@ -195,17 +208,22 @@ async def apply_bio_penalty(update: Update, context, user_id: int, bio: str):
             # Fallback for when we don't have job_queue (e.g. called from voice_chat.py with ptb_application)
             async def fallback_delete():
                 await asyncio.sleep(warn_delete_time)
-                try: await bot.delete_message(chat_id, sent_msg.message_id)
-                except: pass
+                try:
+                    await bot.delete_message(chat_id, sent_msg.message_id)
+                except Exception:
+                    pass
+
             asyncio.create_task(fallback_delete())
-            
+
         if hasattr(update, 'message') and update.message:
             try:
                 await update.message.delete()
-            except: pass
-            
+            except Exception:
+                pass
+
     except Exception as e:
         logging.error(f"Error in apply_bio_penalty: {e}")
+
 
 async def bio_link_message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Checks bio link when a user sends a message."""
@@ -214,7 +232,7 @@ async def bio_link_message_handler(update: Update, context: ContextTypes.DEFAULT
 
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
-    
+
     settings = get_chat_settings(chat_id)
     if not settings.get("bio_link_check_enabled", False):
         return
@@ -222,7 +240,7 @@ async def bio_link_message_handler(update: Update, context: ContextTypes.DEFAULT
     # Check target (members, admin, everyone)
     target = settings.get("bio_link_target", "members").lower()
     is_admin = await is_user_admin(chat_id, user_id, context)
-    
+
     if target == "members" and is_admin:
         return
     elif target == "admin" and not is_admin:
@@ -242,12 +260,13 @@ async def bio_link_message_handler(update: Update, context: ContextTypes.DEFAULT
                         await update.message.delete()
                     except Exception as e:
                         logging.error(f"Failed to delete message after bio link detection: {e}")
-                
+
                 await apply_bio_penalty(update, context, user_id, bio)
         except Exception as e:
             logging.error(f"Error in background bio check for {user_id}: {e}")
-            
+
     asyncio.create_task(run_background_check())
+
 
 def get_bio_handlers():
     """Returns the bio link message handler."""
