@@ -1473,6 +1473,7 @@ def main():
             BotCommand("blockreaction", "Toggle reaction blocking (Admins only)"),
             BotCommand("free", "Exempt a user (Admins only)"),
             BotCommand("joinreq", "Manage group join requests (Admins only)"),
+            BotCommand("ananya", "Chat with Ananya AI Assistant"),
         ]
         try:
             await application.bot.set_my_commands(commands)
