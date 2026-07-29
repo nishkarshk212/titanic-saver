@@ -19,7 +19,6 @@ from link_spam import get_link_spam_handlers
 from forward_protection import get_forward_protection_handlers
 from settings import get_settings_handlers
 from help import get_help_handlers
-from ai_chat import get_chatgpt_handlers
 from translator import get_translation_handlers
 from language_filter import get_language_handlers
 from sticker_manager import get_sticker_handlers
@@ -1352,10 +1351,6 @@ def main():
     # Add forward protection handlers (Group 7)
     for handler in get_forward_protection_handlers():
         application.add_handler(handler, group=7)
-
-    # Add AI Chat handlers (Group 8)
-    for handler in get_chatgpt_handlers():
-        application.add_handler(handler, group=8)
 
     # Add Translation handlers (Group 9)
     for handler in get_translation_handlers():

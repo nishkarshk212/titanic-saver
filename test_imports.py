@@ -123,14 +123,6 @@ except Exception as e:
     traceback.print_exc()
 
 try:
-    from ai_chat import get_chatgpt_handlers
-    print("✓ ai_chat imported")
-except Exception as e:
-    print(f"✗ ai_chat failed: {e}")
-    import traceback
-    traceback.print_exc()
-
-try:
     from translator import get_translation_handlers
     print("✓ translator imported")
 except Exception as e:
