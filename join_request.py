@@ -17,12 +17,39 @@ async def handle_chat_join_request(update: Update, context: ContextTypes.DEFAULT
     chat_id = chat.id
     user_id = user.id
 
+ACCEPT_EMOJI_ID = "6296367896398399651"
+REJECT_EMOJI_ID = "6298671811345254603"
+
+async def handle_chat_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handles incoming chat join requests for a group."""
+    join_req = update.chat_join_request
+    if not join_req:
+        return
+
+    chat = join_req.chat
+    user = join_req.from_user
+    chat_id = chat.id
+    user_id = user.id
+
     settings = get_chat_settings(chat_id)
-    mode = settings.get("join_request_mode", "accept").lower()
+    # Default to manual approval cards in chat
+    mode = settings.get("join_request_mode", "manual").lower()
 
     logging.info(f"Join Request from user {user_id} ({user.first_name}) in chat {chat_id} (mode: {mode})")
 
-    if mode == "decline":
+    if mode == "accept":
+        try:
+            await context.bot.approve_chat_join_request(chat_id=chat_id, user_id=user_id)
+            logging.info(f"Auto-approved join request for user {user_id} in chat {chat_id}")
+            await log_to_channel(context, f"✅ <b>Auto-Approved Join Request</b>\nUser: {user.mention_html()} (<code>{user_id}</code>)\nGroup: <b>{chat.title}</b>")
+            
+            # Send DM welcome message to the approved user
+            from welcome import send_welcome
+            await send_welcome(chat, user, context)
+        except Exception as e:
+            logging.error(f"Error approving join request for {user_id}: {e}")
+
+    elif mode == "decline":
         try:
             await context.bot.decline_chat_join_request(chat_id=chat_id, user_id=user_id)
             logging.info(f"Auto-declined join request for user {user_id} in chat {chat_id}")
@@ -30,11 +57,15 @@ async def handle_chat_join_request(update: Update, context: ContextTypes.DEFAULT
         except Exception as e:
             logging.error(f"Error declining join request for {user_id}: {e}")
 
-    elif mode == "manual":
+    else:
+        # Default: Manual approval card sent in chat with custom emoji buttons
+        accept_btn_text = f"#g <tg-emoji emoji-id=\"{ACCEPT_EMOJI_ID}\">✅</tg-emoji> Accept"
+        reject_btn_text = f"#r <tg-emoji emoji-id=\"{REJECT_EMOJI_ID}\">❌</tg-emoji> Decline"
+
         keyboard = InlineKeyboardMarkup([
             [
-                InlineKeyboardButton(colored_button("✅ Accept", "green"), callback_data=f"joinreq_acc_{chat_id}_{user_id}"),
-                InlineKeyboardButton(colored_button("❌ Decline", "red"), callback_data=f"joinreq_dec_{chat_id}_{user_id}")
+                InlineKeyboardButton(accept_btn_text, callback_data=f"joinreq_acc_{chat_id}_{user_id}"),
+                InlineKeyboardButton(reject_btn_text, callback_data=f"joinreq_dec_{chat_id}_{user_id}")
             ]
         ])
         msg_text = (
@@ -52,19 +83,6 @@ async def handle_chat_join_request(update: Update, context: ContextTypes.DEFAULT
             )
         except Exception as e:
             logging.error(f"Error sending manual join request alert in chat {chat_id}: {e}")
-
-    else:
-        # Default: auto "accept"
-        try:
-            await context.bot.approve_chat_join_request(chat_id=chat_id, user_id=user_id)
-            logging.info(f"Auto-approved join request for user {user_id} in chat {chat_id}")
-            await log_to_channel(context, f"✅ <b>Auto-Approved Join Request</b>\nUser: {user.mention_html()} (<code>{user_id}</code>)\nGroup: <b>{chat.title}</b>")
-            
-            # Send DM welcome message to the approved user
-            from welcome import send_welcome
-            await send_welcome(chat, user, context)
-        except Exception as e:
-            logging.error(f"Error approving join request for {user_id}: {e}")
 
 
 async def join_request_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -85,7 +103,7 @@ async def join_request_command(update: Update, context: ContextTypes.DEFAULT_TYP
 
     args = context.args
     settings = get_chat_settings(chat_id)
-    current_mode = settings.get("join_request_mode", "accept").lower()
+    current_mode = settings.get("join_request_mode", "manual").lower()
 
     if args:
         sub = args[0].lower()
