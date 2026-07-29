@@ -191,8 +191,55 @@ async def set_welcome_button(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     await update.message.reply_text(f"✅ Button added to welcome message: {button_text} -> {button_url}")
 
+async def _deliver_welcome_payload(target_id, media_enabled, welcome_media, welcome_media_type, personal_welcome, reply_markup, context):
+    """Internal helper to deliver welcome payload with or without media to target_id."""
+    if media_enabled and welcome_media:
+        try:
+            if welcome_media_type == "photo":
+                return await context.bot.send_photo(
+                    chat_id=target_id,
+                    photo=welcome_media,
+                    caption=personal_welcome,
+                    reply_markup=reply_markup,
+                    parse_mode=ParseMode.HTML
+                )
+            elif welcome_media_type == "video":
+                return await context.bot.send_video(
+                    chat_id=target_id,
+                    video=welcome_media,
+                    caption=personal_welcome,
+                    reply_markup=reply_markup,
+                    parse_mode=ParseMode.HTML
+                )
+            elif welcome_media_type == "animation":
+                return await context.bot.send_animation(
+                    chat_id=target_id,
+                    animation=welcome_media,
+                    caption=personal_welcome,
+                    reply_markup=reply_markup,
+                    parse_mode=ParseMode.HTML
+                )
+            else:
+                return await context.bot.send_document(
+                    chat_id=target_id,
+                    document=welcome_media,
+                    caption=personal_welcome,
+                    reply_markup=reply_markup,
+                    parse_mode=ParseMode.HTML
+                )
+        except Exception as e:
+            logging.error(f"Error sending welcome media to {target_id}: {e}")
+
+    return await context.bot.send_message(
+        chat_id=target_id,
+        text=personal_welcome,
+        reply_markup=reply_markup,
+        parse_mode=ParseMode.HTML
+    )
+
+
 async def send_welcome(chat, user, context: ContextTypes.DEFAULT_TYPE):
-    """Sends the welcome message to a specific user in a chat."""
+    """Sends the welcome message to personal DM of newly joined user, falling back to group chat if DM fails."""
     chat_id = chat.id
     settings = get_chat_settings(chat_id)
     
@@ -206,11 +253,11 @@ async def send_welcome(chat, user, context: ContextTypes.DEFAULT_TYPE):
     media_enabled = settings.get('welcome_media_enabled', True)
     button_enabled = settings.get('welcome_button_enabled', True)
     welcome_buttons = settings.get('welcome_buttons', [])
+    welcome_dm_enabled = settings.get('welcome_dm_enabled', True)
 
     reply_markup = None
     if button_enabled:
         keyboard = []
-        # Add multiple buttons if they exist
         for btn in welcome_buttons:
             if btn.get("text") and btn.get("url"):
                 btn_color = btn.get("color", "default")
@@ -220,11 +267,6 @@ async def send_welcome(chat, user, context: ContextTypes.DEFAULT_TYPE):
         
         if keyboard:
             reply_markup = InlineKeyboardMarkup(keyboard)
-            logging.info(f"Generated welcome keyboard with {len(keyboard)} buttons")
-        else:
-            logging.info("No welcome buttons generated (keyboard empty)")
-    else:
-        logging.info("Welcome buttons disabled in settings")
 
     # Cache the user
     cache_user(user.id, user.username, user.first_name)
@@ -233,81 +275,61 @@ async def send_welcome(chat, user, context: ContextTypes.DEFAULT_TYPE):
     welcome_text_html = settings.get('welcome_text', "Welcome {NAME} to the group!")
     personal_welcome = format_welcome_message(welcome_text_html, user, chat)
     
-    # Try to delete the previous welcome message
-    if settings.get("welcome_clean_enabled", True):
-        last_welcome_id = settings.get('last_welcome_id')
-        if last_welcome_id:
-            try:
-                await context.bot.delete_message(chat_id=chat_id, message_id=last_welcome_id)
-            except Exception:
-                pass # Message might be already deleted or too old
+    dm_sent = False
+    if welcome_dm_enabled and not user.is_bot:
+        try:
+            await _deliver_welcome_payload(user.id, media_enabled, welcome_media, welcome_media_type, personal_welcome, reply_markup, context)
+            dm_sent = True
+            logging.info(f"✅ Sent personal DM welcome to user {user.id} for joining chat {chat_id}")
+        except Exception as e:
+            logging.warning(f"⚠️ Could not send DM welcome to user {user.id}: {e}. Falling back to group welcome.")
 
     msg = None
-    if media_enabled and welcome_media:
-        try:
-            if welcome_media_type == "photo":
-                msg = await context.bot.send_photo(
-                    chat_id=chat_id,
-                    photo=welcome_media,
-                    caption=personal_welcome,
-                    reply_markup=reply_markup,
-                    parse_mode=ParseMode.HTML
-                )
-            elif welcome_media_type == "video":
-                msg = await context.bot.send_video(
-                    chat_id=chat_id,
-                    video=welcome_media,
-                    caption=personal_welcome,
-                    reply_markup=reply_markup,
-                    parse_mode=ParseMode.HTML
-                )
-            elif welcome_media_type == "animation":
-                msg = await context.bot.send_animation(
-                    chat_id=chat_id,
-                    animation=welcome_media,
-                    caption=personal_welcome,
-                    reply_markup=reply_markup,
-                    parse_mode=ParseMode.HTML
-                )
-            else: # document or fallback
-                msg = await context.bot.send_document(
-                    chat_id=chat_id,
-                    document=welcome_media,
-                    caption=personal_welcome,
-                    reply_markup=reply_markup,
-                    parse_mode=ParseMode.HTML
-                )
-        except Exception as e:
-            logging.error(f"Error sending welcome media: {e}")
-            msg = await context.bot.send_message(
-                chat_id=chat_id, 
-                text=personal_welcome, 
-                reply_markup=reply_markup,
-                parse_mode=ParseMode.HTML
-            )
-    else:
-        msg = await context.bot.send_message(
-            chat_id=chat_id, 
-            text=personal_welcome, 
-            reply_markup=reply_markup,
-            parse_mode=ParseMode.HTML
-        )
+    if not dm_sent:
+        # Try deleting previous group welcome message if enabled
+        if settings.get("welcome_clean_enabled", True):
+            last_welcome_id = settings.get('last_welcome_id')
+            if last_welcome_id:
+                try:
+                    await context.bot.delete_message(chat_id=chat_id, message_id=last_welcome_id)
+                except Exception:
+                    pass
 
-    # Save the new welcome message ID to delete it later
-    if msg:
-        update_chat_setting(chat_id, "last_welcome_id", msg.message_id)
-    
-    # Schedule deletion if msg sent, enabled, and time > 0
-    if msg and settings.get("welcome_delete_enabled", True) and welcome_delete_time > 0 and context.job_queue:
-        from config import delete_message_job
+        # Build group markup with DM start button if DM failed
+        group_markup = reply_markup
+        if welcome_dm_enabled and not dm_sent:
+            try:
+                bot_info = await context.bot.get_me()
+                start_dm_url = f"https://t.me/{bot_info.username}?start=welcome"
+                dm_btn = InlineKeyboardButton("💬 Start Bot in DM", url=start_dm_url)
+                if group_markup and group_markup.inline_keyboard:
+                    new_kb = list(group_markup.inline_keyboard) + [[dm_btn]]
+                    group_markup = InlineKeyboardMarkup(new_kb)
+                else:
+                    group_markup = InlineKeyboardMarkup([[dm_btn]])
+            except Exception:
+                pass
+
         try:
-            context.job_queue.run_once(
-                delete_message_job,
-                welcome_delete_time,
-                data={"chat_id": chat_id, "message_id": msg.message_id}
-            )
+            msg = await _deliver_welcome_payload(chat_id, media_enabled, welcome_media, welcome_media_type, personal_welcome, group_markup, context)
         except Exception as e:
-            logging.error(f"Error scheduling welcome deletion: {e}")
+            logging.error(f"Error delivering group welcome message: {e}")
+
+        # Save new group welcome message ID for auto-clean
+        if msg:
+            update_chat_setting(chat_id, "last_welcome_id", msg.message_id)
+        
+        # Schedule deletion in group if enabled
+        if msg and settings.get("welcome_delete_enabled", True) and welcome_delete_time > 0 and context.job_queue:
+            from config import delete_message_job
+            try:
+                context.job_queue.run_once(
+                    delete_message_job,
+                    welcome_delete_time,
+                    data={"chat_id": chat_id, "message_id": msg.message_id}
+                )
+            except Exception as e:
+                logging.error(f"Error scheduling welcome deletion: {e}")
 
 async def on_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Send welcome message when a new member joins via service message (fallback)."""

@@ -1,6 +1,7 @@
 import logging
 import asyncio
 import re
+from typing import Optional
 from config import colored_button
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ChatPermissions
 from telegram.ext import ContextTypes, MessageHandler, filters
@@ -11,26 +12,15 @@ from moderation import mute_user, kick_user, ban_user
 from telegram.error import BadRequest
 from config import delete_message_job
 
-# URL Regex to detect links and usernames in bio
-#
-# Matches:
-#   - https://... and http://...
-#   - www.something.tld
-#   - t.me/something, telegram.me/something
-#   - @user (as a standalone @mention)
-#   - domain-like words, including multi-part CC TLDs such as .co.uk/.co.in
-#
-# We intentionally do NOT match bare "co.uk" without a preceding label because
-# that would be pure noise on every multi-word English message.
+# URL Regex to detect links, domains, and @mentions in bio
 URL_PATTERN = re.compile(
     r'(https?://\S+|'
     r'www\.\S+|'
-    r't\.me\S*|'
-    r'telegram\.me\S*|'
+    r't\.me/\S*|'
+    r'telegram\.me/\S*|'
+    r'tg://\S+|'
     r'@\w+|'
-    # Full domain + TLD. Enumerating single-part TLDs explicitly, plus
-    # common two-segment CC TLDs (co.uk, co.in, co.jp, co.au, ...).
-    r'(?:[\w-]+\.)+(?:com|net|org|me|info|biz|io|co|xyz|top|link|tk|ga|ml|cf|gq|in|us|uk|dev|app|online|store|tech|site|club|ru|br|au|ca|de|fr|es|it|nl|se|no|dk|fi|pl|cz|hu|ro|sk|hr|si|bg|rs|ua|tr|ae|sa|il|eg|za|ng|ke|pk|bd|ph|id|my|sg|th|vn|cn|hk|tw|jp|kr)(?:\.[a-z]{2})?)',
+    r'\b(?:[a-zA-Z0-9-]+\.)+(?:com|net|org|me|info|biz|io|co|xyz|top|link|tk|ga|ml|cf|gq|in|us|uk|dev|app|online|store|tech|site|club|ru|br|au|ca|de|fr|es|it|nl|se|no|dk|fi|pl|cz|hu|ro|sk|hr|si|bg|rs|ua|tr|ae|sa|il|eg|za|ng|ke|pk|bd|ph|id|my|sg|th|vn|cn|hk|tw|jp|kr|ee|ai)\b(?:/\S*)?)',
     re.IGNORECASE
 )
 
@@ -81,55 +71,58 @@ async def _resolve_user_entity(client, user_id, chat_id=None):
         return user_id
 
 
-async def check_user_bio(user_id, chat_id=None):
-    """Checks user bio for links using Telethon.
+async def check_user_bio(user_id, chat_id=None, bot=None):
+    """Checks user bio for links using Telegram Bot API first, then Telethon fallback.
 
-    Returns (has_link, bio). On any unrecoverable Telethon failure (e.g. a
-    dead/revoked session -> 'The key is not registered in the system'), it logs
-    a SINGLE diagnostic warning and stores the state in-memory so the bot does
-    not spam the logs every message.
+    Returns (has_link, bio).
     """
-    client = await get_telethon_client()
-    if not client:
-        return False, None
+    from font_normalizer import normalize_text
 
-    # Don't try to connect here; voice_chat.py owns the lifecycle.
-    if not client.is_connected():
-        return False, None
+    bio = None
 
-    try:
-        from telethon.tl.functions.users import GetFullUserRequest
-        # Use a timeout for Telethon calls to prevent "stuck" behavior
-        async def fetch_bio():
-            entity = await _resolve_user_entity(client, user_id, chat_id)
-            full_user = await client(GetFullUserRequest(entity))
-            # Telethon marks unset about as None; handle gracefully.
-            return getattr(getattr(full_user, 'full_user', None), 'about', None)
+    # 1. Primary: Try Bot API get_chat if bot instance is available
+    if bot:
+        try:
+            user_chat = await bot.get_chat(user_id)
+            if hasattr(user_chat, 'bio') and user_chat.bio:
+                bio = user_chat.bio
+        except Exception as e:
+            logging.debug(f"Bot API get_chat bio fetch skipped/failed for {user_id}: {e}")
 
-        bio = await asyncio.wait_for(fetch_bio(), timeout=8.0)
+    # 2. Fallback: Telethon if Bot API did not yield a bio
+    if not bio:
+        client = await get_telethon_client()
+        if client and client.is_connected():
+            try:
+                from telethon.tl.functions.users import GetFullUserRequest
+                async def fetch_bio():
+                    entity = await _resolve_user_entity(client, user_id, chat_id)
+                    full_user = await client(GetFullUserRequest(entity))
+                    return getattr(getattr(full_user, 'full_user', None), 'about', None)
 
-        if bio and URL_PATTERN.search(bio.strip()):
-            logging.info(f"🚨 Bio Link detected for {user_id}")
+                bio = await asyncio.wait_for(fetch_bio(), timeout=8.0)
+            except asyncio.TimeoutError:
+                logging.warning(f"Timeout checking bio for {user_id} via Telethon")
+            except Exception as e:
+                err = str(e)
+                if "not registered in the system" in err or "AUTH_KEY" in err or "Unauthorized" in err:
+                    logging.error(
+                        "Bio Link Check: Telethon session is invalid/revoked "
+                        f"('{err}'). Update STRING_SESSION in .env if needed."
+                    )
+                elif "Could not find the input entity" not in err and "User not found" not in err:
+                    logging.error(f"Error checking bio for {user_id} via Telethon: {e}")
+
+    if bio:
+        norm_bio = normalize_text(bio)
+        if URL_PATTERN.search(bio.strip()) or URL_PATTERN.search(norm_bio.strip()):
+            logging.info(f"🚨 Bio Link detected for {user_id}: {bio}")
             return True, bio
-    except asyncio.TimeoutError:
-        logging.warning(f"Timeout checking bio for {user_id}")
-    except Exception as e:
-        err = str(e)
-        # A dead/revoked Telethon session produces this error on every call.
-        # Cache the broken-session state so we do not spam the log.
-        if "not registered in the system" in err or "AUTH_KEY" in err or "Unauthorized" in err:
-            logging.error(
-                "Bio Link Check disabled: Telethon session is invalid/revoked "
-                f"('{err}'). Update STRING_SESSION in .env with a fresh session "
-                "(run generate_session.py) and restart the bot to re-enable bio checks."
-            )
-        elif "Could not find the input entity" not in err and "User not found" not in err:
-            logging.error(f"Error checking bio for {user_id}: {e}")
 
     return False, None
 
 
-async def apply_bio_penalty(update: Update, context, user_id: int, bio: str | None = None):
+async def apply_bio_penalty(update: Update, context, user_id: int, bio: Optional[str] = None):
     """Applies the configured penalty for having a link in bio."""
     chat_id = update.effective_chat.id
     settings = get_chat_settings(chat_id)
@@ -252,7 +245,7 @@ async def bio_link_message_handler(update: Update, context: ContextTypes.DEFAULT
         try:
             # Small delay to ensure Telethon has a chance to "see" the user
             await asyncio.sleep(0.5)
-            has_link, bio = await check_user_bio(user_id, chat_id)
+            has_link, bio = await check_user_bio(user_id, chat_id, bot=context.bot)
             if has_link:
                 # If bio link detected, delete the triggering message immediately if it exists
                 if update.message:

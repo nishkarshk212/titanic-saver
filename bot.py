@@ -26,6 +26,7 @@ from sticker_manager import get_sticker_handlers
 from blocking_handler import get_blocking_handlers, get_blocking_command_handlers
 from edit_handler import get_edit_handlers
 from bio_handler import get_bio_handlers
+from join_request import get_join_request_handlers
 from broadcast import broadcast_command
 from antiflood import get_antiflood_handlers
 from nightmode import get_nightmode_handlers
@@ -1393,6 +1394,10 @@ def main():
     for handler in get_tagger_handlers():
         application.add_handler(handler, group=17)
 
+    # Add Join Request handlers
+    for handler in get_join_request_handlers():
+        application.add_handler(handler)
+
     # Start the bot
     print("Bot is starting...")
     
@@ -1467,6 +1472,7 @@ def main():
             BotCommand("blocktext", "Toggle text blocking (Admins only)"),
             BotCommand("blockreaction", "Toggle reaction blocking (Admins only)"),
             BotCommand("free", "Exempt a user (Admins only)"),
+            BotCommand("joinreq", "Manage group join requests (Admins only)"),
         ]
         try:
             await application.bot.set_my_commands(commands)

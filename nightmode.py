@@ -2,9 +2,25 @@
 Night Mode Module - Restrict group activities during specified hours
 """
 
-import logging
-from datetime import datetime
-import pytz
+try:
+    import pytz
+except ImportError:
+    try:
+        import zoneinfo
+        class PytzFallback:
+            def timezone(self, name):
+                try:
+                    return zoneinfo.ZoneInfo(name)
+                except Exception:
+                    import datetime
+                    return datetime.timezone.utc
+        pytz = PytzFallback()
+    except ImportError:
+        import datetime
+        class PytzFallback:
+            def timezone(self, name):
+                return datetime.timezone.utc
+        pytz = PytzFallback()
 from config import colored_button
 from telegram import Update, ChatPermissions
 from telegram.ext import ContextTypes, MessageHandler, filters

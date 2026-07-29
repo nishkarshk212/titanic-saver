@@ -1,4 +1,5 @@
 import re
+import unicodedata
 
 # Mapping of fancy Unicode characters to standard Latin characters
 FONT_MAP = {
@@ -27,13 +28,15 @@ FONT_MAP = {
 
 def normalize_text(text: str) -> str:
     """
-    Normalizes fancy Unicode fonts to standard Latin characters.
+    Normalizes fancy Unicode fonts, circled letters, and font variations to standard Latin characters.
     """
     if not text:
         return ""
     
-    normalized = []
-    for char in text:
-        normalized.append(FONT_MAP.get(char, char))
+    normalized = [FONT_MAP.get(char, char) for char in text]
+    text_mapped = "".join(normalized)
     
-    return "".join(normalized).lower()
+    # NFKD decomposes circled characters like ⓣ -> t, mathematical symbols, fullwidth chars, etc.
+    nfkd = unicodedata.normalize('NFKD', text_mapped)
+    
+    return nfkd.lower()

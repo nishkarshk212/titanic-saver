@@ -226,4 +226,12 @@ except Exception as e:
     import traceback
     traceback.print_exc()
 
+try:
+    from join_request import get_join_request_handlers
+    print("✓ join_request imported")
+except Exception as e:
+    print(f"✗ join_request failed: {e}")
+    import traceback
+    traceback.print_exc()
+
 print("All imports tested!")
