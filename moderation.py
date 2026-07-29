@@ -202,7 +202,7 @@ async def unban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await send_bot_response(update, context, f"✅ Unbanned channel {target_name}.")
         else:
             # It's a user
-            await context.bot.unban_chat_member(chat_id, target_id)
+            await context.bot.unban_chat_member(chat_id, target_id, only_if_banned=False)
             await send_bot_response(update, context, f"✅ Unbanned {target_name}.")
             
         admin_name = update.effective_user.first_name if update.effective_user else "Channel Admin"

@@ -309,14 +309,13 @@ async def unban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await update.message.reply_text("Usage: /unban @username [reason] or reply to a user with /unban [reason]")
     
     try:
-        member = await chat.get_member(user_id)
-        if not isinstance(member, ChatMemberBanned):
-            return await update.message.reply_text("User is not banned.")
-        
-        await chat.unban_member(user_id)
+        if str(user_id).startswith('-100'):
+            await context.bot.unban_chat_sender_chat(chat.id, user_id)
+        else:
+            await context.bot.unban_chat_member(chat.id, user_id, only_if_banned=False)
         
         admin_name = user.full_name
-        text = f"» Unban a user in {chat.title}\n"
+        text = f"» Unbanned user in {chat.title}\n"
         text += f" User  : {name}\n"
         text += f" Admin : {admin_name}"
         if reason:
