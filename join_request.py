@@ -17,9 +17,6 @@ async def handle_chat_join_request(update: Update, context: ContextTypes.DEFAULT
     chat_id = chat.id
     user_id = user.id
 
-ACCEPT_EMOJI_ID = "6296367896398399651"
-REJECT_EMOJI_ID = "6298671811345254603"
-
 async def handle_chat_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handles incoming chat join requests for a group."""
     join_req = update.chat_join_request
@@ -58,9 +55,9 @@ async def handle_chat_join_request(update: Update, context: ContextTypes.DEFAULT
             logging.error(f"Error declining join request for {user_id}: {e}")
 
     else:
-        # Default: Manual approval card sent in chat with custom emoji buttons
-        accept_btn_text = f"#g <tg-emoji emoji-id=\"{ACCEPT_EMOJI_ID}\">✅</tg-emoji> Accept"
-        reject_btn_text = f"#r <tg-emoji emoji-id=\"{REJECT_EMOJI_ID}\">❌</tg-emoji> Decline"
+        # Manual approval card sent in chat with green Accept & red Decline buttons
+        accept_btn_text = "#g ✅ Accept"
+        reject_btn_text = "#r ❌ Decline"
 
         keyboard = InlineKeyboardMarkup([
             [
