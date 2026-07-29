@@ -196,14 +196,13 @@ async def join_request_callback(update: Update, context: ContextTypes.DEFAULT_TY
         if action == "acc":
             try:
                 await context.bot.approve_chat_join_request(chat_id=target_chat_id, user_id=target_user_id)
-                await query.answer("✅ Join request approved!")
                 try:
-                    user_chat = await context.bot.get_chat(target_user_id)
-                    await query.edit_message_text(f"✅ Approved join request for {user_chat.first_name} (<code>{target_user_id}</code>).", parse_mode=ParseMode.HTML)
+                    group_chat = await context.bot.get_chat(target_chat_id)
+                    user_obj = await context.bot.get_chat(target_user_id)
+                    await query.edit_message_text(f"✅ Approved join request for {user_obj.first_name} (<code>{target_user_id}</code>).", parse_mode=ParseMode.HTML)
                     
-                    # Try sending welcome DM
                     from welcome import send_welcome
-                    await send_welcome(user_chat, user_chat, context)
+                    await send_welcome(group_chat, user_obj, context)
                 except Exception:
                     pass
             except Exception as e:

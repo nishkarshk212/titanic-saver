@@ -228,14 +228,31 @@ async def _deliver_welcome_payload(target_id, media_enabled, welcome_media, welc
                     parse_mode=ParseMode.HTML
                 )
         except Exception as e:
-            logging.error(f"Error sending welcome media to {target_id}: {e}")
+            logging.error(f"Error sending welcome media with HTML to {target_id}: {e}")
+            try:
+                if welcome_media_type == "photo":
+                    return await context.bot.send_photo(chat_id=target_id, photo=welcome_media, caption=personal_welcome, reply_markup=reply_markup)
+                elif welcome_media_type == "video":
+                    return await context.bot.send_video(chat_id=target_id, video=welcome_media, caption=personal_welcome, reply_markup=reply_markup)
+                else:
+                    return await context.bot.send_animation(chat_id=target_id, animation=welcome_media, caption=personal_welcome, reply_markup=reply_markup)
+            except Exception as e2:
+                logging.error(f"Media fallback failed for {target_id}: {e2}. Falling back to plain text.")
 
-    return await context.bot.send_message(
-        chat_id=target_id,
-        text=personal_welcome,
-        reply_markup=reply_markup,
-        parse_mode=ParseMode.HTML
-    )
+    try:
+        return await context.bot.send_message(
+            chat_id=target_id,
+            text=personal_welcome,
+            reply_markup=reply_markup,
+            parse_mode=ParseMode.HTML
+        )
+    except Exception as e:
+        logging.error(f"Error sending welcome message with HTML parse mode to {target_id}: {e}. Retrying plain text.")
+        return await context.bot.send_message(
+            chat_id=target_id,
+            text=personal_welcome,
+            reply_markup=reply_markup
+        )
 
 
 async def send_welcome(chat, user, context: ContextTypes.DEFAULT_TYPE):
@@ -401,6 +418,7 @@ def get_welcome_handlers():
         CommandHandler("setwelcome", set_welcome),
         CommandHandler("setphoto", set_welcome_photo),
         CommandHandler("setbutton", set_welcome_button),
+        MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, on_new_member),
         # Handle status changes (detects joins and re-joins reliably)
         ChatMemberHandler(on_chat_member_update, ChatMemberHandler.CHAT_MEMBER)
     ]
