@@ -244,10 +244,37 @@ async def join_request_callback(update: Update, context: ContextTypes.DEFAULT_TY
                     user_obj = await context.bot.get_chat(target_user_id)
                     await query.edit_message_text(f"✅ Approved join request for {user_obj.first_name} (<code>{target_user_id}</code>).", parse_mode=ParseMode.HTML)
                     
+                    # Send personalized Approval & Thank You message in DM
+                    group_title_html = (group_chat.title or "the group").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                    group_mention = f"@{group_chat.username}" if getattr(group_chat, 'username', None) else f"<b>{group_title_html}</b>"
+                    
+                    approval_dm_text = (
+                        f"🎉 <b>Join Request Approved!</b>\n\n"
+                        f"Welcome to {group_mention} {user_obj.mention_html()}! ✨\n"
+                        f"Thank you for your patience while waiting for approval!\n"
+                    )
+                    
+                    try:
+                        await context.bot.send_message(chat_id=target_user_id, text=approval_dm_text, parse_mode=ParseMode.HTML)
+                    except Exception as err:
+                        err_msg = str(err)
+                        if "Forbidden" in err_msg or "can't initiate" in err_msg or "chat not found" in err_msg.lower():
+                            try:
+                                from voice_chat import telethon_client
+                                if telethon_client:
+                                    if not telethon_client.is_connected():
+                                        await telethon_client.connect()
+                                    from bio_handler import _resolve_user_entity
+                                    user_entity = await _resolve_user_entity(telethon_client, target_user_id, chat_id=target_chat_id)
+                                    if user_entity:
+                                        await telethon_client.send_message(user_entity, approval_dm_text, parse_mode='html')
+                            except Exception:
+                                pass
+
                     from welcome import send_welcome
                     await send_welcome(group_chat, user_obj, context)
-                except Exception:
-                    pass
+                except Exception as ex:
+                    logging.error(f"Error post-approval for user {target_user_id}: {ex}")
             except Exception as e:
                 await query.answer(f"Failed to approve: {e}", show_alert=True)
         elif action == "dec":
