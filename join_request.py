@@ -81,6 +81,49 @@ async def handle_chat_join_request(update: Update, context: ContextTypes.DEFAULT
         except Exception as e:
             logging.error(f"Error sending manual join request alert in chat {chat_id}: {e}")
 
+        # Send DM notification to user that their request is pending approval
+        try:
+            group_title_html = (chat.title or "the group").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            group_mention = f"@{chat.username}" if getattr(chat, 'username', None) else f"<b>{group_title_html}</b>"
+            pending_text = (
+                f"⏳ <b>Join Request Received</b>\n\n"
+                f"Hello {user.mention_html()}!\n"
+                f"Your request to join {group_mention} has been received.\n\n"
+                f"📌 <b>Status:</b> <code>Pending Approval</code>\n"
+                f"Please wait while group admins review your request."
+            )
+            bot_info = await context.bot.get_me()
+            start_dm_url = f"https://t.me/{bot_info.username}?start=welcome_{chat_id}"
+            from config import colored_button
+            dm_btn = InlineKeyboardButton(colored_button("💬 Check Request Status", "blue"), url=start_dm_url)
+            pending_markup = InlineKeyboardMarkup([[dm_btn]])
+
+            try:
+                await context.bot.send_message(
+                    chat_id=user_id,
+                    text=pending_text,
+                    reply_markup=pending_markup,
+                    parse_mode=ParseMode.HTML
+                )
+                logging.info(f"Sent join request pending DM notification to user {user_id} for chat {chat_id}")
+            except Exception as e:
+                err_msg = str(e)
+                if "Forbidden" in err_msg or "can't initiate" in err_msg or "chat not found" in err_msg.lower():
+                    try:
+                        from voice_chat import telethon_client
+                        if telethon_client:
+                            if not telethon_client.is_connected():
+                                await telethon_client.connect()
+                            from bio_handler import _resolve_user_entity
+                            user_entity = await _resolve_user_entity(telethon_client, user_id, chat_id=chat_id)
+                            if user_entity:
+                                await telethon_client.send_message(user_entity, pending_text, parse_mode='html')
+                                logging.info(f"Sent join request pending DM notification to user {user_id} via Telethon for chat {chat_id}")
+                    except Exception as te:
+                        logging.debug(f"Telethon pending DM notification failed for user {user_id}: {te}")
+        except Exception as pe:
+            logging.error(f"Error sending pending notification for user {user_id}: {pe}")
+
 
 async def join_request_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Command /joinreq to configure group join request mode."""
