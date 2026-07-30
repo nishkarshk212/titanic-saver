@@ -181,4 +181,4 @@ async def broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 def get_broadcast_handlers():
-    return [CommandHandler("broadcast", broadcast_command)]
+    return [CommandHandler(["broadcast", "gcast", "bcast"], broadcast_command)]
