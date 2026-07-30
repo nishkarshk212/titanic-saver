@@ -8,7 +8,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # MongoDB Configuration
-MONGODB_URI = os.getenv("MONGODB_URI") or os.getenv("MONGO_URI") or "mongodb+srv://mybotpanda_db_user:hx0n5AI90lFGyl93@grouphelp.puxyti8.mongodb.net/?appName=GROUPHELP"
+MONGODB_URI = os.getenv("MONGODB_URI") or os.getenv("MONGO_URI")
+if not MONGODB_URI:
+    logging.error("❌ MONGODB_URI is not set in environment variables!")
 DATABASE_NAME = "GROUPHELP"
 
 # Global database client and database instances
