@@ -199,6 +199,22 @@ async def join_request_command(update: Update, context: ContextTypes.DEFAULT_TYP
     await update.message.reply_text(text, reply_markup=keyboard, parse_mode=ParseMode.HTML)
 
 
+async def can_user_ban(chat_id: int, user_id: int, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    """Check if user is group creator, bot owner, or admin with can_restrict_members permission."""
+    from config import BOT_OWNER_ID
+    if user_id == BOT_OWNER_ID:
+        return True
+    try:
+        member = await context.bot.get_chat_member(chat_id, user_id)
+        if member.status == "creator":
+            return True
+        if member.status == "administrator":
+            return getattr(member, "can_restrict_members", False) or False
+    except Exception as e:
+        logging.error(f"Error checking ban permission for user {user_id} in chat {chat_id}: {e}")
+    return False
+
+
 async def join_request_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Callback query handler for join request buttons."""
     query = update.callback_query
@@ -212,7 +228,7 @@ async def join_request_callback(update: Update, context: ContextTypes.DEFAULT_TY
     # Handle settings toggles
     if data.startswith("joinreq_set_"):
         new_mode = data.replace("joinreq_set_", "")
-        if chat_id and await is_user_admin(chat_id, user_id, context):
+        if chat_id and await can_user_ban(chat_id, user_id, context):
             update_chat_setting(chat_id, "join_request_mode", new_mode)
             await query.answer(f"Join request mode updated to {new_mode.upper()}!")
             
@@ -229,7 +245,7 @@ async def join_request_callback(update: Update, context: ContextTypes.DEFAULT_TY
                 f"⚙️ <b>Join Request Settings</b>\n\n"
                 f"Current Mode: <b>{new_mode.upper()}</b>\n\n"
                 f"Choose how the bot should handle join requests for this group:\n"
-                f"• <b>Auto-Accept:</b> Automatically approves join requests and sends welcome DM.\n"
+                f"• <b>Auto-Accept:</b> Automatically approves join requests.\n"
                 f"• <b>Auto-Decline:</b> Automatically declines join requests.\n"
                 f"• <b>Manual:</b> Prompts admins in group with Accept/Decline buttons."
             )
@@ -238,7 +254,7 @@ async def join_request_callback(update: Update, context: ContextTypes.DEFAULT_TY
             except Exception:
                 pass
         else:
-            await query.answer("Only admins can change settings.", show_alert=True)
+            await query.answer("❌ Only admins with 'Ban Users' permission can change settings.", show_alert=True)
         return
 
     # Handle manual accept/decline buttons: joinreq_acc_{target_chat_id}_{target_user_id}
@@ -248,8 +264,8 @@ async def join_request_callback(update: Update, context: ContextTypes.DEFAULT_TY
         target_chat_id = int(parts[2])
         target_user_id = int(parts[3])
 
-        if not await is_user_admin(target_chat_id, user_id, context):
-            await query.answer("❌ Only group admins can respond to join requests.", show_alert=True)
+        if not await can_user_ban(target_chat_id, user_id, context):
+            await query.answer("❌ Only admins with 'Ban Users' permission can respond to join requests.", show_alert=True)
             return
 
         if action == "acc":
@@ -257,7 +273,6 @@ async def join_request_callback(update: Update, context: ContextTypes.DEFAULT_TY
                 await context.bot.approve_chat_join_request(chat_id=target_chat_id, user_id=target_user_id)
                 try:
                     from telegram import User
-                    group_chat = await context.bot.get_chat(target_chat_id)
                     user_chat = await context.bot.get_chat(target_user_id)
                     user_obj = User(
                         id=target_user_id,
@@ -267,46 +282,26 @@ async def join_request_callback(update: Update, context: ContextTypes.DEFAULT_TY
                         is_bot=False
                     )
                     await query.edit_message_text(f"✅ Approved join request for {user_obj.mention_html()} (<code>{target_user_id}</code>).", parse_mode=ParseMode.HTML)
-                    
-                    # Send approval thank-you message in personal DM
-                    group_title_html = (group_chat.title or "the group").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-                    group_mention = f"@{group_chat.username}" if getattr(group_chat, 'username', None) else f"<b>{group_title_html}</b>"
-                    
-                    approval_dm_text = (
-                        f"🎉 <b>Join Request Approved!</b>\n\n"
-                        f"Welcome to {group_mention} {user_obj.mention_html()}! ✨\n"
-                        f"Thank you for your patience while waiting for approval!"
-                    )
-                    
-                    try:
-                        await context.bot.send_message(chat_id=target_user_id, text=approval_dm_text, parse_mode=ParseMode.HTML)
-                    except Exception as err:
-                        err_msg = str(err)
-                        if "Forbidden" in err_msg or "can't initiate" in err_msg or "chat not found" in err_msg.lower():
-                            try:
-                                from voice_chat import telethon_client
-                                if telethon_client:
-                                    if not telethon_client.is_connected():
-                                        await telethon_client.connect()
-                                    from bio_handler import _resolve_user_entity
-                                    user_entity = await _resolve_user_entity(telethon_client, target_user_id, chat_id=target_chat_id)
-                                    if user_entity:
-                                        await telethon_client.send_message(user_entity, approval_dm_text, parse_mode='html')
-                            except Exception:
-                                pass
                 except Exception as ex:
-                    logging.error(f"Error post-approval for user {target_user_id}: {ex}")
+                    logging.error(f"Error formatting approval message for user {target_user_id}: {ex}")
             except Exception as e:
                 await query.answer(f"Failed to approve: {e}", show_alert=True)
         elif action == "dec":
             try:
                 await context.bot.decline_chat_join_request(chat_id=target_chat_id, user_id=target_user_id)
-                await query.answer("❌ Join request declined!")
                 try:
+                    from telegram import User
                     user_chat = await context.bot.get_chat(target_user_id)
-                    await query.edit_message_text(f"❌ Declined join request for {user_chat.first_name} (<code>{target_user_id}</code>).", parse_mode=ParseMode.HTML)
+                    user_obj = User(
+                        id=target_user_id,
+                        first_name=user_chat.first_name or "User",
+                        last_name=user_chat.last_name,
+                        username=user_chat.username,
+                        is_bot=False
+                    )
+                    await query.edit_message_text(f"❌ Declined join request for {user_obj.mention_html()} (<code>{target_user_id}</code>).", parse_mode=ParseMode.HTML)
                 except Exception:
-                    pass
+                    await query.edit_message_text(f"❌ Declined join request for user <code>{target_user_id}</code>.", parse_mode=ParseMode.HTML)
             except Exception as e:
                 await query.answer(f"Failed to decline: {e}", show_alert=True)
 
