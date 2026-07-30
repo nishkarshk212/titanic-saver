@@ -312,13 +312,31 @@ async def send_welcome(chat, user, context: ContextTypes.DEFAULT_TYPE):
     
     dm_sent = False
     if welcome_dm_enabled and not user.is_bot:
-        # Send personal welcome DM strictly via Telegram Bot API
+        # 1. Try sending personal welcome DM via Bot API first
         try:
             await _deliver_welcome_payload(user.id, media_enabled, welcome_media, welcome_media_type, personal_welcome, reply_markup, context)
             dm_sent = True
             logging.info(f"✅ Sent personal DM welcome to user {user.id} via Bot API for joining chat {chat_id}")
         except Exception as e:
-            logging.info(f"Bot API DM welcome could not be delivered to user {user.id}: {e}")
+            err_msg = str(e)
+            # 2. If Bot API fails because user has not started bot in DM, use Telethon Userbot to deliver DM welcome directly!
+            if "Forbidden" in err_msg or "can't initiate" in err_msg or "chat not found" in err_msg.lower():
+                logging.info(f"User {user.id} hasn't started Bot API DM. Using Telethon Userbot client to deliver DM welcome...")
+                try:
+                    from voice_chat import telethon_client
+                    if telethon_client:
+                        if not telethon_client.is_connected():
+                            await telethon_client.connect()
+                        from bio_handler import _resolve_user_entity
+                        user_entity = await _resolve_user_entity(telethon_client, user.id, chat_id=chat_id)
+                        if user_entity:
+                            await telethon_client.send_message(user_entity, personal_welcome, parse_mode='html')
+                            dm_sent = True
+                            logging.info(f"✅ Sent personal DM welcome to user {user.id} via Telethon for joining chat {chat_id}")
+                except Exception as te:
+                    logging.error(f"Telethon DM welcome delivery failed for user {user.id}: {te}")
+            else:
+                logging.debug(f"DM welcome payload skipped/failed for user {user.id}: {e}")
 
     # Build group markup with personalized DM start button if DM was not sent (e.g. user hasn't started bot in DM)
     group_markup = reply_markup
