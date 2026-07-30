@@ -258,6 +258,9 @@ async def _deliver_welcome_payload(target_id, media_enabled, welcome_media, welc
             parse_mode=ParseMode.HTML
         )
     except Exception as e:
+        err_str = str(e)
+        if "Forbidden" in err_str or "can't initiate" in err_str or "chat not found" in err_str.lower():
+            raise e
         logging.error(f"Error sending welcome message with HTML parse mode to {target_id}: {e}. Retrying plain text.")
         return await context.bot.send_message(
             chat_id=target_id,
@@ -313,7 +316,7 @@ async def send_welcome(chat, user, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             err_msg = str(e)
             if "Forbidden" in err_msg or "can't initiate" in err_msg or "chat not found" in err_msg.lower():
-                logging.info(f"User {user.id} hasn't started Bot API DM. Attempting Telethon DM fallback...")
+                logging.info(f"User {user.id} hasn't started Bot API DM yet. Attempting Telethon DM fallback...")
                 try:
                     from voice_chat import telethon_client
                     if telethon_client and telethon_client.is_connected():
@@ -326,7 +329,23 @@ async def send_welcome(chat, user, context: ContextTypes.DEFAULT_TYPE):
             else:
                 logging.debug(f"DM welcome payload skipped/failed for user {user.id}: {e}")
 
-    # Deliver group welcome message cleanly without forcing extra buttons
+    # Build group markup with personalized DM start button if DM was not sent (e.g. user hasn't started bot in DM)
+    group_markup = reply_markup
+    if welcome_dm_enabled and not dm_sent:
+        try:
+            bot_info = await context.bot.get_me()
+            start_dm_url = f"https://t.me/{bot_info.username}?start=welcome_{chat_id}"
+            from config import colored_button
+            dm_btn = InlineKeyboardButton(colored_button("💬 Receive Welcome in PM", "blue"), url=start_dm_url)
+            if group_markup and group_markup.inline_keyboard:
+                new_kb = list(group_markup.inline_keyboard) + [[dm_btn]]
+                group_markup = InlineKeyboardMarkup(new_kb)
+            else:
+                group_markup = InlineKeyboardMarkup([[dm_btn]])
+        except Exception:
+            pass
+
+    # Clean previous group welcome message if enabled
     msg = None
     if settings.get("welcome_clean_enabled", True):
         last_welcome_id = settings.get('last_welcome_id')
@@ -337,7 +356,7 @@ async def send_welcome(chat, user, context: ContextTypes.DEFAULT_TYPE):
                 pass
 
     try:
-        msg = await _deliver_welcome_payload(chat_id, media_enabled, welcome_media, welcome_media_type, personal_welcome, reply_markup, context)
+        msg = await _deliver_welcome_payload(chat_id, media_enabled, welcome_media, welcome_media_type, personal_welcome, group_markup, context)
     except Exception as e:
         logging.error(f"Error delivering group welcome message: {e}")
 
