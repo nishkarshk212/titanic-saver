@@ -11,11 +11,44 @@ async def handle_chat_join_request(update: Update, context: ContextTypes.DEFAULT
     join_req = update.chat_join_request
     if not join_req:
         return
+async def send_approval_dm(target_user_id: int, user_obj, group_chat, context: ContextTypes.DEFAULT_TYPE):
+    """Sends join request approval confirmation message to user's private chat DM."""
+    try:
+        group_title_html = (group_chat.title or "the group").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        group_mention = f"@{group_chat.username}" if getattr(group_chat, 'username', None) else f"<b>{group_title_html}</b>"
+        
+        approval_text = (
+            f"🎉 <b>Join Request Approved!</b>\n\n"
+            f"Hello {user_obj.mention_html()}!\n"
+            f"Your request to join {group_mention} has been approved! ✨\n\n"
+            f"📌 <b>Status:</b> <code>Approved</code>\n"
+            f"Welcome to the group! Thank you for your patience while waiting for approval."
+        )
 
-    chat = join_req.chat
-    user = join_req.from_user
-    chat_id = chat.id
-    user_id = user.id
+        try:
+            await context.bot.send_message(
+                chat_id=target_user_id,
+                text=approval_text,
+                parse_mode=ParseMode.HTML
+            )
+            logging.info(f"✅ Sent approval DM confirmation to user {target_user_id} via Bot API")
+        except Exception as e:
+            err_msg = str(e)
+            if "Forbidden" in err_msg or "can't initiate" in err_msg or "chat not found" in err_msg.lower():
+                try:
+                    from voice_chat import telethon_client
+                    if telethon_client:
+                        if not telethon_client.is_connected():
+                            await telethon_client.connect()
+                        from bio_handler import _resolve_user_entity
+                        user_entity = await _resolve_user_entity(telethon_client, target_user_id, chat_id=group_chat.id)
+                        if user_entity:
+                            await telethon_client.send_message(user_entity, approval_text, parse_mode='html')
+                            logging.info(f"✅ Sent approval DM confirmation to user {target_user_id} via Telethon")
+                except Exception as te:
+                    logging.error(f"Telethon approval DM failed for user {target_user_id}: {te}")
+    except Exception as ex:
+        logging.error(f"Error building approval DM for user {target_user_id}: {ex}")
 
 async def handle_chat_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handles incoming chat join requests for a group."""
@@ -39,33 +72,7 @@ async def handle_chat_join_request(update: Update, context: ContextTypes.DEFAULT
             await context.bot.approve_chat_join_request(chat_id=chat_id, user_id=user_id)
             logging.info(f"Auto-approved join request for user {user_id} in chat {chat_id}")
             await log_to_channel(context, f"✅ <b>Auto-Approved Join Request</b>\nUser: {user.mention_html()} (<code>{user_id}</code>)\nGroup: <b>{chat.title}</b>")
-            
-            # Send approval DM confirmation message to the approved user
-            group_title_html = (chat.title or "the group").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-            group_mention = f"@{chat.username}" if getattr(chat, 'username', None) else f"<b>{group_title_html}</b>"
-            approval_dm_text = (
-                f"🎉 <b>Join Request Approved!</b>\n\n"
-                f"Welcome to {group_mention} {user.mention_html()}! ✨\n"
-                f"Thank you for your patience while waiting for approval!"
-            )
-            try:
-                await context.bot.send_message(chat_id=user_id, text=approval_dm_text, parse_mode=ParseMode.HTML)
-                logging.info(f"✅ Sent approval DM confirmation to user {user_id} via Bot API")
-            except Exception as err:
-                err_msg = str(err)
-                if "Forbidden" in err_msg or "can't initiate" in err_msg or "chat not found" in err_msg.lower():
-                    try:
-                        from voice_chat import telethon_client
-                        if telethon_client:
-                            if not telethon_client.is_connected():
-                                await telethon_client.connect()
-                            from bio_handler import _resolve_user_entity
-                            user_entity = await _resolve_user_entity(telethon_client, user_id, chat_id=chat_id)
-                            if user_entity:
-                                await telethon_client.send_message(user_entity, approval_dm_text, parse_mode='html')
-                                logging.info(f"✅ Sent approval DM confirmation to user {user_id} via Telethon")
-                    except Exception as te:
-                        logging.error(f"Telethon approval DM failed for user {user_id}: {te}")
+            await send_approval_dm(user_id, user, chat, context)
         except Exception as e:
             logging.error(f"Error approving join request for {user_id}: {e}")
 
@@ -282,6 +289,8 @@ async def join_request_callback(update: Update, context: ContextTypes.DEFAULT_TY
                         is_bot=False
                     )
                     await query.edit_message_text(f"✅ Approved join request for {user_obj.mention_html()} (<code>{target_user_id}</code>).", parse_mode=ParseMode.HTML)
+                    group_chat = await context.bot.get_chat(target_chat_id)
+                    await send_approval_dm(target_user_id, user_obj, group_chat, context)
                 except Exception as ex:
                     logging.error(f"Error formatting approval message for user {target_user_id}: {ex}")
             except Exception as e:
