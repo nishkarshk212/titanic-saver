@@ -240,9 +240,17 @@ async def join_request_callback(update: Update, context: ContextTypes.DEFAULT_TY
             try:
                 await context.bot.approve_chat_join_request(chat_id=target_chat_id, user_id=target_user_id)
                 try:
+                    from telegram import User
                     group_chat = await context.bot.get_chat(target_chat_id)
-                    user_obj = await context.bot.get_chat(target_user_id)
-                    await query.edit_message_text(f"✅ Approved join request for {user_obj.first_name} (<code>{target_user_id}</code>).", parse_mode=ParseMode.HTML)
+                    user_chat = await context.bot.get_chat(target_user_id)
+                    user_obj = User(
+                        id=target_user_id,
+                        first_name=user_chat.first_name or "User",
+                        last_name=user_chat.last_name,
+                        username=user_chat.username,
+                        is_bot=False
+                    )
+                    await query.edit_message_text(f"✅ Approved join request for {user_obj.mention_html()} (<code>{target_user_id}</code>).", parse_mode=ParseMode.HTML)
                     
                     # Send personalized Approval & Thank You message in DM
                     group_title_html = (group_chat.title or "the group").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")

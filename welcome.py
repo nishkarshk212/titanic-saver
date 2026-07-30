@@ -35,7 +35,7 @@ def format_welcome_message(text, user, chat):
         "{NAME}": first_name,
         "{SURNAME}": last_name,
         "{NAMESURNAME}": f"{first_name} {last_name}".strip(),
-        "{LANG}": user.language_code or "Unknown",
+        "{LANG}": getattr(user, 'language_code', None) or "Unknown",
         "{DATE}": now.strftime("%Y-%m-%d"),
         "{TIME}": now.strftime("%H:%M:%S"),
         "{WEEKDAY}": now.strftime("%A"),
