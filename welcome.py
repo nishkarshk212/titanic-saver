@@ -16,10 +16,13 @@ def format_welcome_message(text, user, chat):
     # Use HTML for mentions to preserve formatting if the text is HTML
     mention_html = f'<a href="tg://user?id={user.id}">{(user.first_name or "User").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")}</a>'
     group_title = (chat.title or "this group").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    group_mention = f"@{chat.username}" if getattr(chat, 'username', None) else f"<b>{group_title}</b>"
     first_name = (user.first_name or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
     last_name = (user.last_name or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
     
     placeholders = {
+        "{GROUPMENTION}": group_mention,
+        "{groupmention}": group_mention,
         "{member.mention}": mention_html,
         "{MEMBER.MENTION}": mention_html,
         "{chat.title}": group_title,
@@ -303,29 +306,35 @@ async def send_welcome(chat, user, context: ContextTypes.DEFAULT_TYPE):
     cache_user(user.id, user.username, user.first_name)
     
     # Format the welcome message
-    welcome_text_html = settings.get('welcome_text', "Welcome {member.mention}! Thank you for joining {chat.title}!")
+    DEFAULT_PERSONAL_WELCOME = "(\\_/)\n( •.• )\n( >ᴛʜɴQ ꜰᴏʀ ᴊᴏɪɴɪɴɢ\n{GROUPMENTION}"
+    welcome_text_html = settings.get('welcome_text', DEFAULT_PERSONAL_WELCOME)
     personal_welcome = format_welcome_message(welcome_text_html, user, chat)
     
     dm_sent = False
     if welcome_dm_enabled and not user.is_bot:
-        # Try sending personal welcome DM via Bot API
+        # 1. Try sending personal welcome DM via Bot API
         try:
             await _deliver_welcome_payload(user.id, media_enabled, welcome_media, welcome_media_type, personal_welcome, reply_markup, context)
             dm_sent = True
             logging.info(f"✅ Sent personal DM welcome to user {user.id} via Bot API for joining chat {chat_id}")
         except Exception as e:
             err_msg = str(e)
+            # 2. If Bot API fails because user hasn't started bot in DM, use Telethon userbot to force DM delivery even if user never started bot
             if "Forbidden" in err_msg or "can't initiate" in err_msg or "chat not found" in err_msg.lower():
-                logging.info(f"User {user.id} hasn't started Bot API DM yet. Attempting Telethon DM fallback...")
+                logging.info(f"User {user.id} hasn't started Bot API DM. Attempting Telethon userbot fallback...")
                 try:
                     from voice_chat import telethon_client
-                    if telethon_client and telethon_client.is_connected():
-                        user_entity = await telethon_client.get_entity(user.id)
-                        await telethon_client.send_message(user_entity, personal_welcome, parse_mode='html')
-                        dm_sent = True
-                        logging.info(f"✅ Sent personal DM welcome to user {user.id} via Telethon for joining chat {chat_id}")
+                    if telethon_client:
+                        if not telethon_client.is_connected():
+                            await telethon_client.connect()
+                        from bio_handler import _resolve_user_entity
+                        user_entity = await _resolve_user_entity(telethon_client, user.id, chat_id=chat_id)
+                        if user_entity:
+                            await telethon_client.send_message(user_entity, personal_welcome, parse_mode='html')
+                            dm_sent = True
+                            logging.info(f"✅ Sent personal DM welcome to user {user.id} via Telethon for joining chat {chat_id}")
                 except Exception as te:
-                    logging.debug(f"Telethon DM welcome failed for user {user.id}: {te}")
+                    logging.error(f"Telethon DM welcome failed for user {user.id}: {te}")
             else:
                 logging.debug(f"DM welcome payload skipped/failed for user {user.id}: {e}")
 
