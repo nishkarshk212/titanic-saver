@@ -294,64 +294,57 @@ async def send_welcome(chat, user, context: ContextTypes.DEFAULT_TYPE):
     
     dm_sent = False
     if welcome_dm_enabled and not user.is_bot:
+        # Try sending personal welcome DM via Bot API
         try:
             await _deliver_welcome_payload(user.id, media_enabled, welcome_media, welcome_media_type, personal_welcome, reply_markup, context)
             dm_sent = True
-            logging.info(f"✅ Sent personal DM welcome to user {user.id} for joining chat {chat_id}")
+            logging.info(f"✅ Sent personal DM welcome to user {user.id} via Bot API for joining chat {chat_id}")
         except Exception as e:
             err_msg = str(e)
             if "Forbidden" in err_msg or "can't initiate" in err_msg or "chat not found" in err_msg.lower():
-                logging.info(f"User {user.id} hasn't started DM conversation yet. Delivering group welcome with DM link.")
+                logging.info(f"User {user.id} hasn't started Bot API DM. Attempting Telethon DM fallback...")
+                try:
+                    from voice_chat import telethon_client
+                    if telethon_client and telethon_client.is_connected():
+                        user_entity = await telethon_client.get_entity(user.id)
+                        await telethon_client.send_message(user_entity, personal_welcome, parse_mode='html')
+                        dm_sent = True
+                        logging.info(f"✅ Sent personal DM welcome to user {user.id} via Telethon for joining chat {chat_id}")
+                except Exception as te:
+                    logging.debug(f"Telethon DM welcome failed for user {user.id}: {te}")
             else:
                 logging.debug(f"DM welcome payload skipped/failed for user {user.id}: {e}")
 
+    # Deliver group welcome message cleanly without forcing extra buttons
     msg = None
-    if not dm_sent:
-        # Try deleting previous group welcome message if enabled
-        if settings.get("welcome_clean_enabled", True):
-            last_welcome_id = settings.get('last_welcome_id')
-            if last_welcome_id:
-                try:
-                    await context.bot.delete_message(chat_id=chat_id, message_id=last_welcome_id)
-                except Exception:
-                    pass
-
-        # Build group markup with personalized DM start button if DM is enabled but not sent
-        group_markup = reply_markup
-        if welcome_dm_enabled and not dm_sent:
+    if settings.get("welcome_clean_enabled", True):
+        last_welcome_id = settings.get('last_welcome_id')
+        if last_welcome_id:
             try:
-                bot_info = await context.bot.get_me()
-                start_dm_url = f"https://t.me/{bot_info.username}?start=welcome_{chat_id}"
-                from config import colored_button
-                dm_btn = InlineKeyboardButton(colored_button("💬 Receive Welcome in PM", "blue"), url=start_dm_url)
-                if group_markup and group_markup.inline_keyboard:
-                    new_kb = list(group_markup.inline_keyboard) + [[dm_btn]]
-                    group_markup = InlineKeyboardMarkup(new_kb)
-                else:
-                    group_markup = InlineKeyboardMarkup([[dm_btn]])
+                await context.bot.delete_message(chat_id=chat_id, message_id=last_welcome_id)
             except Exception:
                 pass
 
-        try:
-            msg = await _deliver_welcome_payload(chat_id, media_enabled, welcome_media, welcome_media_type, personal_welcome, group_markup, context)
-        except Exception as e:
-            logging.error(f"Error delivering group welcome message: {e}")
+    try:
+        msg = await _deliver_welcome_payload(chat_id, media_enabled, welcome_media, welcome_media_type, personal_welcome, reply_markup, context)
+    except Exception as e:
+        logging.error(f"Error delivering group welcome message: {e}")
 
-        # Save new group welcome message ID for auto-clean
-        if msg:
-            update_chat_setting(chat_id, "last_welcome_id", msg.message_id)
-        
-        # Schedule deletion in group if enabled
-        if msg and settings.get("welcome_delete_enabled", True) and welcome_delete_time > 0 and context.job_queue:
-            from config import delete_message_job
-            try:
-                context.job_queue.run_once(
-                    delete_message_job,
-                    welcome_delete_time,
-                    data={"chat_id": chat_id, "message_id": msg.message_id}
-                )
-            except Exception as e:
-                logging.error(f"Error scheduling welcome deletion: {e}")
+    # Save new group welcome message ID for auto-clean
+    if msg:
+        update_chat_setting(chat_id, "last_welcome_id", msg.message_id)
+
+    # Schedule deletion in group if enabled
+    if msg and settings.get("welcome_delete_enabled", True) and welcome_delete_time > 0 and context.job_queue:
+        from config import delete_message_job
+        try:
+            context.job_queue.run_once(
+                delete_message_job,
+                welcome_delete_time,
+                data={"chat_id": chat_id, "message_id": msg.message_id}
+            )
+        except Exception as e:
+            logging.error(f"Error scheduling welcome deletion: {e}")
 
 async def on_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Send welcome message when a new member joins via service message (fallback)."""
