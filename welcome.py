@@ -381,8 +381,93 @@ async def on_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if member.is_bot: continue
         await send_welcome(update.effective_chat, member, context)
 
+async def send_goodbye(chat, user, context: ContextTypes.DEFAULT_TYPE):
+    """Sends a personalized goodbye message to a user who left or was removed from a group."""
+    chat_id = chat.id
+    settings = get_chat_settings(chat_id)
+    
+    if not settings.get("goodbye_enabled", True):
+        return
+
+    DEFAULT_GOODBYE = "Goodbye {member.mention}!\nWe are sorry to see you leave {GROUPMENTION}. Hope to see you back again soon! 👋"
+    goodbye_text_html = settings.get('goodbye_text', DEFAULT_GOODBYE)
+    goodbye_message = format_welcome_message(goodbye_text_html, user, chat)
+    
+    # 1. Try sending personal goodbye DM via Bot API
+    try:
+        await context.bot.send_message(
+            chat_id=user.id,
+            text=goodbye_message,
+            parse_mode=ParseMode.HTML
+        )
+        logging.info(f"✅ Sent personal DM goodbye to user {user.id} via Bot API for leaving chat {chat_id}")
+    except Exception as e:
+        err_msg = str(e)
+        # 2. If Bot API fails (user hasn't started bot in DM), use Telethon Userbot fallback
+        if "Forbidden" in err_msg or "can't initiate" in err_msg or "chat not found" in err_msg.lower():
+            logging.info(f"User {user.id} hasn't started Bot API DM. Using Telethon Userbot client to deliver goodbye DM...")
+            try:
+                from voice_chat import telethon_client
+                if telethon_client:
+                    if not telethon_client.is_connected():
+                        await telethon_client.connect()
+                    from bio_handler import _resolve_user_entity
+                    user_entity = await _resolve_user_entity(telethon_client, user.id, chat_id=chat_id)
+                    if user_entity:
+                        await telethon_client.send_message(user_entity, goodbye_message, parse_mode='html')
+                        logging.info(f"✅ Sent personal DM goodbye to user {user.id} via Telethon for leaving chat {chat_id}")
+            except Exception as te:
+                logging.error(f"Telethon DM goodbye delivery failed for user {user.id}: {te}")
+        else:
+            logging.debug(f"Goodbye payload skipped/failed for user {user.id}: {e}")
+
+
+async def set_goodbye(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Command /setgoodbye to customize group goodbye message."""
+    if not update.effective_chat or not update.effective_user:
+        return
+        
+    chat_id = update.effective_chat.id
+    user_id = update.effective_user.id
+    
+    if update.effective_chat.type == "private":
+        await update.message.reply_text("This command can only be used in groups.")
+        return
+        
+    if not await is_user_admin(chat_id, user_id, context):
+        await update.message.reply_text("❌ Admin only command.")
+        return
+        
+    if not context.args:
+        await update.message.reply_text(
+            "👋 <b>Set Goodbye Message</b>\n\n"
+            "Usage: <code>/setgoodbye <your message></code>\n\n"
+            "<b>Available Placeholders:</b>\n"
+            "• <code>{member.mention}</code> - User mention\n"
+            "• <code>{chat.title}</code> - Group title\n"
+            "• <code>{GROUPMENTION}</code> - Group mention",
+            parse_mode=ParseMode.HTML
+        )
+        return
+        
+    goodbye_text = " ".join(context.args)
+    update_chat_setting(chat_id, "goodbye_text", goodbye_text)
+    update_chat_setting(chat_id, "goodbye_enabled", True)
+    await update.message.reply_text("✅ <b>Goodbye message updated successfully!</b>", parse_mode=ParseMode.HTML)
+
+
+async def on_left_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle StatusUpdate.LEFT_CHAT_MEMBER."""
+    if not update.message or not update.message.left_chat_member:
+        return
+    member = update.message.left_chat_member
+    if member.is_bot or member.id == context.bot.id:
+        return
+    await send_goodbye(update.effective_chat, member, context)
+
+
 async def on_chat_member_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle chat member status changes to detect joins/re-joins."""
+    """Handle chat member status changes to detect joins/re-joins/leaves."""
     result = update.chat_member
     if not result:
         return
@@ -412,7 +497,7 @@ async def on_chat_member_update(update: Update, context: ContextTypes.DEFAULT_TY
     # Active statuses that should receive a welcome message
     active_statuses = ['member', 'administrator', 'restricted']
     
-    # Non-active statuses from which a user can "join"
+    # Non-active statuses from which a user can "join" or to which a user can "leave"
     inactive_statuses = ['left', 'kicked', 'none']
 
     # Trigger welcome if moving from inactive to active
@@ -430,14 +515,24 @@ async def on_chat_member_update(update: Update, context: ContextTypes.DEFAULT_TY
                 return
         
         await send_welcome(update.effective_chat, member, context)
+        return
+
+    # Trigger goodbye if moving from active to inactive (user left or was removed)
+    is_leaving = old_status in active_statuses and new_status in inactive_statuses
+    if is_leaving:
+        member = result.old_chat_member.user
+        if not member.is_bot and member.id != context.bot.id:
+            await send_goodbye(update.effective_chat, member, context)
 
 def get_welcome_handlers():
-    """Return handlers for welcome message."""
+    """Return handlers for welcome & goodbye messages."""
     return [
         CommandHandler("setwelcome", set_welcome),
         CommandHandler("setphoto", set_welcome_photo),
         CommandHandler("setbutton", set_welcome_button),
+        CommandHandler("setgoodbye", set_goodbye),
         MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, on_new_member),
-        # Handle status changes (detects joins and re-joins reliably)
+        MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, on_left_chat_member),
+        # Handle status changes (detects joins, re-joins, and leaves reliably)
         ChatMemberHandler(on_chat_member_update, ChatMemberHandler.CHAT_MEMBER)
     ]
