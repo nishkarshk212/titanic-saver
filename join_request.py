@@ -92,17 +92,10 @@ async def handle_chat_join_request(update: Update, context: ContextTypes.DEFAULT
                 f"📌 <b>Status:</b> <code>Pending Approval</code>\n"
                 f"Please wait while group admins review your request."
             )
-            bot_info = await context.bot.get_me()
-            start_dm_url = f"https://t.me/{bot_info.username}?start=welcome_{chat_id}"
-            from config import colored_button
-            dm_btn = InlineKeyboardButton(colored_button("💬 Check Request Status", "blue"), url=start_dm_url)
-            pending_markup = InlineKeyboardMarkup([[dm_btn]])
-
             try:
                 await context.bot.send_message(
                     chat_id=user_id,
                     text=pending_text,
-                    reply_markup=pending_markup,
                     parse_mode=ParseMode.HTML
                 )
                 logging.info(f"Sent join request pending DM notification to user {user_id} for chat {chat_id}")

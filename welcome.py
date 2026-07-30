@@ -338,21 +338,8 @@ async def send_welcome(chat, user, context: ContextTypes.DEFAULT_TYPE):
             else:
                 logging.debug(f"DM welcome payload skipped/failed for user {user.id}: {e}")
 
-    # Build group markup with personalized DM start button if DM was not sent (e.g. user hasn't started bot in DM)
+    # Group welcome markup
     group_markup = reply_markup
-    if welcome_dm_enabled and not dm_sent:
-        try:
-            bot_info = await context.bot.get_me()
-            start_dm_url = f"https://t.me/{bot_info.username}?start=welcome_{chat_id}"
-            from config import colored_button
-            dm_btn = InlineKeyboardButton(colored_button("💬 Receive Welcome in PM", "blue"), url=start_dm_url)
-            if group_markup and group_markup.inline_keyboard:
-                new_kb = list(group_markup.inline_keyboard) + [[dm_btn]]
-                group_markup = InlineKeyboardMarkup(new_kb)
-            else:
-                group_markup = InlineKeyboardMarkup([[dm_btn]])
-        except Exception:
-            pass
 
     # Clean previous group welcome message if enabled
     msg = None
