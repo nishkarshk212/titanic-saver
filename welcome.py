@@ -14,20 +14,31 @@ def format_welcome_message(text, user, chat):
     
     # Placeholders dictionary
     # Use HTML for mentions to preserve formatting if the text is HTML
-    mention_html = f'<a href="tg://user?id={user.id}">{user.first_name}</a>'
+    mention_html = f'<a href="tg://user?id={user.id}">{(user.first_name or "User").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")}</a>'
+    group_title = (chat.title or "this group").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    first_name = (user.first_name or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    last_name = (user.last_name or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
     
     placeholders = {
+        "{member.mention}": mention_html,
+        "{MEMBER.MENTION}": mention_html,
+        "{chat.title}": group_title,
+        "{CHAT.TITLE}": group_title,
+        "{member.first_name}": first_name,
+        "{member.id}": str(user.id),
+        "{title}": group_title,
+        "{TITLE}": group_title,
         "{ID}": str(user.id),
-        "{NAME}": (user.first_name or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"),
-        "{SURNAME}": (user.last_name or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"),
-        "{NAMESURNAME}": f"{(user.first_name or '').replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')} {(user.last_name or '').replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')}".strip(),
+        "{NAME}": first_name,
+        "{SURNAME}": last_name,
+        "{NAMESURNAME}": f"{first_name} {last_name}".strip(),
         "{LANG}": user.language_code or "Unknown",
         "{DATE}": now.strftime("%Y-%m-%d"),
         "{TIME}": now.strftime("%H:%M:%S"),
         "{WEEKDAY}": now.strftime("%A"),
         "{MENTION}": mention_html,
         "{USERNAME}": f"@{user.username}" if user.username else "No Username",
-        "{GROUPNAME}": (chat.title or "this group").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"),
+        "{GROUPNAME}": group_title,
         "{RULES}": "/rules" 
     }
     
@@ -289,7 +300,7 @@ async def send_welcome(chat, user, context: ContextTypes.DEFAULT_TYPE):
     cache_user(user.id, user.username, user.first_name)
     
     # Format the welcome message
-    welcome_text_html = settings.get('welcome_text', "Welcome {NAME} to the group!")
+    welcome_text_html = settings.get('welcome_text', "Welcome {member.mention}! Thank you for joining {chat.title}!")
     personal_welcome = format_welcome_message(welcome_text_html, user, chat)
     
     dm_sent = False
