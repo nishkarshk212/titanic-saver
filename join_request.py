@@ -40,9 +40,32 @@ async def handle_chat_join_request(update: Update, context: ContextTypes.DEFAULT
             logging.info(f"Auto-approved join request for user {user_id} in chat {chat_id}")
             await log_to_channel(context, f"✅ <b>Auto-Approved Join Request</b>\nUser: {user.mention_html()} (<code>{user_id}</code>)\nGroup: <b>{chat.title}</b>")
             
-            # Send DM welcome message to the approved user
-            from welcome import send_welcome
-            await send_welcome(chat, user, context)
+            # Send approval DM confirmation message to the approved user
+            group_title_html = (chat.title or "the group").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            group_mention = f"@{chat.username}" if getattr(chat, 'username', None) else f"<b>{group_title_html}</b>"
+            approval_dm_text = (
+                f"🎉 <b>Join Request Approved!</b>\n\n"
+                f"Welcome to {group_mention} {user.mention_html()}! ✨\n"
+                f"Thank you for your patience while waiting for approval!"
+            )
+            try:
+                await context.bot.send_message(chat_id=user_id, text=approval_dm_text, parse_mode=ParseMode.HTML)
+                logging.info(f"✅ Sent approval DM confirmation to user {user_id} via Bot API")
+            except Exception as err:
+                err_msg = str(err)
+                if "Forbidden" in err_msg or "can't initiate" in err_msg or "chat not found" in err_msg.lower():
+                    try:
+                        from voice_chat import telethon_client
+                        if telethon_client:
+                            if not telethon_client.is_connected():
+                                await telethon_client.connect()
+                            from bio_handler import _resolve_user_entity
+                            user_entity = await _resolve_user_entity(telethon_client, user_id, chat_id=chat_id)
+                            if user_entity:
+                                await telethon_client.send_message(user_entity, approval_dm_text, parse_mode='html')
+                                logging.info(f"✅ Sent approval DM confirmation to user {user_id} via Telethon")
+                    except Exception as te:
+                        logging.error(f"Telethon approval DM failed for user {user_id}: {te}")
         except Exception as e:
             logging.error(f"Error approving join request for {user_id}: {e}")
 
