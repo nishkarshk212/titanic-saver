@@ -83,6 +83,8 @@ DEFAULT_CHAT_SETTINGS = {
     "vc_safety_enabled": False,
     "vc_panic_mode_enabled": False,
     "tagger_enabled": True,
+    "premium_boost_enabled": True,
+    "premium_boost_count": 4,
     # Recurring messages settings
     "recurring_messages": [
         {
