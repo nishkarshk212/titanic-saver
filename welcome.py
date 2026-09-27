@@ -377,9 +377,19 @@ async def on_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.new_chat_members:
         return
         
+    chat = update.effective_chat
+    chat_id = chat.id
+    settings = get_chat_settings(chat_id)
     for member in update.message.new_chat_members:
         if member.is_bot: continue
-        await send_welcome(update.effective_chat, member, context)
+        if settings.get("premium_boost_enabled", True):
+            from premium_boost import is_premium_user, is_user_boost_verified, handle_premium_user_join
+            from user_manager_mongo import is_user_admin
+            if is_premium_user(member) and member.id != OWNER_ID and not await is_user_admin(chat_id, member.id, context):
+                if not is_user_boost_verified(chat_id, member.id):
+                    await handle_premium_user_join(context.bot, chat, member, context)
+                    continue
+        await send_welcome(chat, member, context)
 
 async def on_chat_member_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle chat member status changes to detect joins/re-joins."""
@@ -428,6 +438,15 @@ async def on_chat_member_update(update: Update, context: ContextTypes.DEFAULT_TY
             if not settings.get("welcome_rejoin_enabled", True):
                 logging.info(f"Skipping welcome for re-joining user {member.id} in {chat_id} as welcome_rejoin_enabled is False")
                 return
+
+        # If user is premium and premium boost is enabled, trigger captcha and skip normal welcome
+        if settings.get("premium_boost_enabled", True):
+            from premium_boost import is_premium_user, is_user_boost_verified, handle_premium_user_join
+            from user_manager_mongo import is_user_admin
+            if is_premium_user(member) and member.id != OWNER_ID and not await is_user_admin(chat_id, member.id, context):
+                if not is_user_boost_verified(chat_id, member.id):
+                    await handle_premium_user_join(context.bot, update.effective_chat, member, context)
+                    return
         
         await send_welcome(update.effective_chat, member, context)
 
