@@ -23,7 +23,15 @@ def confirmation_keyboard(cmd):
 
 async def ask_mass_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Ask for confirmation before mass action."""
-    cmd = update.message.command[0].lower() if update.message.command else (context.args[0].lower() if context.args else None)
+    cmd = None
+    if update.message and update.message.text:
+        first_token = update.message.text.split()[0]
+        if first_token.startswith(('/', '!')):
+            cmd = first_token[1:].split('@')[0].lower()
+    
+    if not cmd and context.args:
+        cmd = context.args[0].lower()
+
     if not cmd or cmd not in MASS_CMDS:
         return
     
