@@ -199,11 +199,16 @@ async def check_bot_permission(update: Update, context: ContextTypes.DEFAULT_TYP
         if bot_member.status != 'administrator':
             return False, "❌ I need to be an administrator to perform this action."
             
-        if getattr(bot_member, permission, False):
+        perm_map = {
+            'can_ban_users': 'can_restrict_members',
+        }
+        attr = perm_map.get(permission, permission)
+        if getattr(bot_member, attr, False):
             return True, None
             
         perm_names = {
             'can_restrict_members': "Ban Users",
+            'can_ban_users': "Ban Users",
             'can_promote_members': "Add New Admins",
             'can_pin_messages': "Pin Messages",
             'can_delete_messages': "Delete Messages",

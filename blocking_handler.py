@@ -286,7 +286,10 @@ async def handle_blocking(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return False
         
     user_id = update.effective_user.id
-    user_perms = settings.get("user_permissions", {}).get(str(user_id), {})
+    raw_user_perms = settings.get("user_permissions") or {}
+    user_perms = raw_user_perms.get(str(user_id)) or raw_user_perms.get(user_id) or {}
+    if not isinstance(user_perms, dict):
+        user_perms = {}
     
     # Debug logging
     logging.info(f"[BLOCKING] User {user_id}, user_perms={user_perms}")
@@ -681,27 +684,29 @@ async def free_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     # Get current settings
+    # Get current settings
     settings = get_chat_settings(chat_id)
-    user_permissions = settings.get("user_permissions", {})
+    user_permissions = settings.get("user_permissions") or {}
+    if not isinstance(user_permissions, dict):
+        user_permissions = {}
     
     # Check if user is already freed
     user_id_str = str(target_user_id)
-    already_freed = user_id_str in user_permissions
+    exemptions = user_permissions.get(user_id_str) or user_permissions.get(target_user_id) or {}
+    already_freed = bool(exemptions) or (user_id_str in user_permissions) or (target_user_id in user_permissions)
     
     # Define labels for permissions
     blocking_labels = {
         "block_stickers": "🎫 Stickers",
         "block_premium_sticker": "✨ Premium",
+        "block_bio_link": "🔗 Bio Link",
     }
     
     if already_freed:
-        # Get existing exemptions
-        exemptions = user_permissions[user_id_str]
-        
         # List which ones are freed (True)
         freed_list = []
         for key, label in blocking_labels.items():
-            if exemptions.get(key, False):
+            if exemptions.get(key, False) or (key == "block_bio_link" and (exemptions.get("bio_link") or exemptions.get("bio"))):
                 freed_list.append(f"• {label} ✅")
         
         random_emoji = get_random_premium_emoji()
@@ -725,10 +730,8 @@ async def free_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"ᴛᴏɢɢʟᴇ ꜰᴇᴀᴛᴜʀᴇꜱ ᴛᴏ ᴀʟʟᴏᴡ ᴛʜᴇᴍ ᴛᴏ ꜱᴇɴᴅ ᴄᴏɴᴛᴇɴᴛ:"
         )
     
-    # Create keyboard with permission button
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton(colored_button("🛡 Permissions", "blue"), callback_data=f"free_perms_{chat_id}_{target_user_id}")]
-    ])
+    # Create keyboard with permission options directly
+    keyboard = get_user_permission_keyboard(chat_id, target_user_id, settings)
     
     await send_bot_response(update, context, message_text, reply_markup=keyboard, parse_mode="HTML")
 
@@ -772,12 +775,21 @@ async def unfree_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Get current settings
     settings = get_chat_settings(chat_id)
-    user_permissions = settings.get("user_permissions", {})
+    user_permissions = settings.get("user_permissions") or {}
+    if not isinstance(user_permissions, dict):
+        user_permissions = {}
     
     # Remove user from permissions
     user_id_str = str(target_user_id)
+    removed = False
     if user_id_str in user_permissions:
         del user_permissions[user_id_str]
+        removed = True
+    if target_user_id in user_permissions:
+        del user_permissions[target_user_id]
+        removed = True
+        
+    if removed:
         update_chat_setting(chat_id, "user_permissions", user_permissions)
         await send_bot_response(update, context, 
             f"❌ <b>{user_name}</b> is no longer exempt from blocking rules.")
@@ -814,6 +826,7 @@ async def list_freed_members(update: Update, context: ContextTypes.DEFAULT_TYPE)
     blocking_labels = {
         "block_stickers": "🎫",
         "block_premium_sticker": "✨",
+        "block_bio_link": "🔗",
     }
 
     from user_manager_mongo import resolve_username
@@ -957,9 +970,11 @@ async def handle_message_blocking(update: Update, context: ContextTypes.DEFAULT_
 
 def get_user_permission_keyboard(chat_id, user_id, settings):
     """Get keyboard for user permission settings."""
-    # Convert to string for MongoDB compatibility
     user_id_str = str(user_id)
-    user_perms = settings.get("user_permissions", {}).get(user_id_str, {})
+    raw_perms = settings.get("user_permissions") or {}
+    user_perms = raw_perms.get(user_id_str) or raw_perms.get(user_id) or {}
+    if not isinstance(user_perms, dict):
+        user_perms = {}
     
     logging.info(f"[KEYBOARD] Building keyboard for chat {chat_id}, user {user_id_str}, perms: {user_perms}")
     
@@ -968,6 +983,7 @@ def get_user_permission_keyboard(chat_id, user_id, settings):
     blocking_options = [
         ("block_stickers", "🎫 Stickers"),
         ("block_premium_sticker", "✨ Premium"),
+        ("block_bio_link", "🔗 Bio Link"),
     ]
     
     keyboard = []
@@ -975,14 +991,20 @@ def get_user_permission_keyboard(chat_id, user_id, settings):
         row = []
         key1, label1 = blocking_options[i]
         # True = FREED/ALLOWED ✅, False = BLOCKED ❌
-        value1 = user_perms.get(key1, False)
+        if key1 == "block_bio_link":
+            value1 = bool(user_perms.get("block_bio_link") or user_perms.get("bio_link") or user_perms.get("bio"))
+        else:
+            value1 = bool(user_perms.get(key1, False))
         status1 = "✅" if value1 else "❌"
         color1 = "green" if value1 else "red"
         row.append(InlineKeyboardButton(colored_button(f"{label1} {status1}", color1), callback_data=f"free_toggle_{chat_id}_{user_id}_{key1}"))
         
         if i + 1 < len(blocking_options):
             key2, label2 = blocking_options[i + 1]
-            value2 = user_perms.get(key2, False)
+            if key2 == "block_bio_link":
+                value2 = bool(user_perms.get("block_bio_link") or user_perms.get("bio_link") or user_perms.get("bio"))
+            else:
+                value2 = bool(user_perms.get(key2, False))
             status2 = "✅" if value2 else "❌"
             color2 = "green" if value2 else "red"
             row.append(InlineKeyboardButton(colored_button(f"{label2} {status2}", color2), callback_data=f"free_toggle_{chat_id}_{user_id}_{key2}"))
@@ -1069,16 +1091,36 @@ async def free_permission_toggle(update: Update, context: ContextTypes.DEFAULT_T
     logging.info(f"[TOGGLE] Starting toggle for chat {chat_id}, user {user_id_str}, key: {perm_key}")
     
     # Get current permissions from database
-    user_permissions = settings.get("user_permissions", {})
+    user_permissions = settings.get("user_permissions") or {}
+    if not isinstance(user_permissions, dict):
+        user_permissions = {}
     
-    # Initialize user permissions if not exists
-    if user_id_str not in user_permissions:
-        user_permissions[user_id_str] = {}
+    # Initialize user permissions if not exists (check both str and int keys)
+    target_entry = None
+    if user_id_str in user_permissions:
+        target_entry = user_permissions[user_id_str]
+    elif user_id in user_permissions:
+        target_entry = user_permissions.pop(user_id)
+        user_permissions[user_id_str] = target_entry
+    else:
+        target_entry = {}
+        user_permissions[user_id_str] = target_entry
+        
+    if not isinstance(target_entry, dict):
+        target_entry = {}
+        user_permissions[user_id_str] = target_entry
     
     # Get current value and toggle it
-    current_value = user_permissions[user_id_str].get(perm_key, False)
+    if perm_key == "block_bio_link":
+        current_value = bool(target_entry.get("block_bio_link") or target_entry.get("bio_link") or target_entry.get("bio"))
+    else:
+        current_value = bool(target_entry.get(perm_key, False))
+        
     new_value = not current_value
-    user_permissions[user_id_str][perm_key] = new_value
+    target_entry[perm_key] = new_value
+    if perm_key == "block_bio_link":
+        target_entry["bio_link"] = new_value
+        target_entry["bio"] = new_value
     
     logging.info(f"[TOGGLE] {perm_key} changed from {current_value} to {new_value}")
     
@@ -1089,7 +1131,7 @@ async def free_permission_toggle(update: Update, context: ContextTypes.DEFAULT_T
     # Refresh the keyboard with updated permissions
     import copy
     temp_settings = copy.deepcopy(settings)
-    if 'user_permissions' not in temp_settings:
+    if 'user_permissions' not in temp_settings or not isinstance(temp_settings['user_permissions'], dict):
         temp_settings['user_permissions'] = {}
     temp_settings['user_permissions'][user_id_str] = user_permissions[user_id_str]
     

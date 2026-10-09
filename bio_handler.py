@@ -123,9 +123,13 @@ async def check_user_bio(user_id, chat_id=None, bot=None):
 
 
 async def apply_bio_penalty(update: Update, context, user_id: int, bio: Optional[str] = None):
-    """Applies the configured penalty for having a link in bio."""
     chat_id = update.effective_chat.id
     settings = get_chat_settings(chat_id)
+    # Check if user is freed from bio link check via /free
+    user_perms = (settings.get("user_permissions") or {}).get(str(user_id)) or (settings.get("user_permissions") or {}).get(user_id) or {}
+    if user_perms.get("block_bio_link") or user_perms.get("bio_link") or user_perms.get("bio"):
+        logging.info(f"[BIO] User {user_id} is freed from bio link check in chat {chat_id}, skipping penalty")
+        return
 
     penalty = settings.get("bio_link_penalty", "warn").lower()
     if penalty == "off":
@@ -238,15 +242,33 @@ async def bio_link_message_handler(update: Update, context: ContextTypes.DEFAULT
         return
     elif target == "admin" and not is_admin:
         return
-    # if target is "everyone", we don't return early
+    # Check if user is freed from bio link check via /free
+    user_perms = (settings.get("user_permissions") or {}).get(str(user_id)) or (settings.get("user_permissions") or {}).get(user_id) or {}
+    if user_perms.get("block_bio_link") or user_perms.get("bio_link") or user_perms.get("bio"):
+        logging.info(f"[BIO] User {user_id} is freed from bio link check in chat {chat_id}")
+        return
 
     # Run the check in the background to not block the main message loop
     async def run_background_check():
         try:
+            # Re-check exemption before checking bio
+            fresh_settings = get_chat_settings(chat_id)
+            fresh_perms = (fresh_settings.get("user_permissions") or {}).get(str(user_id)) or (fresh_settings.get("user_permissions") or {}).get(int(user_id)) or {}
+            if fresh_perms.get("block_bio_link") or fresh_perms.get("bio_link") or fresh_perms.get("bio"):
+                logging.info(f"[BIO] User {user_id} is freed from bio link check in chat {chat_id}")
+                return
+
             # Small delay to ensure Telethon has a chance to "see" the user
             await asyncio.sleep(0.5)
             has_link, bio = await check_user_bio(user_id, chat_id, bot=context.bot)
             if has_link:
+                # Re-check exemption after bio check
+                fresh_settings = get_chat_settings(chat_id)
+                fresh_perms = (fresh_settings.get("user_permissions") or {}).get(str(user_id)) or (fresh_settings.get("user_permissions") or {}).get(int(user_id)) or {}
+                if fresh_perms.get("block_bio_link") or fresh_perms.get("bio_link") or fresh_perms.get("bio"):
+                    logging.info(f"[BIO] User {user_id} is freed from bio link check in chat {chat_id}, suppressing deletion/penalty")
+                    return
+
                 # If bio link detected, delete the triggering message immediately if it exists
                 if update.message:
                     try:
