@@ -69,6 +69,7 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "🛡️ <b>Moderation Commands</b>\n\n"
             "• /ban - Ban a user (reply, ID, or @username)\n"
             "• /unban - Unban a user\n"
+            "• /unbanall, /unabnall - Unban all banned members in the group\n"
             "• /mute - Mute a user (prevents sending messages)\n"
             "• /unmute - Unmute a user\n"
             "• /warn - Give a user a warning\n"

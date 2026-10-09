@@ -52,7 +52,7 @@ Commands for managing group settings:
 Owner/Admin-only mass commands with confirmation:
 - `/kickall` - Kick all non-admin members
 - `/banall` - Ban all non-admin members
-- `/unbanall` - Unban all banned members
+- `/unbanall`, `/unabnall` - Unban all banned members
 - `/muteall` - Mute all non-admin members
 - `/unmuteall` - Unmute all members
 - `/unpinall` - Unpin all messages

@@ -126,6 +126,7 @@ python bot.py
 | `/mute` | Mute user |
 | `/ban` | Ban user |
 | `/unban` | Unban user |
+| `/unbanall`, `/unabnall` | Unban all banned users |
 
 ---
 
